@@ -32,6 +32,10 @@ _Avoid_: Command-specific configuration, vendor-specific command model
 The owned, observable realization of one Scenario in a Simulation Target. Its identity bounds reconciliation, status reporting, updates, and cleanup so simulated state cannot be confused with pre-existing cluster state.
 _Avoid_: Unowned mutation, anonymous mock state
 
+**Fidelity Mode（保真模式）**:
+A declared boundary of Kubernetes behavior that a Scenario Instance promises to exercise and report truthfully. A Fidelity Mode distinguishes observed scheduler or control-plane behavior from node-runtime protocols and real accelerator computation that were not exercised.
+_Avoid_: Backend, implementation mode, hardware fidelity
+
 **Vendor Profile（厂商配置档案）**:
 A source-backed declaration of the Kubernetes-visible resource names, labels, device classes, and scheduling attributes exposed by one accelerator ecosystem. Vendor Profiles extend the vendor-neutral core without introducing vendor branches into it.
 _Avoid_: Vendor-specific engine, hard-coded vendor path
