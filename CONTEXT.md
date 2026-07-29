@@ -29,8 +29,20 @@ A declarative, reproducible description of simulated accelerator capacity and it
 _Avoid_: Command-specific configuration, vendor-specific command model
 
 **Scenario Instance（场景实例）**:
-The owned, observable realization of one Scenario in a Simulation Target. Its identity bounds reconciliation, status reporting, updates, and cleanup so simulated state cannot be confused with pre-existing cluster state.
+The target-scoped, owned, and observable realization of a Scenario. A Scenario Instance has a stable identity and advances through immutable Scenario Revisions, bounding reconciliation, status, updates, and cleanup.
 _Avoid_: Unowned mutation, anonymous mock state
+
+**Scenario Revision（场景修订版）**:
+An immutable, normalized desired state accepted for a Scenario Instance. Capacity, health, placement, or scale changes create a new revision instead of an imperative side channel or embedded time script.
+_Avoid_: Mutable command state, workflow timeline
+
+**Node Group（节点组）**:
+A named homogeneous template and replica count for Synthetic Nodes in a Scenario. Different capacity, placement, or Accelerator composition is represented by a different Node Group rather than per-node overrides.
+_Avoid_: Individual node manifest, backend node template
+
+**Accelerator Pool（加速器池）**:
+A named homogeneous set of simulated Accelerator units repeated on every Synthetic Node in a Node Group, with one Vendor Profile, Accelerator Model, Resource Contract, variant, total count, and healthy count.
+_Avoid_: Arbitrary resource map, physical device inventory
 
 **Fidelity Mode（保真模式）**:
 A declared boundary of Kubernetes behavior that a Scenario Instance promises to exercise and report truthfully. A Fidelity Mode distinguishes observed scheduler or control-plane behavior from node-runtime protocols and real accelerator computation that were not exercised.
