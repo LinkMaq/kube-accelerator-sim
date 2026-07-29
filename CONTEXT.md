@@ -37,9 +37,17 @@ A declared boundary of Kubernetes behavior that a Scenario Instance promises to 
 _Avoid_: Backend, implementation mode, hardware fidelity
 
 **Vendor Profile（厂商配置档案）**:
-A source-backed declaration of the Kubernetes-visible resource names, labels, device classes, and scheduling attributes exposed by one accelerator ecosystem. Vendor Profiles extend the vendor-neutral core without introducing vendor branches into it.
+A versioned, source-backed declaration of the Kubernetes-visible contracts exposed by one Accelerator ecosystem or named integration. A Vendor Profile records provenance explicitly so a community integration cannot be mistaken for a vendor default.
 _Avoid_: Vendor-specific engine, hard-coded vendor path
 
 **Accelerator Model（加速器型号）**:
 A commercially distinct accelerator board or SKU represented within a Vendor Profile and selectable by a Scenario. Model support means its relevant Kubernetes-visible identity and scheduling attributes are source-backed, not merely that its marketing name appears in a catalog.
 _Avoid_: Display-only model, invented per-model resource name
+
+**Resource Contract（资源契约）**:
+One source-backed Kubernetes scheduling surface within a Vendor Profile, expressed either through scalar extended resources or DRA. It preserves exact resource names, labels, attributes, variants, provider scope, and evidence without deriving them from an Accelerator Model name.
+_Avoid_: Guessed resource mapping, backend configuration
+
+**Profile Class（档案等级）**:
+The trust and distribution class of a Vendor Profile: verified, provisional, or custom. It describes the evidence behind emitted Kubernetes contracts, independently of whether an Accelerator Model is current, older-but-supported, or merely cataloged.
+_Avoid_: Model popularity, hardware certification
