@@ -771,11 +771,10 @@ func (adapter *Adapter) applySyntheticNode(
 	if err != nil {
 		return classify("revalidate Synthetic Node before apply", err)
 	}
-	if err := validateOwnedMetadata(
+	if err := validateOwnedIdentity(
 		change.Key(),
 		current.Labels,
 		current.UID,
-		current.ResourceVersion,
 		current.OwnerReferences,
 		scope,
 		preconditions,
@@ -817,11 +816,10 @@ func (adapter *Adapter) updateSyntheticNodeStatus(
 	if err != nil {
 		return classify("revalidate Synthetic Node before status apply", err)
 	}
-	if err := validateOwnedMetadata(
+	if err := validateOwnedIdentity(
 		change.Key(),
 		current.Labels,
 		current.UID,
-		current.ResourceVersion,
 		current.OwnerReferences,
 		scope,
 		change.Preconditions(),
@@ -1241,6 +1239,38 @@ func validateOwnedMetadata(
 	scope cluster.OwnershipScope,
 	preconditions cluster.ObjectPreconditions,
 ) error {
+	if err := validateOwnedIdentity(
+		key,
+		objectLabels,
+		actualUID,
+		objectOwnerReferences,
+		scope,
+		preconditions,
+	); err != nil {
+		return err
+	}
+	if resourceVersion != preconditions.ResourceVersion {
+		return cluster.NewError(
+			cluster.ErrorResourceVersionConflict,
+			fmt.Sprintf(
+				"%s %q resourceVersion precondition failed",
+				key.Kind(),
+				key.Name(),
+			),
+			false,
+		)
+	}
+	return nil
+}
+
+func validateOwnedIdentity(
+	key cluster.ObjectKey,
+	objectLabels map[string]string,
+	actualUID types.UID,
+	objectOwnerReferences []metav1.OwnerReference,
+	scope cluster.OwnershipScope,
+	preconditions cluster.ObjectPreconditions,
+) error {
 	if objectLabels[cluster.ManagedByLabel] != cluster.ManagedByValue ||
 		objectLabels[cluster.InstanceUIDLabel] != scope.InstanceUID().String() {
 		return cluster.NewError(
@@ -1260,17 +1290,6 @@ func validateOwnedMetadata(
 		return cluster.NewError(
 			cluster.ErrorUIDConflict,
 			fmt.Sprintf("%s %q UID precondition failed", key.Kind(), key.Name()),
-			false,
-		)
-	}
-	if resourceVersion != preconditions.ResourceVersion {
-		return cluster.NewError(
-			cluster.ErrorResourceVersionConflict,
-			fmt.Sprintf(
-				"%s %q resourceVersion precondition failed",
-				key.Kind(),
-				key.Name(),
-			),
 			false,
 		)
 	}

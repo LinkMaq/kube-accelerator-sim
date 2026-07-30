@@ -774,6 +774,83 @@ func TestAdapterRevalidatesOwnershipAndHonorsServerDryRunDelete(t *testing.T) {
 	}
 }
 
+func TestAdapterRebasesNodeStatusAcrossOwnedResourceVersionDrift(t *testing.T) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 2)
+	node := ownedNode("synthetic-node", "node-uid", "10", scope)
+	kubernetesClient := kubernetesfake.NewSimpleClientset(&node)
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+	key, err := cluster.NewObjectKey(
+		cluster.ObjectKindNodeStatus,
+		"",
+		node.Name,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	change, err := cluster.NewUpdateSyntheticNodeStatus(
+		key,
+		cluster.ObjectPreconditions{
+			UID:             string(node.UID),
+			ResourceVersion: "9",
+		},
+		cluster.SyntheticNodeStatusInput{
+			Capacity:    map[string]string{"nvidia.com/gpu": "8"},
+			Allocatable: map[string]string{"nvidia.com/gpu": "8"},
+			ManageReady: true,
+			Ready:       true,
+			ObservedAt:  time.Date(2026, 7, 30, 8, 0, 0, 0, time.UTC),
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	executeSingle(
+		t,
+		adapter,
+		scope,
+		cluster.ExecutionPersistent,
+		change,
+	)
+}
+
+func TestAdapterRebasesOwnedNodeSpecAcrossStatusResourceVersionDrift(t *testing.T) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 2)
+	node := ownedNode("synthetic-node", "node-uid", "10", scope)
+	kubernetesClient := kubernetesfake.NewSimpleClientset(&node)
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+	key, err := cluster.NewObjectKey(cluster.ObjectKindNode, "", node.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	change, err := cluster.NewApplySyntheticNode(
+		key,
+		cluster.ObjectPreconditions{
+			UID:             string(node.UID),
+			ResourceVersion: "9",
+		},
+		cluster.SyntheticNodeInput{
+			Labels:        map[string]string{"workload.example.com/class": "training"},
+			Unschedulable: true,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	executeSingle(
+		t,
+		adapter,
+		scope,
+		cluster.ExecutionPersistent,
+		change,
+	)
+}
+
 func TestAdapterCreatesNodeAndLeaseWithScenarioInstanceOwnerReference(t *testing.T) {
 	t.Parallel()
 
