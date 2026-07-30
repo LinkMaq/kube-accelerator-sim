@@ -71,6 +71,30 @@ type RevisionCommand struct {
 	Fidelity         domain.FidelityMode
 	Preconditions    Preconditions
 	Revision         ScenarioRevision
+	ServerDryRun     bool
+}
+
+// RevisionIntent is target-independent compiled desired state. Application
+// preflight binds it to the fingerprint learned from one explicit connection.
+type RevisionIntent struct {
+	Name             domain.Name
+	CreationIdentity string
+	Fidelity         domain.FidelityMode
+	Preconditions    Preconditions
+	Revision         ScenarioRevision
+}
+
+// Bind returns the complete intention-level transport command for one
+// immutable explicit target.
+func (intent RevisionIntent) Bind(target ExplicitTarget) RevisionCommand {
+	return RevisionCommand{
+		Target:           target,
+		Name:             intent.Name,
+		CreationIdentity: intent.CreationIdentity,
+		Fidelity:         intent.Fidelity,
+		Preconditions:    intent.Preconditions,
+		Revision:         CloneRevision(intent.Revision),
+	}
 }
 
 // InstanceRecord is the version-neutral durable logical representation.
@@ -147,6 +171,7 @@ type SubmissionReceipt struct {
 	RevisionDigest    domain.Digest
 	Accepted          bool
 	NoOp              bool
+	DryRun            bool
 }
 
 // WatchCursor resumes events strictly after one opaque resource version.
@@ -240,26 +265,40 @@ func CloneRevision(revision ScenarioRevision) ScenarioRevision {
 // adapter considers persistence.
 func ValidateCommand(command RevisionCommand) error {
 	if command.Target.ContextName == "" ||
-		command.Target.Fingerprint.String() == "" ||
-		command.Name.String() == "" ||
-		command.CreationIdentity == "" ||
-		command.Fidelity.String() == "" ||
-		command.Revision.Digest.String() == "" ||
-		len(command.Revision.CanonicalScenario) == 0 {
+		command.Target.Fingerprint.String() == "" {
 		return NewError(ErrorInvalidCommand, "revision command is incomplete", "")
 	}
-	if command.Revision.Generation.Value() == 0 {
+	return ValidateRevisionIntent(RevisionIntent{
+		Name:             command.Name,
+		CreationIdentity: command.CreationIdentity,
+		Fidelity:         command.Fidelity,
+		Preconditions:    command.Preconditions,
+		Revision:         command.Revision,
+	})
+}
+
+// ValidateRevisionIntent performs the complete pure offline validation that
+// does not depend on a Simulation Target.
+func ValidateRevisionIntent(intent RevisionIntent) error {
+	if intent.Name.String() == "" ||
+		intent.CreationIdentity == "" ||
+		intent.Fidelity.String() == "" ||
+		intent.Revision.Digest.String() == "" ||
+		len(intent.Revision.CanonicalScenario) == 0 {
+		return NewError(ErrorInvalidCommand, "revision intent is incomplete", "")
+	}
+	if intent.Revision.Generation.Value() == 0 {
 		return NewError(ErrorInvalidCommand, "revision generation must be positive", "")
 	}
-	sum := sha256.Sum256(command.Revision.CanonicalScenario)
-	if command.Revision.Digest.String() != "sha256:"+hex.EncodeToString(sum[:]) {
+	sum := sha256.Sum256(intent.Revision.CanonicalScenario)
+	if intent.Revision.Digest.String() != "sha256:"+hex.EncodeToString(sum[:]) {
 		return NewError(
 			ErrorInvalidCommand,
 			"revision digest does not match canonical Scenario bytes",
 			"",
 		)
 	}
-	for _, profile := range command.Revision.Profiles {
+	for _, profile := range intent.Revision.Profiles {
 		if profile.ID == "" || profile.Revision == "" ||
 			profile.Digest.String() == "" || profile.Class == "" {
 			return NewError(ErrorInvalidCommand, "revision contains an incomplete profile receipt", "")

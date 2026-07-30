@@ -130,7 +130,7 @@ func (adapter *Adapter) Submit(
 		)
 	}
 	if current.Revision.Digest == command.Revision.Digest {
-		return receipt(current, false, true), nil
+		return receipt(current, false, true, command.ServerDryRun), nil
 	}
 	if current.InstanceUID != command.Preconditions.InstanceUID {
 		return controlplane.SubmissionReceipt{}, controlplane.NewError(
@@ -161,6 +161,16 @@ func (adapter *Adapter) Submit(
 			"",
 		)
 	}
+	if command.ServerDryRun {
+		proposed := controlplane.CloneRecord(current)
+		proposed.DesiredGeneration = command.Revision.Generation
+		proposed.Revision = controlplane.CloneRevision(command.Revision)
+		proposed.Revisions = append(
+			proposed.Revisions,
+			controlplane.CloneRevision(command.Revision),
+		)
+		return receipt(proposed, false, false, true), nil
+	}
 	adapter.nextVersion++
 	current.ResourceVersion = strconv.FormatUint(adapter.nextVersion, 10)
 	current.DesiredGeneration = command.Revision.Generation
@@ -171,7 +181,7 @@ func (adapter *Adapter) Submit(
 	)
 	adapter.records[key] = current
 	adapter.recordEvent(key, current)
-	return receipt(current, true, false), nil
+	return receipt(current, true, false, false), nil
 }
 
 func (adapter *Adapter) create(
@@ -206,6 +216,23 @@ func (adapter *Adapter) create(
 			"",
 		)
 	}
+	if command.ServerDryRun {
+		observed, err := domain.NewGeneration(0)
+		if err != nil {
+			return controlplane.SubmissionReceipt{}, err
+		}
+		revision := controlplane.CloneRevision(command.Revision)
+		return receipt(controlplane.InstanceRecord{
+			Target:             command.Target,
+			Name:               command.Name,
+			CreationIdentity:   command.CreationIdentity,
+			Fidelity:           command.Fidelity,
+			DesiredGeneration:  command.Revision.Generation,
+			ObservedGeneration: observed,
+			Revision:           revision,
+			Revisions:          []controlplane.ScenarioRevision{revision},
+		}, false, false, true), nil
+	}
 	adapter.nextVersion++
 	adapter.nextUID++
 	uid, err := domain.ParseInstanceUID(fmt.Sprintf("memory-%d", adapter.nextUID))
@@ -231,7 +258,7 @@ func (adapter *Adapter) create(
 	}
 	adapter.records[key] = record
 	adapter.recordEvent(key, record)
-	return receipt(record, true, false), nil
+	return receipt(record, true, false, false), nil
 }
 
 func (adapter *Adapter) recordEvent(key string, record controlplane.InstanceRecord) {
@@ -295,7 +322,7 @@ func recordKey(key controlplane.InstanceKey) string {
 
 func receipt(
 	record controlplane.InstanceRecord,
-	accepted, noOp bool,
+	accepted, noOp, dryRun bool,
 ) controlplane.SubmissionReceipt {
 	return controlplane.SubmissionReceipt{
 		InstanceUID:       record.InstanceUID,
@@ -304,6 +331,7 @@ func receipt(
 		RevisionDigest:    record.Revision.Digest,
 		Accepted:          accepted,
 		NoOp:              noOp,
+		DryRun:            dryRun,
 	}
 }
 

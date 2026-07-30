@@ -279,6 +279,22 @@ func TestEnvtestAdmissionStatusFinalizerAndAtomicConflict(t *testing.T) {
 	}
 	adapter := controlplanekubernetes.New(kubernetesClient, "kubernetes-v1alpha1")
 	fixture := newFixture(t)
+	dryRun := fixture.createCommand()
+	dryRun.ServerDryRun = true
+	proposed, err := adapter.Submit(context.Background(), dryRun)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !proposed.DryRun || proposed.Accepted {
+		t.Fatalf("unexpected envtest dry-run receipt: %#v", proposed)
+	}
+	if err := kubernetesClient.Get(
+		context.Background(),
+		client.ObjectKey{Name: fixture.name.String()},
+		&simulationv1alpha1.ScenarioInstance{},
+	); !apierrors.IsNotFound(err) {
+		t.Fatalf("server dry-run create error = %v, want NotFound", err)
+	}
 	created, err := adapter.Submit(context.Background(), fixture.createCommand())
 	if err != nil {
 		t.Fatal(err)
@@ -368,7 +384,29 @@ func newKubernetesAdapter(
 						"fake-" + generationString(nextUID.Add(1)),
 					))
 				}
+				applied := &client.CreateOptions{}
+				for _, option := range options {
+					option.ApplyToCreate(applied)
+				}
+				if slices.Contains(applied.DryRun, metav1.DryRunAll) {
+					return nil
+				}
 				return delegate.Create(ctx, object, options...)
+			},
+			Update: func(
+				ctx context.Context,
+				delegate client.WithWatch,
+				object client.Object,
+				options ...client.UpdateOption,
+			) error {
+				applied := &client.UpdateOptions{}
+				for _, option := range options {
+					option.ApplyToUpdate(applied)
+				}
+				if slices.Contains(applied.DryRun, metav1.DryRunAll) {
+					return nil
+				}
+				return delegate.Update(ctx, object, options...)
 			},
 		}).
 		Build()
@@ -446,6 +484,21 @@ func runSubmissionContract(t *testing.T, adapter controlplane.ScenarioControlPla
 		t.Fatal("Probe() lost target identity")
 	}
 
+	dryRunCreate := fixture.createCommand()
+	dryRunCreate.ServerDryRun = true
+	proposed, err := adapter.Submit(ctx, dryRunCreate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !proposed.DryRun || proposed.Accepted || proposed.NoOp ||
+		proposed.DesiredGeneration.Value() != 1 {
+		t.Fatalf("unexpected dry-run create receipt: %#v", proposed)
+	}
+	if _, err := adapter.Read(ctx, fixture.key); controlplane.ErrorCodeOf(err) !=
+		controlplane.ErrorNotFound {
+		t.Fatalf("dry-run create persisted an instance: %v", err)
+	}
+
 	created, err := adapter.Submit(ctx, fixture.createCommand())
 	if err != nil {
 		t.Fatal(err)
@@ -475,6 +528,25 @@ func runSubmissionContract(t *testing.T, adapter controlplane.ScenarioControlPla
 		noOp.DesiredGeneration != created.DesiredGeneration ||
 		noOp.ResourceVersion != created.ResourceVersion {
 		t.Fatalf("unexpected no-op receipt: %#v", noOp)
+	}
+
+	dryRunUpdate := fixture.updateCommand(created, "dry-run-update")
+	dryRunUpdate.ServerDryRun = true
+	proposed, err = adapter.Submit(ctx, dryRunUpdate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !proposed.DryRun || proposed.Accepted || proposed.NoOp ||
+		proposed.DesiredGeneration.Value() != 2 {
+		t.Fatalf("unexpected dry-run update receipt: %#v", proposed)
+	}
+	afterDryRun, err := adapter.Read(ctx, fixture.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if afterDryRun.DesiredGeneration.Value() != 1 ||
+		afterDryRun.Revision.Digest != fixture.firstDigest {
+		t.Fatalf("dry-run update persisted desired state: %#v", afterDryRun)
 	}
 
 	nextDigest := scenarioDigest("second")

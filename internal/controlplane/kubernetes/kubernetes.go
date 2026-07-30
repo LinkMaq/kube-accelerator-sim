@@ -133,7 +133,7 @@ func (adapter *Adapter) Submit(
 		)
 	}
 	if record.Revision.Digest == command.Revision.Digest {
-		return receipt(record, false, true), nil
+		return receipt(record, false, true, command.ServerDryRun), nil
 	}
 	if record.InstanceUID != command.Preconditions.InstanceUID {
 		return controlplane.SubmissionReceipt{}, controlplane.NewError(
@@ -171,7 +171,14 @@ func (adapter *Adapter) Submit(
 		updated.Spec.Revisions,
 		toTransportRevision(command.Revision),
 	)
-	if err := adapter.client.Update(ctx, updated); err != nil {
+	updateOptions := make([]client.UpdateOption, 0, 1)
+	if command.ServerDryRun {
+		updateOptions = append(
+			updateOptions,
+			&client.UpdateOptions{DryRun: []string{metav1.DryRunAll}},
+		)
+	}
+	if err := adapter.client.Update(ctx, updated, updateOptions...); err != nil {
 		if apierrors.IsConflict(err) {
 			return controlplane.SubmissionReceipt{}, controlplane.NewError(
 				controlplane.ErrorResourceVersionConflict,
@@ -188,7 +195,12 @@ func (adapter *Adapter) Submit(
 	if err != nil {
 		return controlplane.SubmissionReceipt{}, err
 	}
-	return receipt(accepted, true, false), nil
+	return receipt(
+		accepted,
+		!command.ServerDryRun,
+		false,
+		command.ServerDryRun,
+	), nil
 }
 
 func (adapter *Adapter) create(
@@ -243,7 +255,14 @@ func (adapter *Adapter) create(
 			},
 		},
 	}
-	if err := adapter.client.Create(ctx, instance); err != nil {
+	createOptions := make([]client.CreateOption, 0, 1)
+	if command.ServerDryRun {
+		createOptions = append(
+			createOptions,
+			&client.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+		)
+	}
+	if err := adapter.client.Create(ctx, instance, createOptions...); err != nil {
 		if apierrors.IsAlreadyExists(err) || apierrors.IsConflict(err) {
 			return controlplane.SubmissionReceipt{}, controlplane.NewError(
 				controlplane.ErrorResourceVersionConflict,
@@ -260,7 +279,12 @@ func (adapter *Adapter) create(
 	if err != nil {
 		return controlplane.SubmissionReceipt{}, err
 	}
-	return receipt(record, true, false), nil
+	return receipt(
+		record,
+		!command.ServerDryRun,
+		false,
+		command.ServerDryRun,
+	), nil
 }
 
 // Watch opens one bounded remote event stream after an opaque resourceVersion.
@@ -598,7 +622,7 @@ func fromTransportRevision(
 
 func receipt(
 	record controlplane.InstanceRecord,
-	accepted, noOp bool,
+	accepted, noOp, dryRun bool,
 ) controlplane.SubmissionReceipt {
 	return controlplane.SubmissionReceipt{
 		InstanceUID:       record.InstanceUID,
@@ -607,6 +631,7 @@ func receipt(
 		RevisionDigest:    record.Revision.Digest,
 		Accepted:          accepted,
 		NoOp:              noOp,
+		DryRun:            dryRun,
 	}
 }
 
