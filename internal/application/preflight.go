@@ -44,6 +44,7 @@ type PreflightApplyResult struct {
 	Authorization cluster.AuthorizationReport
 	Observed      cluster.ObservedGraph
 	CurrentFound  bool
+	Intent        controlplane.RevisionIntent
 	Proposed      controlplane.SubmissionReceipt
 	Warning       string
 }
@@ -200,7 +201,14 @@ func PreflightApply(
 			return PreflightApplyResult{}, readErr
 		}
 		result.CurrentFound = true
-		scope, err := cluster.NewOwnershipScope(
+		if command.Preconditions.ResourceVersion == "" &&
+			command.Preconditions.InstanceUID == current.InstanceUID &&
+			command.Preconditions.ExpectedGeneration == current.DesiredGeneration {
+			command.Preconditions.ResourceVersion = current.ResourceVersion
+			intent.Preconditions.ResourceVersion = current.ResourceVersion
+		}
+		scope, err := cluster.NewInstanceOwnershipScope(
+			current.Name,
 			current.InstanceUID,
 			current.DesiredGeneration,
 		)
@@ -229,6 +237,7 @@ func PreflightApply(
 			false,
 		)
 	}
+	result.Intent = intent
 	result.Warning = serverDryRunWarning
 	return result, nil
 }

@@ -179,6 +179,96 @@ type ScenarioCompileResult struct {
 
 func (ScenarioCompileResult) presentationResult() {}
 
+// ConnectionResult is the redacted immutable identity of one explicit target.
+type ConnectionResult struct {
+	ContextName       string `json:"contextName" yaml:"contextName"`
+	APIServerURL      string `json:"apiServerURL" yaml:"apiServerURL"`
+	TargetFingerprint string `json:"targetFingerprint" yaml:"targetFingerprint"`
+	CADigest          string `json:"caDigest" yaml:"caDigest"`
+}
+
+// RevisionReceiptResult preserves exact accepted/proposed revision identity.
+type RevisionReceiptResult struct {
+	InstanceName       string   `json:"instanceName" yaml:"instanceName"`
+	InstanceUID        string   `json:"instanceUID" yaml:"instanceUID"`
+	DesiredGeneration  uint64   `json:"desiredGeneration" yaml:"desiredGeneration"`
+	ObservedGeneration uint64   `json:"observedGeneration" yaml:"observedGeneration"`
+	RevisionDigest     string   `json:"revisionDigest" yaml:"revisionDigest"`
+	ProfileDigests     []string `json:"profileDigests" yaml:"profileDigests"`
+	RevisionAccepted   bool     `json:"revisionAccepted" yaml:"revisionAccepted"`
+	NoOp               bool     `json:"noOp" yaml:"noOp"`
+}
+
+type ProfileReceiptResult struct {
+	ID       string `json:"id" yaml:"id"`
+	Revision string `json:"revision" yaml:"revision"`
+	Digest   string `json:"digest" yaml:"digest"`
+	Class    string `json:"class" yaml:"class"`
+}
+
+type PoolResult struct {
+	Group            string `json:"group" yaml:"group"`
+	Pool             string `json:"pool" yaml:"pool"`
+	RequestedTotal   int64  `json:"requestedTotal" yaml:"requestedTotal"`
+	RequestedHealthy int64  `json:"requestedHealthy" yaml:"requestedHealthy"`
+	ObservedTotal    int64  `json:"observedTotal" yaml:"observedTotal"`
+	ObservedHealthy  int64  `json:"observedHealthy" yaml:"observedHealthy"`
+}
+
+type InventoryResult struct {
+	APIVersion string `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string `json:"kind" yaml:"kind"`
+	Count      int32  `json:"count" yaml:"count"`
+}
+
+type SnapshotDiagnosticResult struct {
+	Code             string `json:"code" yaml:"code"`
+	Message          string `json:"message" yaml:"message"`
+	Retryable        bool   `json:"retryable" yaml:"retryable"`
+	RevisionAccepted bool   `json:"revisionAccepted" yaml:"revisionAccepted"`
+	ExitCategory     int32  `json:"exitCategory" yaml:"exitCategory"`
+}
+
+type ConditionResult struct {
+	Type               string `json:"type" yaml:"type"`
+	Status             string `json:"status" yaml:"status"`
+	Reason             string `json:"reason" yaml:"reason"`
+	Message            string `json:"message" yaml:"message"`
+	ObservedGeneration int64  `json:"observedGeneration" yaml:"observedGeneration"`
+	LastTransitionTime string `json:"lastTransitionTime,omitempty" yaml:"lastTransitionTime,omitempty"`
+}
+
+// SnapshotResult is the bounded, transport-neutral Scenario Instance status.
+type SnapshotResult struct {
+	InstanceName         string                     `json:"instanceName" yaml:"instanceName"`
+	InstanceUID          string                     `json:"instanceUID" yaml:"instanceUID"`
+	TargetFingerprint    string                     `json:"targetFingerprint" yaml:"targetFingerprint"`
+	DesiredGeneration    uint64                     `json:"desiredGeneration" yaml:"desiredGeneration"`
+	ObservedGeneration   uint64                     `json:"observedGeneration" yaml:"observedGeneration"`
+	RevisionDigest       string                     `json:"revisionDigest" yaml:"revisionDigest"`
+	Profiles             []ProfileReceiptResult     `json:"profiles" yaml:"profiles"`
+	Phase                string                     `json:"phase" yaml:"phase"`
+	Pools                []PoolResult               `json:"pools" yaml:"pools"`
+	PoolsTruncated       bool                       `json:"poolsTruncated" yaml:"poolsTruncated"`
+	Inventory            []InventoryResult          `json:"inventory" yaml:"inventory"`
+	InventoryTruncated   bool                       `json:"inventoryTruncated" yaml:"inventoryTruncated"`
+	Diagnostics          []SnapshotDiagnosticResult `json:"diagnostics" yaml:"diagnostics"`
+	DiagnosticsTruncated bool                       `json:"diagnosticsTruncated" yaml:"diagnosticsTruncated"`
+	Conditions           []ConditionResult          `json:"conditions" yaml:"conditions"`
+	ConditionsTruncated  bool                       `json:"conditionsTruncated" yaml:"conditionsTruncated"`
+}
+
+// LifecycleResult is used by every target-connected command on both success
+// and post-acceptance failure.
+type LifecycleResult struct {
+	Connection ConnectionResult      `json:"connection" yaml:"connection"`
+	Receipt    RevisionReceiptResult `json:"receipt" yaml:"receipt"`
+	Snapshot   *SnapshotResult       `json:"snapshot,omitempty" yaml:"snapshot,omitempty"`
+	Warning    string                `json:"warning,omitempty" yaml:"warning,omitempty"`
+}
+
+func (LifecycleResult) presentationResult() {}
+
 // Success constructs one successful versioned envelope.
 func Success(kind, command string, result Result) OutputEnvelope {
 	return OutputEnvelope{
@@ -205,6 +295,18 @@ func Failure(command string, diagnostic domain.Diagnostic) OutputEnvelope {
 			ExitCategory:     diagnostic.ExitCategory().Code(),
 		},
 	}
+}
+
+// FailureWithResult preserves an accepted lifecycle receipt and latest
+// Snapshot while keeping the diagnostic as the primary failure signal.
+func FailureWithResult(
+	command string,
+	diagnostic domain.Diagnostic,
+	result Result,
+) OutputEnvelope {
+	envelope := Failure(command, diagnostic)
+	envelope.Result = result
+	return envelope
 }
 
 // Render returns one complete newline-terminated output payload.
@@ -237,11 +339,17 @@ func Render(envelope OutputEnvelope, format OutputFormat) ([]byte, error) {
 
 func renderHuman(envelope OutputEnvelope) ([]byte, error) {
 	if envelope.Diagnostic != nil {
-		return []byte(fmt.Sprintf(
+		var output strings.Builder
+		fmt.Fprintf(
+			&output,
 			"Error [%s]: %s\n",
 			envelope.Diagnostic.Code,
 			envelope.Diagnostic.Message,
-		)), nil
+		)
+		if result, ok := envelope.Result.(LifecycleResult); ok {
+			renderLifecycleHuman(&output, result)
+		}
+		return []byte(output.String()), nil
 	}
 	switch result := envelope.Result.(type) {
 	case VersionResult:
@@ -321,6 +429,10 @@ func renderHuman(envelope OutputEnvelope) ([]byte, error) {
 			)
 		}
 		return []byte(output.String()), nil
+	case LifecycleResult:
+		var output strings.Builder
+		renderLifecycleHuman(&output, result)
+		return []byte(output.String()), nil
 	default:
 		return nil, fmt.Errorf("unsupported human output kind %q", envelope.Kind)
 	}
@@ -380,8 +492,98 @@ func redactEnvelope(envelope OutputEnvelope) OutputEnvelope {
 		}
 		result.CanonicalScenario = redactValue(result.CanonicalScenario, "")
 		envelope.Result = result
+	case LifecycleResult:
+		redactLifecycle(&result)
+		envelope.Result = result
 	}
 	return envelope
+}
+
+func renderLifecycleHuman(output *strings.Builder, result LifecycleResult) {
+	fmt.Fprintf(
+		output,
+		"Scenario %s uid=%s desired=%d observed=%d accepted=%t no-op=%t\n",
+		result.Receipt.InstanceName,
+		result.Receipt.InstanceUID,
+		result.Receipt.DesiredGeneration,
+		result.Receipt.ObservedGeneration,
+		result.Receipt.RevisionAccepted,
+		result.Receipt.NoOp,
+	)
+	fmt.Fprintf(
+		output,
+		"Target %s fingerprint=%s api=%s\n",
+		result.Connection.ContextName,
+		result.Connection.TargetFingerprint,
+		result.Connection.APIServerURL,
+	)
+	if result.Snapshot != nil {
+		fmt.Fprintf(
+			output,
+			"Phase: %s  pools=%d inventory=%d diagnostics=%d conditions=%d\n",
+			result.Snapshot.Phase,
+			len(result.Snapshot.Pools),
+			len(result.Snapshot.Inventory),
+			len(result.Snapshot.Diagnostics),
+			len(result.Snapshot.Conditions),
+		)
+	}
+	if result.Warning != "" {
+		fmt.Fprintf(output, "Warning: %s\n", result.Warning)
+	}
+}
+
+func redactLifecycle(result *LifecycleResult) {
+	result.Connection.ContextName = redactString(result.Connection.ContextName)
+	result.Connection.APIServerURL = redactString(result.Connection.APIServerURL)
+	result.Connection.TargetFingerprint = redactString(
+		result.Connection.TargetFingerprint,
+	)
+	result.Connection.CADigest = redactString(result.Connection.CADigest)
+	result.Receipt.InstanceName = redactString(result.Receipt.InstanceName)
+	result.Receipt.InstanceUID = redactString(result.Receipt.InstanceUID)
+	result.Receipt.RevisionDigest = redactString(result.Receipt.RevisionDigest)
+	result.Receipt.ProfileDigests = redactStrings(result.Receipt.ProfileDigests)
+	result.Warning = redactString(result.Warning)
+	if result.Snapshot == nil {
+		return
+	}
+	snapshot := result.Snapshot
+	snapshot.InstanceName = redactString(snapshot.InstanceName)
+	snapshot.InstanceUID = redactString(snapshot.InstanceUID)
+	snapshot.TargetFingerprint = redactString(snapshot.TargetFingerprint)
+	snapshot.RevisionDigest = redactString(snapshot.RevisionDigest)
+	for index := range snapshot.Profiles {
+		profile := &snapshot.Profiles[index]
+		profile.ID = redactString(profile.ID)
+		profile.Revision = redactString(profile.Revision)
+		profile.Digest = redactString(profile.Digest)
+		profile.Class = redactString(profile.Class)
+	}
+	snapshot.Phase = redactString(snapshot.Phase)
+	for index := range snapshot.Pools {
+		pool := &snapshot.Pools[index]
+		pool.Group = redactString(pool.Group)
+		pool.Pool = redactString(pool.Pool)
+	}
+	for index := range snapshot.Inventory {
+		inventory := &snapshot.Inventory[index]
+		inventory.APIVersion = redactString(inventory.APIVersion)
+		inventory.Kind = redactString(inventory.Kind)
+	}
+	for index := range snapshot.Diagnostics {
+		diagnostic := &snapshot.Diagnostics[index]
+		diagnostic.Code = redactString(diagnostic.Code)
+		diagnostic.Message = redactString(diagnostic.Message)
+	}
+	for index := range snapshot.Conditions {
+		condition := &snapshot.Conditions[index]
+		condition.Type = redactString(condition.Type)
+		condition.Status = redactString(condition.Status)
+		condition.Reason = redactString(condition.Reason)
+		condition.Message = redactString(condition.Message)
+		condition.LastTransitionTime = redactString(condition.LastTransitionTime)
+	}
 }
 
 func redactProfileSummary(profile *ProfileSummaryResult) {

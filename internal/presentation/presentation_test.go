@@ -167,6 +167,86 @@ func TestCanonicalScenarioSecretLookingFieldsAreRedacted(t *testing.T) {
 	}
 }
 
+func TestLifecycleFailurePreservesReceiptSnapshotAndRedactsDetail(t *testing.T) {
+	t.Parallel()
+
+	code, err := domain.ParseDiagnosticCode("ConvergenceTimeout")
+	if err != nil {
+		t.Fatal(err)
+	}
+	exitCategory, err := domain.ParseExitCategory(5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	diagnostic, err := domain.NewDiagnostic(
+		code,
+		"accepted revision timed out token=top-secret",
+		true,
+		true,
+		exitCategory,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := presentation.LifecycleResult{
+		Connection: presentation.ConnectionResult{
+			ContextName:       "simulation",
+			APIServerURL:      "https://cluster.example",
+			TargetFingerprint: "sha256:target",
+			CADigest:          "sha256:ca",
+		},
+		Receipt: presentation.RevisionReceiptResult{
+			InstanceName:       "training-lab",
+			InstanceUID:        "instance-1",
+			DesiredGeneration:  2,
+			ObservedGeneration: 1,
+			RevisionDigest:     "sha256:revision",
+			ProfileDigests:     []string{"sha256:profile"},
+			RevisionAccepted:   true,
+		},
+		Snapshot: &presentation.SnapshotResult{
+			Phase:                "Reconciling",
+			DiagnosticsTruncated: true,
+			Diagnostics: []presentation.SnapshotDiagnosticResult{{
+				Code:    "ConvergenceFailed",
+				Message: "Bearer abc.def.ghi",
+			}},
+			Conditions: []presentation.ConditionResult{{
+				Type:    "Progressing",
+				Status:  "True",
+				Reason:  "ConvergenceFailed",
+				Message: "password=still-secret",
+			}},
+		},
+	}
+	envelope := presentation.FailureWithResult("apply", diagnostic, result)
+	for _, formatName := range []string{"human", "json", "yaml"} {
+		format, err := presentation.ParseOutputFormat(formatName)
+		if err != nil {
+			t.Fatal(err)
+		}
+		encoded, err := presentation.Render(envelope, format)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, secret := range []string{"top-secret", "abc.def.ghi", "still-secret"} {
+			if bytes.Contains(encoded, []byte(secret)) {
+				t.Fatalf("%s lifecycle output exposed %q:\n%s", formatName, secret, encoded)
+			}
+		}
+		for _, expected := range []string{
+			"ConvergenceTimeout",
+			"training-lab",
+			"instance-1",
+			"Reconciling",
+		} {
+			if !bytes.Contains(encoded, []byte(expected)) {
+				t.Fatalf("%s lifecycle output omitted %q:\n%s", formatName, expected, encoded)
+			}
+		}
+	}
+}
+
 func renderFailureMessage(t *testing.T, message string) string {
 	t.Helper()
 	code, err := domain.ParseDiagnosticCode("InvocationInvalid")

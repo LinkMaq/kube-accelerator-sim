@@ -127,6 +127,137 @@ func (adapter *Adapter) RequestDeletion(
 	return nil
 }
 
+// Delete atomically accepts exact deletion desired state.
+func (adapter *Adapter) Delete(
+	_ context.Context,
+	command controlplane.DeletionCommand,
+) (controlplane.DeletionReceipt, error) {
+	if err := controlplane.ValidateDeletionCommand(command); err != nil {
+		return controlplane.DeletionReceipt{}, err
+	}
+	adapter.mutex.Lock()
+	defer adapter.mutex.Unlock()
+
+	key := recordKey(controlplane.InstanceKey{
+		TargetFingerprint: command.Target.Fingerprint,
+		Name:              command.Name,
+	})
+	record, found := adapter.records[key]
+	if !found {
+		return controlplane.DeletionReceipt{}, controlplane.NewError(
+			controlplane.ErrorNotFound,
+			fmt.Sprintf("Scenario Instance %q was not found", command.Name.String()),
+			"",
+		)
+	}
+	if record.Target.Fingerprint != command.Target.Fingerprint {
+		return controlplane.DeletionReceipt{}, controlplane.NewError(
+			controlplane.ErrorTargetMismatch,
+			"Scenario Instance target fingerprint is immutable",
+			"",
+		)
+	}
+	if record.InstanceUID != command.Preconditions.InstanceUID {
+		return controlplane.DeletionReceipt{}, controlplane.NewError(
+			controlplane.ErrorUIDConflict,
+			"Scenario Instance UID precondition failed",
+			"",
+		)
+	}
+	if record.DesiredGeneration != command.Preconditions.ExpectedGeneration {
+		return controlplane.DeletionReceipt{}, controlplane.NewError(
+			controlplane.ErrorGenerationConflict,
+			"Scenario Instance generation precondition failed",
+			"",
+		)
+	}
+	if record.DeletionRequested {
+		return deletionReceipt(record, false, true), nil
+	}
+	adapter.nextVersion++
+	record.ResourceVersion = strconv.FormatUint(adapter.nextVersion, 10)
+	record.DeletionRequested = true
+	adapter.records[key] = record
+	adapter.recordEvent(key, record)
+	return deletionReceipt(record, true, false), nil
+}
+
+// CommitStatus advances the deterministic controller-facing status of one
+// record and emits a resumable event. It is concrete in-memory adapter
+// plumbing, not another Scenario Control Plane operation.
+func (adapter *Adapter) CommitStatus(
+	_ context.Context,
+	key controlplane.InstanceKey,
+	observedGeneration domain.Generation,
+	status controlplane.InstanceStatus,
+) error {
+	adapter.mutex.Lock()
+	defer adapter.mutex.Unlock()
+
+	storageKey := recordKey(key)
+	record, found := adapter.records[storageKey]
+	if !found {
+		return controlplane.NewError(
+			controlplane.ErrorNotFound,
+			fmt.Sprintf("Scenario Instance %q was not found", key.Name.String()),
+			"",
+		)
+	}
+	if record.Target.Fingerprint != key.TargetFingerprint {
+		return controlplane.NewError(
+			controlplane.ErrorTargetMismatch,
+			"Scenario Instance target fingerprint does not match the explicit target",
+			"",
+		)
+	}
+	if observedGeneration.Value() > record.DesiredGeneration.Value() {
+		return controlplane.NewError(
+			controlplane.ErrorGenerationConflict,
+			"observed generation exceeds desired generation",
+			"",
+		)
+	}
+	adapter.nextVersion++
+	record.ResourceVersion = strconv.FormatUint(adapter.nextVersion, 10)
+	record.ObservedGeneration = observedGeneration
+	record.Status = cloneStatus(status)
+	adapter.records[storageKey] = record
+	adapter.recordEvent(storageKey, record)
+	return nil
+}
+
+// CompleteDeletion removes a deletion-requested record to model API-server
+// finalizer completion in deterministic application tests.
+func (adapter *Adapter) CompleteDeletion(
+	_ context.Context,
+	key controlplane.InstanceKey,
+) error {
+	adapter.mutex.Lock()
+	defer adapter.mutex.Unlock()
+
+	storageKey := recordKey(key)
+	record, found := adapter.records[storageKey]
+	if !found {
+		return nil
+	}
+	if record.Target.Fingerprint != key.TargetFingerprint {
+		return controlplane.NewError(
+			controlplane.ErrorTargetMismatch,
+			"Scenario Instance target fingerprint does not match the explicit target",
+			"",
+		)
+	}
+	if !record.DeletionRequested {
+		return controlplane.NewError(
+			controlplane.ErrorInvalidCommand,
+			"Scenario Instance deletion has not been requested",
+			"",
+		)
+	}
+	delete(adapter.records, storageKey)
+	return nil
+}
+
 // Submit atomically enforces immutable identity and optimistic preconditions.
 func (adapter *Adapter) Submit(
 	_ context.Context,
@@ -358,6 +489,24 @@ func recordKey(key controlplane.InstanceKey) string {
 	return key.Name.String()
 }
 
+func cloneStatus(status controlplane.InstanceStatus) controlplane.InstanceStatus {
+	result := status
+	result.Pools = append([]controlplane.PoolStatus(nil), status.Pools...)
+	result.Inventory = append(
+		[]controlplane.InventoryEntry(nil),
+		status.Inventory...,
+	)
+	result.Diagnostics = append(
+		[]controlplane.DiagnosticStatus(nil),
+		status.Diagnostics...,
+	)
+	result.Conditions = append(
+		[]controlplane.ConditionStatus(nil),
+		status.Conditions...,
+	)
+	return result
+}
+
 func receipt(
 	record controlplane.InstanceRecord,
 	accepted, noOp, dryRun bool,
@@ -370,6 +519,20 @@ func receipt(
 		Accepted:          accepted,
 		NoOp:              noOp,
 		DryRun:            dryRun,
+	}
+}
+
+func deletionReceipt(
+	record controlplane.InstanceRecord,
+	accepted,
+	noOp bool,
+) controlplane.DeletionReceipt {
+	return controlplane.DeletionReceipt{
+		InstanceUID:       record.InstanceUID,
+		DesiredGeneration: record.DesiredGeneration,
+		ResourceVersion:   record.ResourceVersion,
+		Accepted:          accepted,
+		NoOp:              noOp,
 	}
 }
 

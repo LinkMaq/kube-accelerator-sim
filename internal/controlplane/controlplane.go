@@ -84,6 +84,20 @@ type RevisionIntent struct {
 	Revision         ScenarioRevision
 }
 
+// DeletionPreconditions are atomically checked before Kubernetes deletion is
+// accepted as desired state.
+type DeletionPreconditions struct {
+	InstanceUID        domain.InstanceUID
+	ExpectedGeneration domain.Generation
+}
+
+// DeletionCommand identifies exactly one instance on exactly one target.
+type DeletionCommand struct {
+	Target        ExplicitTarget
+	Name          domain.Name
+	Preconditions DeletionPreconditions
+}
+
 // Bind returns the complete intention-level transport command for one
 // immutable explicit target.
 func (intent RevisionIntent) Bind(target ExplicitTarget) RevisionCommand {
@@ -175,6 +189,16 @@ type SubmissionReceipt struct {
 	DryRun            bool
 }
 
+// DeletionReceipt distinguishes newly accepted deletion from an idempotent
+// retry while retaining exact concurrency identity.
+type DeletionReceipt struct {
+	InstanceUID       domain.InstanceUID
+	DesiredGeneration domain.Generation
+	ResourceVersion   string
+	Accepted          bool
+	NoOp              bool
+}
+
 // WatchCursor resumes events strictly after one opaque resource version.
 type WatchCursor struct {
 	Key                  InstanceKey
@@ -200,6 +224,7 @@ type ScenarioControlPlane interface {
 	Probe(context.Context, ExplicitTarget) (TargetCapabilities, error)
 	Read(context.Context, InstanceKey) (InstanceRecord, error)
 	Submit(context.Context, RevisionCommand) (SubmissionReceipt, error)
+	Delete(context.Context, DeletionCommand) (DeletionReceipt, error)
 	Watch(context.Context, WatchCursor) (InstanceEventStream, error)
 }
 
@@ -276,6 +301,31 @@ func ValidateCommand(command RevisionCommand) error {
 		Preconditions:    command.Preconditions,
 		Revision:         command.Revision,
 	})
+}
+
+// ValidateDeletionCommand rejects ambiguous, wildcard, or incomplete
+// deletion intention before an adapter contacts Kubernetes.
+func ValidateDeletionCommand(command DeletionCommand) error {
+	if command.Target.ContextName == "" ||
+		command.Target.Fingerprint.String() == "" ||
+		command.Name.String() == "" {
+		return NewError(ErrorInvalidCommand, "deletion command is incomplete", "")
+	}
+	if command.Preconditions.InstanceUID.String() == "" {
+		return NewError(
+			ErrorInvalidCommand,
+			"deletion requires an exact instance UID",
+			"",
+		)
+	}
+	if command.Preconditions.ExpectedGeneration.Value() == 0 {
+		return NewError(
+			ErrorInvalidCommand,
+			"deletion requires a positive expected generation",
+			"",
+		)
+	}
+	return nil
 }
 
 // ValidateRevisionIntent performs the complete pure offline validation that

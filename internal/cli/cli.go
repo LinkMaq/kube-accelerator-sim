@@ -3,14 +3,20 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/LinkMaq/kube-accelerator-sim/internal/application"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/catalog"
+	"github.com/LinkMaq/kube-accelerator-sim/internal/cluster"
+	clusterkubernetes "github.com/LinkMaq/kube-accelerator-sim/internal/cluster/kubernetes"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/domain"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/presentation"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/scenario"
@@ -18,10 +24,44 @@ import (
 )
 
 const maximumScenarioBytes = 1 << 20
+const creationIdentity = "kasim-cli/v1"
+
+// Dependencies contains concrete delivery wiring used by tests. It does not
+// add a product behavior seam; ScenarioRuntime still owns lifecycle behavior.
+type Dependencies struct {
+	Connect application.ConnectorFunc
+	Catalog catalog.Snapshot
+}
 
 // Run executes one concrete CLI invocation and returns its stable exit
 // category. Successful envelopes go to stdout; failures go to stderr.
 func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	return run(
+		args,
+		stdin,
+		stdout,
+		stderr,
+		Dependencies{Connect: connectKubernetes},
+	)
+}
+
+// RunWithDependencies exercises the same CLI delivery with concrete,
+// process-local adapters.
+func RunWithDependencies(
+	args []string,
+	stdin io.Reader,
+	stdout, stderr io.Writer,
+	dependencies Dependencies,
+) int {
+	return run(args, stdin, stdout, stderr, dependencies)
+}
+
+func run(
+	args []string,
+	stdin io.Reader,
+	stdout, stderr io.Writer,
+	dependencies Dependencies,
+) int {
 	format, err := requestedOutputFormat(args)
 	if err != nil {
 		human, _ := presentation.ParseOutputFormat("human")
@@ -37,15 +77,18 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		)
 	}
 
-	snapshot, err := catalog.LoadBundled()
-	if err != nil {
-		return writeFailure(
-			args[0],
-			"CatalogInvalid",
-			err.Error(),
-			format,
-			stderr,
-		)
+	snapshot := dependencies.Catalog
+	if snapshot.Digest().String() == "" {
+		snapshot, err = catalog.LoadBundled()
+		if err != nil {
+			return writeFailure(
+				args[0],
+				"CatalogInvalid",
+				err.Error(),
+				format,
+				stderr,
+			)
+		}
 	}
 	switch args[0] {
 	case "version":
@@ -53,15 +96,23 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	case "profile":
 		return runProfile(args[1:], snapshot, format, stdout, stderr)
 	case "apply":
-		return runApply(args[1:], stdin, snapshot, format, stdout, stderr)
-	case "status", "health", "scale", "delete":
-		return writeFailure(
-			args[0],
-			"InvocationInvalid",
-			fmt.Sprintf("%s requires the cluster runtime, which is not available in this build stage", args[0]),
+		return runApply(
+			args[1:],
+			stdin,
+			snapshot,
+			dependencies.Connect,
 			format,
+			stdout,
 			stderr,
 		)
+	case "status":
+		return runStatus(args[1:], snapshot, dependencies.Connect, format, stdout, stderr)
+	case "health":
+		return runHealth(args[1:], snapshot, dependencies.Connect, format, stdout, stderr)
+	case "scale":
+		return runScale(args[1:], snapshot, dependencies.Connect, format, stdout, stderr)
+	case "delete":
+		return runDelete(args[1:], snapshot, dependencies.Connect, format, stdout, stderr)
 	default:
 		return writeFailure(
 			args[0],
@@ -71,6 +122,22 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			stderr,
 		)
 	}
+}
+
+func connectKubernetes(
+	ctx context.Context,
+	selection cluster.TargetSelection,
+) (application.ConnectedTarget, error) {
+	connection, err := clusterkubernetes.Connect(ctx, selection)
+	if err != nil {
+		return application.ConnectedTarget{}, err
+	}
+	return application.ConnectedTarget{
+		Receipt:      connection.Receipt(),
+		Target:       connection.Target(),
+		ControlPlane: connection.ControlPlane(),
+		Cluster:      connection.Cluster(),
+	}, nil
 }
 
 func runVersion(
@@ -207,6 +274,7 @@ func runApply(
 	args []string,
 	stdin io.Reader,
 	snapshot catalog.Snapshot,
+	connect application.ConnectorFunc,
 	format presentation.OutputFormat,
 	stdout, stderr io.Writer,
 ) int {
@@ -217,13 +285,28 @@ func runApply(
 	flags := flag.NewFlagSet("apply", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	var file, dryRun, output string
+	var kubeconfigPath, contextName, instanceUIDValue string
 	var profileID, modelID, contractID, resourceAlias, fidelity string
 	var nodes, accelerators, healthy int64
+	var expectedGeneration uint64
 	var acceptProvisional bool
+	var async bool
+	var timeout time.Duration
 	flags.StringVar(&file, "f", "", "local Scenario file or - for stdin")
-	flags.StringVar(&dryRun, "dry-run", "", "client")
+	flags.StringVar(&dryRun, "dry-run", "", "client or server")
 	flags.StringVar(&output, "o", "human", "human, json, or yaml")
 	flags.StringVar(&output, "output", "human", "human, json, or yaml")
+	flags.StringVar(&kubeconfigPath, "kubeconfig", "", "explicit kubeconfig path")
+	flags.StringVar(&contextName, "context", "", "exact kubeconfig context")
+	flags.StringVar(&instanceUIDValue, "instance-uid", "", "exact existing instance UID")
+	flags.Uint64Var(
+		&expectedGeneration,
+		"expected-generation",
+		0,
+		"exact existing desired generation",
+	)
+	flags.BoolVar(&async, "async", false, "return after revision acceptance")
+	flags.DurationVar(&timeout, "timeout", 5*time.Minute, "terminal wait timeout")
 	flags.StringVar(&profileID, "profile", "", "Vendor Profile ID")
 	flags.StringVar(&modelID, "model", "", "Accelerator Model ID")
 	flags.StringVar(&contractID, "contract", "", "Resource Contract ID")
@@ -250,11 +333,67 @@ func runApply(
 			stderr,
 		)
 	}
-	if dryRun != "client" {
+	if dryRun != "" && dryRun != "client" && dryRun != "server" {
 		return writeFailure(
 			"apply",
 			"InvocationInvalid",
-			"offline apply requires --dry-run=client",
+			"--dry-run accepts only client or server",
+			format,
+			stderr,
+		)
+	}
+	if dryRun == "client" &&
+		(kubeconfigPath != "" || contextName != "" || instanceUIDValue != "" ||
+			expectedGeneration != 0 || async) {
+		return writeFailure(
+			"apply",
+			"InvocationInvalid",
+			"client dry-run is offline and does not accept target, revision, or async flags",
+			format,
+			stderr,
+		)
+	}
+	if dryRun != "client" && (kubeconfigPath == "" || contextName == "") {
+		return writeFailure(
+			"apply",
+			"InvocationInvalid",
+			"connected apply requires --kubeconfig and --context",
+			format,
+			stderr,
+		)
+	}
+	if dryRun == "server" && async {
+		return writeFailure(
+			"apply",
+			"InvocationInvalid",
+			"server dry-run cannot be asynchronous",
+			format,
+			stderr,
+		)
+	}
+	if timeout <= 0 {
+		return writeFailure(
+			"apply",
+			"InvocationInvalid",
+			"--timeout must be positive",
+			format,
+			stderr,
+		)
+	}
+	if (instanceUIDValue == "") != (expectedGeneration == 0) {
+		return writeFailure(
+			"apply",
+			"InvocationInvalid",
+			"--instance-uid and --expected-generation must be supplied together",
+			format,
+			stderr,
+		)
+	}
+	if expectedGeneration > math.MaxInt64 {
+		return writeFailure(
+			"apply",
+			"InvocationInvalid",
+			"--expected-generation is too large",
 			format,
 			stderr,
 		)
@@ -336,12 +475,481 @@ func runApply(
 	if err != nil {
 		return writeFailure("apply", "ScenarioInvalid", err.Error(), format, stderr)
 	}
-	return writeSuccess(
-		presentation.Success("ScenarioCompile", "apply", result),
+	if dryRun == "client" {
+		return writeSuccess(
+			presentation.Success("ScenarioCompile", "apply", result),
+			format,
+			stdout,
+			stderr,
+		)
+	}
+	instanceUID, generation, err := revisionPreconditions(
+		instanceUIDValue,
+		expectedGeneration,
+	)
+	if err != nil {
+		return writeFailure("apply", "InvocationInvalid", err.Error(), format, stderr)
+	}
+	intent, err := application.NewRevisionIntent(
+		compiled,
+		receipt,
+		creationIdentity,
+		instanceUID,
+		generation,
+	)
+	if err != nil {
+		return writeFailure("apply", "ScenarioInvalid", err.Error(), format, stderr)
+	}
+	runtime, err := application.NewScenarioRuntime(application.RuntimeOptions{
+		Connect: connect,
+		Catalog: snapshot,
+	})
+	if err != nil {
+		return writeFailure("apply", "InvocationInvalid", err.Error(), format, stderr)
+	}
+	mode := application.DryRunNone
+	if dryRun == "server" {
+		mode = application.DryRunServer
+	}
+	lifecycle, lifecycleErr := runtime.Apply(
+		context.Background(),
+		application.ApplyRequest{
+			Selection: cluster.TargetSelection{
+				KubeconfigPath: kubeconfigPath,
+				ContextName:    contextName,
+			},
+			Intent:  intent,
+			Mode:    mode,
+			Async:   async,
+			Timeout: timeout,
+		},
+	)
+	return writeLifecycle(
+		"apply",
+		lifecycle,
+		lifecycleErr,
 		format,
 		stdout,
 		stderr,
 	)
+}
+
+type connectedFlags struct {
+	kubeconfigPath string
+	contextName    string
+	instanceUID    string
+	generation     uint64
+	timeout        time.Duration
+	async          bool
+}
+
+func addConnectedFlags(flags *flag.FlagSet, values *connectedFlags, mutation bool) {
+	flags.StringVar(
+		&values.kubeconfigPath,
+		"kubeconfig",
+		"",
+		"explicit kubeconfig path",
+	)
+	flags.StringVar(
+		&values.contextName,
+		"context",
+		"",
+		"exact kubeconfig context",
+	)
+	flags.DurationVar(
+		&values.timeout,
+		"timeout",
+		5*time.Minute,
+		"terminal wait timeout",
+	)
+	if mutation {
+		flags.StringVar(
+			&values.instanceUID,
+			"instance-uid",
+			"",
+			"exact existing instance UID",
+		)
+		flags.Uint64Var(
+			&values.generation,
+			"expected-generation",
+			0,
+			"exact existing desired generation",
+		)
+		flags.BoolVar(
+			&values.async,
+			"async",
+			false,
+			"return after revision acceptance",
+		)
+	}
+}
+
+func runStatus(
+	args []string,
+	snapshot catalog.Snapshot,
+	connect application.ConnectorFunc,
+	format presentation.OutputFormat,
+	stdout, stderr io.Writer,
+) int {
+	nameValue, flagArgs, ok := exactNameArgument(args)
+	if !ok {
+		return writeFailure(
+			"status",
+			"InvocationInvalid",
+			"usage: kasim status <instance-name> --kubeconfig PATH --context NAME",
+			format,
+			stderr,
+		)
+	}
+	flags := flag.NewFlagSet("status", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	var output string
+	var watch bool
+	var connected connectedFlags
+	flags.StringVar(&output, "o", "human", "human, json, or yaml")
+	flags.StringVar(&output, "output", "human", "human, json, or yaml")
+	flags.BoolVar(&watch, "watch", false, "watch until the current revision is Ready")
+	addConnectedFlags(flags, &connected, false)
+	if err := flags.Parse(flagArgs); err != nil || flags.NArg() != 0 {
+		message := "status accepts one exact instance name and flags"
+		if err != nil {
+			message = err.Error()
+		}
+		return writeFailure("status", "InvocationInvalid", message, format, stderr)
+	}
+	name, err := domain.ParseName(nameValue)
+	if err != nil {
+		return writeFailure("status", "InvocationInvalid", err.Error(), format, stderr)
+	}
+	if err := validateConnectedFlags(connected, false); err != nil {
+		return writeFailure("status", "InvocationInvalid", err.Error(), format, stderr)
+	}
+	runtime, err := application.NewScenarioRuntime(application.RuntimeOptions{
+		Connect: connect,
+		Catalog: snapshot,
+	})
+	if err != nil {
+		return writeFailure("status", "InvocationInvalid", err.Error(), format, stderr)
+	}
+	result, observeErr := runtime.Observe(
+		context.Background(),
+		application.ObserveRequest{
+			Selection: cluster.TargetSelection{
+				KubeconfigPath: connected.kubeconfigPath,
+				ContextName:    connected.contextName,
+			},
+			Name:    name,
+			Watch:   watch,
+			Timeout: connected.timeout,
+		},
+	)
+	return writeLifecycle(
+		"status",
+		result,
+		observeErr,
+		format,
+		stdout,
+		stderr,
+	)
+}
+
+func runHealth(
+	args []string,
+	snapshot catalog.Snapshot,
+	connect application.ConnectorFunc,
+	format presentation.OutputFormat,
+	stdout, stderr io.Writer,
+) int {
+	nameValue, flagArgs, ok := exactNameArgument(args)
+	if !ok {
+		return writeFailure(
+			"health",
+			"InvocationInvalid",
+			"usage: kasim health <instance-name> --group NAME --pool NAME --healthy COUNT",
+			format,
+			stderr,
+		)
+	}
+	flags := flag.NewFlagSet("health", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	var output, group, pool string
+	var healthy int64
+	healthy = -1
+	var connected connectedFlags
+	flags.StringVar(&output, "o", "human", "human, json, or yaml")
+	flags.StringVar(&output, "output", "human", "human, json, or yaml")
+	flags.StringVar(&group, "group", "", "exact Node Group")
+	flags.StringVar(&pool, "pool", "", "exact Accelerator Pool")
+	flags.Int64Var(&healthy, "healthy", -1, "healthy accelerators per synthetic Node")
+	addConnectedFlags(flags, &connected, true)
+	if err := flags.Parse(flagArgs); err != nil || flags.NArg() != 0 {
+		message := "health accepts one exact instance name and flags"
+		if err != nil {
+			message = err.Error()
+		}
+		return writeFailure("health", "InvocationInvalid", message, format, stderr)
+	}
+	if group == "" || pool == "" || healthy < 0 {
+		return writeFailure(
+			"health",
+			"InvocationInvalid",
+			"health requires --group, --pool, and non-negative --healthy",
+			format,
+			stderr,
+		)
+	}
+	change, err := scenario.Health(group, pool, healthy)
+	if err != nil {
+		return writeFailure("health", "ScenarioInvalid", err.Error(), format, stderr)
+	}
+	return runTypedRevision(
+		"health",
+		nameValue,
+		change,
+		connected,
+		snapshot,
+		connect,
+		format,
+		stdout,
+		stderr,
+	)
+}
+
+func runScale(
+	args []string,
+	snapshot catalog.Snapshot,
+	connect application.ConnectorFunc,
+	format presentation.OutputFormat,
+	stdout, stderr io.Writer,
+) int {
+	nameValue, flagArgs, ok := exactNameArgument(args)
+	if !ok {
+		return writeFailure(
+			"scale",
+			"InvocationInvalid",
+			"usage: kasim scale <instance-name> --group NAME --replicas COUNT",
+			format,
+			stderr,
+		)
+	}
+	flags := flag.NewFlagSet("scale", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	var output, group string
+	var replicas int64
+	replicas = -1
+	var connected connectedFlags
+	flags.StringVar(&output, "o", "human", "human, json, or yaml")
+	flags.StringVar(&output, "output", "human", "human, json, or yaml")
+	flags.StringVar(&group, "group", "", "exact Node Group")
+	flags.Int64Var(&replicas, "replicas", -1, "desired synthetic Node replicas")
+	addConnectedFlags(flags, &connected, true)
+	if err := flags.Parse(flagArgs); err != nil || flags.NArg() != 0 {
+		message := "scale accepts one exact instance name and flags"
+		if err != nil {
+			message = err.Error()
+		}
+		return writeFailure("scale", "InvocationInvalid", message, format, stderr)
+	}
+	if group == "" || replicas < 0 {
+		return writeFailure(
+			"scale",
+			"InvocationInvalid",
+			"scale requires --group and non-negative --replicas",
+			format,
+			stderr,
+		)
+	}
+	change, err := scenario.Scale(group, replicas)
+	if err != nil {
+		return writeFailure("scale", "ScenarioInvalid", err.Error(), format, stderr)
+	}
+	return runTypedRevision(
+		"scale",
+		nameValue,
+		change,
+		connected,
+		snapshot,
+		connect,
+		format,
+		stdout,
+		stderr,
+	)
+}
+
+func runTypedRevision(
+	command, nameValue string,
+	change scenario.TypedRevisionChange,
+	connected connectedFlags,
+	snapshot catalog.Snapshot,
+	connect application.ConnectorFunc,
+	format presentation.OutputFormat,
+	stdout, stderr io.Writer,
+) int {
+	name, err := domain.ParseName(nameValue)
+	if err != nil {
+		return writeFailure(command, "InvocationInvalid", err.Error(), format, stderr)
+	}
+	if err := validateConnectedFlags(connected, true); err != nil {
+		return writeFailure(command, "InvocationInvalid", err.Error(), format, stderr)
+	}
+	instanceUID, generation, err := revisionPreconditions(
+		connected.instanceUID,
+		connected.generation,
+	)
+	if err != nil {
+		return writeFailure(command, "InvocationInvalid", err.Error(), format, stderr)
+	}
+	runtime, err := application.NewScenarioRuntime(application.RuntimeOptions{
+		Connect: connect,
+		Catalog: snapshot,
+	})
+	if err != nil {
+		return writeFailure(command, "InvocationInvalid", err.Error(), format, stderr)
+	}
+	result, applyErr := runtime.Apply(
+		context.Background(),
+		application.ApplyRequest{
+			Selection: cluster.TargetSelection{
+				KubeconfigPath: connected.kubeconfigPath,
+				ContextName:    connected.contextName,
+			},
+			TypedRevision: &application.TypedRevisionRequest{
+				Name:               name,
+				InstanceUID:        instanceUID,
+				ExpectedGeneration: generation,
+				Change:             change,
+			},
+			Async:   connected.async,
+			Timeout: connected.timeout,
+		},
+	)
+	return writeLifecycle(
+		command,
+		result,
+		applyErr,
+		format,
+		stdout,
+		stderr,
+	)
+}
+
+func runDelete(
+	args []string,
+	snapshot catalog.Snapshot,
+	connect application.ConnectorFunc,
+	format presentation.OutputFormat,
+	stdout, stderr io.Writer,
+) int {
+	nameValue, flagArgs, ok := exactNameArgument(args)
+	if !ok {
+		return writeFailure(
+			"delete",
+			"InvocationInvalid",
+			"usage: kasim delete <instance-name> --instance-uid UID --expected-generation N",
+			format,
+			stderr,
+		)
+	}
+	flags := flag.NewFlagSet("delete", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	var output string
+	var connected connectedFlags
+	flags.StringVar(&output, "o", "human", "human, json, or yaml")
+	flags.StringVar(&output, "output", "human", "human, json, or yaml")
+	addConnectedFlags(flags, &connected, true)
+	if err := flags.Parse(flagArgs); err != nil || flags.NArg() != 0 {
+		message := "delete accepts one exact instance name and safety flags"
+		if err != nil {
+			message = err.Error()
+		}
+		return writeFailure("delete", "InvocationInvalid", message, format, stderr)
+	}
+	name, err := domain.ParseName(nameValue)
+	if err != nil {
+		return writeFailure("delete", "InvocationInvalid", err.Error(), format, stderr)
+	}
+	if err := validateConnectedFlags(connected, true); err != nil {
+		return writeFailure("delete", "InvocationInvalid", err.Error(), format, stderr)
+	}
+	instanceUID, generation, err := revisionPreconditions(
+		connected.instanceUID,
+		connected.generation,
+	)
+	if err != nil {
+		return writeFailure("delete", "InvocationInvalid", err.Error(), format, stderr)
+	}
+	runtime, err := application.NewScenarioRuntime(application.RuntimeOptions{
+		Connect: connect,
+		Catalog: snapshot,
+	})
+	if err != nil {
+		return writeFailure("delete", "InvocationInvalid", err.Error(), format, stderr)
+	}
+	result, deleteErr := runtime.Delete(
+		context.Background(),
+		application.DeleteRequest{
+			Selection: cluster.TargetSelection{
+				KubeconfigPath: connected.kubeconfigPath,
+				ContextName:    connected.contextName,
+			},
+			Name:               name,
+			InstanceUID:        instanceUID,
+			ExpectedGeneration: generation,
+			Async:              connected.async,
+			Timeout:            connected.timeout,
+		},
+	)
+	return writeLifecycle(
+		"delete",
+		result,
+		deleteErr,
+		format,
+		stdout,
+		stderr,
+	)
+}
+
+func exactNameArgument(args []string) (string, []string, bool) {
+	if len(args) == 0 || strings.HasPrefix(args[0], "-") {
+		return "", nil, false
+	}
+	return args[0], args[1:], true
+}
+
+func validateConnectedFlags(values connectedFlags, mutation bool) error {
+	if values.kubeconfigPath == "" || values.contextName == "" {
+		return fmt.Errorf("connected command requires --kubeconfig and --context")
+	}
+	if values.timeout <= 0 {
+		return fmt.Errorf("--timeout must be positive")
+	}
+	if mutation && (values.instanceUID == "" || values.generation == 0) {
+		return fmt.Errorf(
+			"mutation requires --instance-uid and positive --expected-generation",
+		)
+	}
+	if values.generation > math.MaxInt64 {
+		return fmt.Errorf("--expected-generation is too large")
+	}
+	return nil
+}
+
+func revisionPreconditions(
+	instanceUIDValue string,
+	generationValue uint64,
+) (domain.InstanceUID, domain.Generation, error) {
+	generation, err := domain.NewGeneration(int64(generationValue))
+	if err != nil {
+		return domain.InstanceUID{}, domain.Generation{}, err
+	}
+	if instanceUIDValue == "" {
+		return domain.InstanceUID{}, generation, nil
+	}
+	instanceUID, err := domain.ParseInstanceUID(instanceUIDValue)
+	if err != nil {
+		return domain.InstanceUID{}, domain.Generation{}, err
+	}
+	return instanceUID, generation, nil
 }
 
 func requestedOutputFormat(args []string) (presentation.OutputFormat, error) {
@@ -514,6 +1122,164 @@ func evidenceResults(evidence []catalog.EvidenceReceipt) []presentation.Evidence
 		})
 	}
 	return results
+}
+
+func writeLifecycle(
+	command string,
+	result application.LifecycleResult,
+	lifecycleErr error,
+	format presentation.OutputFormat,
+	stdout, stderr io.Writer,
+) int {
+	presented := lifecycleResult(result)
+	if lifecycleErr == nil {
+		return writeSuccess(
+			presentation.Success("ScenarioLifecycle", command, presented),
+			format,
+			stdout,
+			stderr,
+		)
+	}
+	diagnostic := application.DiagnosticForError(lifecycleErr)
+	envelope := presentation.Failure(command, diagnostic)
+	if result.Receipt.InstanceName().String() != "" {
+		envelope = presentation.FailureWithResult(command, diagnostic, presented)
+	}
+	encoded, err := presentation.Render(envelope, format)
+	if err != nil {
+		_, _ = io.WriteString(
+			stderr,
+			"Error [InvocationInvalid]: command failed safely\n",
+		)
+		return 2
+	}
+	_, _ = stderr.Write(encoded)
+	return diagnostic.ExitCategory().Code()
+}
+
+func lifecycleResult(
+	result application.LifecycleResult,
+) presentation.LifecycleResult {
+	profileDigests := result.Receipt.ProfileDigests()
+	presentedDigests := make([]string, 0, len(profileDigests))
+	for _, digest := range profileDigests {
+		presentedDigests = append(presentedDigests, digest.String())
+	}
+	presented := presentation.LifecycleResult{
+		Connection: presentation.ConnectionResult{
+			ContextName:       result.Connection.ContextName,
+			APIServerURL:      result.Connection.APIServerURL,
+			TargetFingerprint: result.Connection.TargetFingerprint.String(),
+			CADigest:          result.Connection.CADigest.String(),
+		},
+		Receipt: presentation.RevisionReceiptResult{
+			InstanceName:       result.Receipt.InstanceName().String(),
+			InstanceUID:        result.Receipt.InstanceUID().String(),
+			DesiredGeneration:  result.Receipt.DesiredGeneration().Value(),
+			ObservedGeneration: result.Receipt.ObservedGeneration().Value(),
+			RevisionDigest:     result.Receipt.RevisionDigest().String(),
+			ProfileDigests:     presentedDigests,
+			RevisionAccepted:   result.Receipt.RevisionAccepted(),
+			NoOp:               result.Receipt.NoOp(),
+		},
+		Warning: result.Warning,
+	}
+	if result.Snapshot != nil {
+		snapshot := result.Snapshot
+		profiles := make(
+			[]presentation.ProfileReceiptResult,
+			0,
+			len(snapshot.Profiles),
+		)
+		for _, profile := range snapshot.Profiles {
+			profiles = append(profiles, presentation.ProfileReceiptResult{
+				ID:       profile.ID,
+				Revision: profile.Revision,
+				Digest:   profile.Digest.String(),
+				Class:    profile.Class,
+			})
+		}
+		pools := make([]presentation.PoolResult, 0, len(snapshot.Pools))
+		for _, pool := range snapshot.Pools {
+			pools = append(pools, presentation.PoolResult{
+				Group:            pool.Group,
+				Pool:             pool.Pool,
+				RequestedTotal:   pool.RequestedTotal,
+				RequestedHealthy: pool.RequestedHealthy,
+				ObservedTotal:    pool.ObservedTotal,
+				ObservedHealthy:  pool.ObservedHealthy,
+			})
+		}
+		inventory := make(
+			[]presentation.InventoryResult,
+			0,
+			len(snapshot.Inventory),
+		)
+		for _, item := range snapshot.Inventory {
+			inventory = append(inventory, presentation.InventoryResult{
+				APIVersion: item.APIVersion,
+				Kind:       item.Kind,
+				Count:      item.Count,
+			})
+		}
+		diagnostics := make(
+			[]presentation.SnapshotDiagnosticResult,
+			0,
+			len(snapshot.Diagnostics),
+		)
+		for _, diagnostic := range snapshot.Diagnostics {
+			diagnostics = append(
+				diagnostics,
+				presentation.SnapshotDiagnosticResult{
+					Code:             diagnostic.Code,
+					Message:          diagnostic.Message,
+					Retryable:        diagnostic.Retryable,
+					RevisionAccepted: diagnostic.RevisionAccepted,
+					ExitCategory:     diagnostic.ExitCategory,
+				},
+			)
+		}
+		conditions := make(
+			[]presentation.ConditionResult,
+			0,
+			len(snapshot.Conditions),
+		)
+		for _, condition := range snapshot.Conditions {
+			transitionTime := ""
+			if !condition.LastTransitionTime.IsZero() {
+				transitionTime = condition.LastTransitionTime.
+					UTC().
+					Format(time.RFC3339Nano)
+			}
+			conditions = append(conditions, presentation.ConditionResult{
+				Type:               condition.Type,
+				Status:             condition.Status,
+				Reason:             condition.Reason,
+				Message:            condition.Message,
+				ObservedGeneration: condition.ObservedGeneration,
+				LastTransitionTime: transitionTime,
+			})
+		}
+		presented.Snapshot = &presentation.SnapshotResult{
+			InstanceName:         snapshot.InstanceName.String(),
+			InstanceUID:          snapshot.InstanceUID.String(),
+			TargetFingerprint:    snapshot.TargetFingerprint.String(),
+			DesiredGeneration:    snapshot.DesiredGeneration.Value(),
+			ObservedGeneration:   snapshot.ObservedGeneration.Value(),
+			RevisionDigest:       snapshot.RevisionDigest.String(),
+			Profiles:             profiles,
+			Phase:                snapshot.Phase,
+			Pools:                pools,
+			PoolsTruncated:       snapshot.PoolsTruncated,
+			Inventory:            inventory,
+			InventoryTruncated:   snapshot.InventoryTruncated,
+			Diagnostics:          diagnostics,
+			DiagnosticsTruncated: snapshot.DiagnosticsTruncated,
+			Conditions:           conditions,
+			ConditionsTruncated:  snapshot.ConditionsTruncated,
+		}
+	}
+	return presented
 }
 
 func writeSuccess(

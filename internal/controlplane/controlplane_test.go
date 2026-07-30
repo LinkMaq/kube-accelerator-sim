@@ -611,6 +611,72 @@ func runSubmissionContract(t *testing.T, adapter controlplane.ScenarioControlPla
 		updatedRecord.Revisions[1].Digest != nextDigest {
 		t.Fatalf("logical revisions are not immutable append-only: %#v", updatedRecord.Revisions)
 	}
+
+	wrongInstanceUID, err := domain.ParseInstanceUID("wrong-instance-uid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wrongDeleteUID := controlplane.DeletionCommand{
+		Target: fixture.target,
+		Name:   fixture.name,
+		Preconditions: controlplane.DeletionPreconditions{
+			InstanceUID:        wrongInstanceUID,
+			ExpectedGeneration: updated.DesiredGeneration,
+		},
+	}
+	if _, err := adapter.Delete(
+		ctx,
+		wrongDeleteUID,
+	); controlplane.ErrorCodeOf(err) != controlplane.ErrorUIDConflict {
+		t.Fatalf("delete UID error = %v", err)
+	}
+	wrongDeleteGeneration := wrongDeleteUID
+	wrongDeleteGeneration.Preconditions.InstanceUID = updated.InstanceUID
+	wrongDeleteGeneration.Preconditions.ExpectedGeneration = generation(t, 99)
+	if _, err := adapter.Delete(
+		ctx,
+		wrongDeleteGeneration,
+	); controlplane.ErrorCodeOf(err) != controlplane.ErrorGenerationConflict {
+		t.Fatalf("delete generation error = %v", err)
+	}
+	deletion, err := adapter.Delete(ctx, controlplane.DeletionCommand{
+		Target: fixture.target,
+		Name:   fixture.name,
+		Preconditions: controlplane.DeletionPreconditions{
+			InstanceUID:        updated.InstanceUID,
+			ExpectedGeneration: updated.DesiredGeneration,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !deletion.Accepted ||
+		deletion.NoOp ||
+		deletion.InstanceUID != updated.InstanceUID ||
+		deletion.DesiredGeneration != updated.DesiredGeneration {
+		t.Fatalf("unexpected deletion receipt: %#v", deletion)
+	}
+	deleting, err := adapter.Read(ctx, fixture.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !deleting.DeletionRequested {
+		t.Fatal("accepted deletion did not become durable desired state")
+	}
+	retry, err := adapter.Delete(ctx, controlplane.DeletionCommand{
+		Target: fixture.target,
+		Name:   fixture.name,
+		Preconditions: controlplane.DeletionPreconditions{
+			InstanceUID:        updated.InstanceUID,
+			ExpectedGeneration: updated.DesiredGeneration,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if retry.Accepted || !retry.NoOp {
+		t.Fatalf("deletion retry was not idempotent: %#v", retry)
+	}
 }
 
 type fixture struct {

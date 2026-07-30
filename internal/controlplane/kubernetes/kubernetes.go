@@ -14,6 +14,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -201,6 +202,117 @@ func (adapter *Adapter) Submit(
 		false,
 		command.ServerDryRun,
 	), nil
+}
+
+// Delete atomically checks logical identity, then asks Kubernetes to set
+// deletion desired state with exact UID and resourceVersion preconditions.
+func (adapter *Adapter) Delete(
+	ctx context.Context,
+	command controlplane.DeletionCommand,
+) (controlplane.DeletionReceipt, error) {
+	if err := controlplane.ValidateDeletionCommand(command); err != nil {
+		return controlplane.DeletionReceipt{}, err
+	}
+	current := &simulationv1alpha1.ScenarioInstance{}
+	if err := adapter.client.Get(
+		ctx,
+		client.ObjectKey{Name: command.Name.String()},
+		current,
+	); err != nil {
+		if apierrors.IsNotFound(err) {
+			return controlplane.DeletionReceipt{}, controlplane.NewError(
+				controlplane.ErrorNotFound,
+				fmt.Sprintf(
+					"Scenario Instance %q was not found",
+					command.Name.String(),
+				),
+				"",
+			)
+		}
+		return controlplane.DeletionReceipt{}, fmt.Errorf(
+			"read Scenario Instance before delete: %w",
+			err,
+		)
+	}
+	record, err := toRecord(current)
+	if err != nil {
+		return controlplane.DeletionReceipt{}, err
+	}
+	if record.Target.Fingerprint != command.Target.Fingerprint {
+		return controlplane.DeletionReceipt{}, controlplane.NewError(
+			controlplane.ErrorTargetMismatch,
+			"Scenario Instance target fingerprint is immutable",
+			"",
+		)
+	}
+	if record.InstanceUID != command.Preconditions.InstanceUID {
+		return controlplane.DeletionReceipt{}, controlplane.NewError(
+			controlplane.ErrorUIDConflict,
+			"Scenario Instance UID precondition failed",
+			"",
+		)
+	}
+	if record.DesiredGeneration != command.Preconditions.ExpectedGeneration {
+		return controlplane.DeletionReceipt{}, controlplane.NewError(
+			controlplane.ErrorGenerationConflict,
+			"Scenario Instance generation precondition failed",
+			"",
+		)
+	}
+	if record.DeletionRequested {
+		return deletionReceipt(record, false, true), nil
+	}
+
+	uid := types.UID(record.InstanceUID.String())
+	resourceVersion := record.ResourceVersion
+	if err := adapter.client.Delete(
+		ctx,
+		current,
+		&client.DeleteOptions{Raw: &metav1.DeleteOptions{
+			Preconditions: &metav1.Preconditions{
+				UID:             &uid,
+				ResourceVersion: &resourceVersion,
+			},
+		}},
+	); err != nil {
+		switch {
+		case apierrors.IsConflict(err):
+			return controlplane.DeletionReceipt{}, controlplane.NewError(
+				controlplane.ErrorResourceVersionConflict,
+				"Scenario Instance changed during deletion",
+				"",
+			)
+		case apierrors.IsNotFound(err):
+			return controlplane.DeletionReceipt{}, controlplane.NewError(
+				controlplane.ErrorNotFound,
+				"Scenario Instance disappeared during deletion",
+				"",
+			)
+		default:
+			return controlplane.DeletionReceipt{}, fmt.Errorf(
+				"delete exact Scenario Instance: %w",
+				err,
+			)
+		}
+	}
+	deleting := &simulationv1alpha1.ScenarioInstance{}
+	if err := adapter.client.Get(
+		ctx,
+		client.ObjectKey{Name: command.Name.String()},
+		deleting,
+	); err == nil {
+		updated, translateErr := toRecord(deleting)
+		if translateErr != nil {
+			return controlplane.DeletionReceipt{}, translateErr
+		}
+		return deletionReceipt(updated, true, false), nil
+	} else if !apierrors.IsNotFound(err) {
+		return controlplane.DeletionReceipt{}, fmt.Errorf(
+			"read accepted Scenario Instance deletion: %w",
+			err,
+		)
+	}
+	return deletionReceipt(record, true, false), nil
 }
 
 func (adapter *Adapter) create(
@@ -633,6 +745,20 @@ func receipt(
 		Accepted:          accepted,
 		NoOp:              noOp,
 		DryRun:            dryRun,
+	}
+}
+
+func deletionReceipt(
+	record controlplane.InstanceRecord,
+	accepted,
+	noOp bool,
+) controlplane.DeletionReceipt {
+	return controlplane.DeletionReceipt{
+		InstanceUID:       record.InstanceUID,
+		DesiredGeneration: record.DesiredGeneration,
+		ResourceVersion:   record.ResourceVersion,
+		Accepted:          accepted,
+		NoOp:              noOp,
 	}
 }
 

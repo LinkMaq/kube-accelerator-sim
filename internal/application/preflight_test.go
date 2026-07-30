@@ -31,7 +31,6 @@ func TestApplyPreflightRunsInOrderAndMakesZeroPersistentWrites(t *testing.T) {
 	update.Preconditions = controlplane.Preconditions{
 		InstanceUID:        created.InstanceUID,
 		ExpectedGeneration: created.DesiredGeneration,
-		ResourceVersion:    created.ResourceVersion,
 	}
 	clusterAdapter := recording.New(recording.Options{
 		Capabilities: cluster.TargetCapabilities{
@@ -84,6 +83,7 @@ func TestApplyPreflightRunsInOrderAndMakesZeroPersistentWrites(t *testing.T) {
 	}
 	if !result.Proposed.DryRun || result.Proposed.Accepted ||
 		result.Proposed.DesiredGeneration.Value() != 2 ||
+		result.Intent.Preconditions.ResourceVersion != created.ResourceVersion ||
 		result.Warning == "" {
 		t.Fatalf("unexpected preflight result: %#v", result)
 	}
@@ -294,10 +294,19 @@ func (adapter *tracedControlPlane) Submit(
 	return adapter.delegate.Submit(ctx, command)
 }
 
+func (adapter *tracedControlPlane) Delete(
+	ctx context.Context,
+	command controlplane.DeletionCommand,
+) (controlplane.DeletionReceipt, error) {
+	*adapter.trace = append(*adapter.trace, "delete")
+	return adapter.delegate.Delete(ctx, command)
+}
+
 func (adapter *tracedControlPlane) Watch(
 	ctx context.Context,
 	cursor controlplane.WatchCursor,
 ) (controlplane.InstanceEventStream, error) {
+	*adapter.trace = append(*adapter.trace, "watch")
 	return adapter.delegate.Watch(ctx, cursor)
 }
 
