@@ -2,6 +2,7 @@ package e2e_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -71,6 +72,28 @@ func TestStableDRASchedulerAllocation(t *testing.T) {
 	)
 	if !strings.Contains(discovery, `"groupVersion":"resource.k8s.io/v1"`) {
 		t.Fatalf("stable DRA discovery returned an incompatible document: %s", discovery)
+	}
+	versionJSON := kubeOutput(
+		t,
+		ctx,
+		kubectlBinary,
+		kubeconfig,
+		"get",
+		"--raw=/version",
+	)
+	var versionDocument struct {
+		GitVersion string `json:"gitVersion"`
+	}
+	if err := json.Unmarshal([]byte(versionJSON), &versionDocument); err != nil {
+		t.Fatalf("decode Kubernetes version: %v\n%s", err, versionJSON)
+	}
+	if expected := os.Getenv("KASIM_KUBERNETES_PATCH"); expected != "" &&
+		versionDocument.GitVersion != "v"+expected {
+		t.Fatalf(
+			"DRA server version = %q, want v%s",
+			versionDocument.GitVersion,
+			expected,
+		)
 	}
 	nodeName := kubeOutput(
 		t,
@@ -220,6 +243,113 @@ spec:
 		"get",
 		"resourceclaim/kasim-dra-smoke",
 		"-o=jsonpath={.status.reservedFor[0].uid}",
+	)
+
+	runKube(
+		t,
+		ctx,
+		kubectlBinary,
+		kubeconfig,
+		"delete",
+		"pod/kasim-dra-smoke",
+		"resourceclaim/kasim-dra-smoke",
+		"--wait=true",
+		"--timeout=120s",
+	)
+	reuseManifest := fmt.Sprintf(`apiVersion: resource.k8s.io/v1
+kind: ResourceClaim
+metadata:
+  name: kasim-dra-reuse
+spec:
+  devices:
+    requests:
+    - name: accelerator
+      exactly:
+        deviceClassName: kasim-dra-smoke
+        allocationMode: ExactCount
+        count: 1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kasim-dra-reuse
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: %s
+  tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+  resourceClaims:
+  - name: accelerator
+    resourceClaimName: kasim-dra-reuse
+  containers:
+  - name: workload
+    image: registry.k8s.io/pause:3.10
+    resources:
+      claims:
+      - name: accelerator
+`, nodeName)
+	kubectlInput(
+		t,
+		ctx,
+		kubectlBinary,
+		kubeconfig,
+		[]byte(reuseManifest),
+		"apply",
+		"--server-side",
+		"-f",
+		"-",
+	)
+	waitFor(t, ctx, "stable DRA device reuse", func() bool {
+		return tryKubeOutput(
+			ctx,
+			kubectlBinary,
+			kubeconfig,
+			"kasim-device-0",
+			"get",
+			"resourceclaim/kasim-dra-reuse",
+			"-o=jsonpath={.status.allocation.devices.results[0].device}",
+		) && tryKubeOutput(
+			ctx,
+			kubectlBinary,
+			kubeconfig,
+			nodeName,
+			"get",
+			"pod/kasim-dra-reuse",
+			"-o=jsonpath={.spec.nodeName}",
+		)
+	})
+	runKube(
+		t,
+		ctx,
+		kubectlBinary,
+		kubeconfig,
+		"delete",
+		"pod/kasim-dra-reuse",
+		"resourceclaim/kasim-dra-reuse",
+		"resourceslice/kasim-dra-smoke",
+		"deviceclass/kasim-dra-smoke",
+		"--wait=true",
+		"--timeout=120s",
+	)
+	for _, object := range []string{
+		"pod/kasim-dra-reuse",
+		"resourceclaim/kasim-dra-reuse",
+		"resourceslice/kasim-dra-smoke",
+		"deviceclass/kasim-dra-smoke",
+	} {
+		if tryKube(ctx, kubectlBinary, kubeconfig, "get", object) {
+			t.Fatalf("DRA cleanup left %s", object)
+		}
+	}
+	writeDRACompatibilityReceipt(
+		t,
+		ctx,
+		kindBinary,
+		kubectlBinary,
+		versionDocument.GitVersion,
+		nodeImage,
 	)
 }
 

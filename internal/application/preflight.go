@@ -66,12 +66,10 @@ func PreflightApply(
 		[]cluster.AccessRequirement(nil),
 		request.RequiredAccess...,
 	)
-	if intent.Fidelity.String() == "dra-control-plane" {
-		requiredAccess = append(
-			requiredAccess,
-			draObservationAccessRequirements()...,
-		)
-	}
+	requiredAccess = append(
+		requiredAccess,
+		ownershipObservationAccessRequirements(intent.Fidelity.String())...,
+	)
 	if request.Selection.KubeconfigPath == "" ||
 		request.Selection.ContextName == "" {
 		return PreflightApplyResult{}, cluster.NewError(
@@ -259,6 +257,34 @@ func PreflightApply(
 	return result, nil
 }
 
+func ownershipObservationAccessRequirements(
+	fidelity string,
+) []cluster.AccessRequirement {
+	requirements := []cluster.AccessRequirement{
+		{
+			Verb:     "list",
+			Resource: "nodes",
+		},
+		{
+			Verb:       "list",
+			Group:      "coordination.k8s.io",
+			Resource:   "leases",
+			Namespace:  "kube-node-lease",
+			Namespaced: true,
+		},
+		{
+			Verb:          "list",
+			Resource:      "pods",
+			Namespaced:    true,
+			AllNamespaces: true,
+		},
+	}
+	if fidelity != "dra-control-plane" {
+		return requirements
+	}
+	return append(requirements, draObservationAccessRequirements()...)
+}
+
 func draObservationAccessRequirements() []cluster.AccessRequirement {
 	return []cluster.AccessRequirement{
 		{
@@ -275,12 +301,6 @@ func draObservationAccessRequirements() []cluster.AccessRequirement {
 			Verb:          "list",
 			Group:         "resource.k8s.io",
 			Resource:      "resourceclaims",
-			Namespaced:    true,
-			AllNamespaces: true,
-		},
-		{
-			Verb:          "list",
-			Resource:      "pods",
 			Namespaced:    true,
 			AllNamespaces: true,
 		},

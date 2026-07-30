@@ -43,6 +43,20 @@ rules:
   - apiGroups: [authorization.k8s.io]
     resources: [selfsubjectaccessreviews]
     verbs: [create]
+  - apiGroups: [""]
+    resources: [nodes]
+    verbs: [get, list]
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list]
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    verbs: [get, list]
+  {{- if .Values.dra.enabled }}
+  - apiGroups: [resource.k8s.io]
+    resources: [deviceclasses, resourceslices, resourceclaims]
+    verbs: [get, list]
+  {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

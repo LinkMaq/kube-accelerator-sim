@@ -299,23 +299,28 @@ func (runtime *ScenarioRuntime) applyTyped(
 		)
 	}
 
+	requiredAccess := []cluster.AccessRequirement{
+		{
+			Verb:     "get",
+			Group:    "simulation.kasim.io",
+			Resource: "scenarioinstances",
+			Name:     typed.Name.String(),
+		},
+		{
+			Verb:     "update",
+			Group:    "simulation.kasim.io",
+			Resource: "scenarioinstances",
+			Name:     typed.Name.String(),
+		},
+	}
+	requiredAccess = append(
+		requiredAccess,
+		ownershipObservationAccessRequirements("")...,
+	)
 	connected, err := runtime.connectAndPreflight(
 		ctx,
 		request.Selection,
-		[]cluster.AccessRequirement{
-			{
-				Verb:     "get",
-				Group:    "simulation.kasim.io",
-				Resource: "scenarioinstances",
-				Name:     typed.Name.String(),
-			},
-			{
-				Verb:     "update",
-				Group:    "simulation.kasim.io",
-				Resource: "scenarioinstances",
-				Name:     typed.Name.String(),
-			},
-		},
+		requiredAccess,
 	)
 	if err != nil {
 		return LifecycleResult{}, err
@@ -378,6 +383,15 @@ func (runtime *ScenarioRuntime) applyTyped(
 			"stored canonical Scenario fidelity does not match its instance",
 			"",
 		)
+	}
+	if current.Fidelity.String() == "dra-control-plane" {
+		if err := authorizeRequirements(
+			ctx,
+			connected.Cluster,
+			draObservationAccessRequirements(),
+		); err != nil {
+			return LifecycleResult{}, err
+		}
 	}
 	if current.DesiredGeneration.Value() >= math.MaxInt64 {
 		return LifecycleResult{}, controlplane.NewError(
@@ -833,12 +847,23 @@ func (runtime *ScenarioRuntime) connectAndPreflight(
 	if _, err := connected.Cluster.Discover(ctx); err != nil {
 		return ConnectedTarget{}, err
 	}
-	report, err := connected.Cluster.Authorize(ctx, requirements)
-	if err != nil {
+	if err := authorizeRequirements(ctx, connected.Cluster, requirements); err != nil {
 		return ConnectedTarget{}, err
 	}
+	return connected, nil
+}
+
+func authorizeRequirements(
+	ctx context.Context,
+	clusterPort cluster.Port,
+	requirements []cluster.AccessRequirement,
+) error {
+	report, err := clusterPort.Authorize(ctx, requirements)
+	if err != nil {
+		return err
+	}
 	if len(report.Decisions) != len(requirements) {
-		return ConnectedTarget{}, cluster.NewError(
+		return cluster.NewError(
 			cluster.ErrorCapabilityUnavailable,
 			"authorization response did not cover every exact operation",
 			false,
@@ -846,7 +871,7 @@ func (runtime *ScenarioRuntime) connectAndPreflight(
 	}
 	for index, decision := range report.Decisions {
 		if decision.Requirement != requirements[index] || !decision.Allowed {
-			return ConnectedTarget{}, cluster.NewError(
+			return cluster.NewError(
 				cluster.ErrorAuthorizationDenied,
 				fmt.Sprintf(
 					"authorization denied %s on %s/%s",
@@ -858,7 +883,7 @@ func (runtime *ScenarioRuntime) connectAndPreflight(
 			)
 		}
 	}
-	return connected, nil
+	return nil
 }
 
 func deletionRevisionReceipt(

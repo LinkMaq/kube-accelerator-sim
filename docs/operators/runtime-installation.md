@@ -26,7 +26,7 @@ The chart defines separate deny-by-default identities:
 | Persona | Intended use | Can mutate Nodes, Leases, or DRA inventory |
 | --- | --- | --- |
 | observer | Read and watch Scenario Instances | No |
-| operator | Submit, update, observe, and delete exact Scenario Instances; read the `kube-system` UID; create self-access reviews | No |
+| operator | Submit, update, observe, and delete exact Scenario Instances; read the `kube-system` UID and simulator-owned Node/Lease/Pod inventory; create self-access reviews | No |
 | controller | Reconcile exact simulator-owned resources | Yes, only through application ownership checks |
 | KWOK controller | Maintain the pinned simulated Node/Pod surfaces | Only its exact runtime surface |
 | Stage installer | Helm hooks that apply/delete five exact pinned Stage names | Only those five Stage objects |
@@ -55,3 +55,6 @@ resources, and the cluster itself are outside the uninstall ownership set.
 The controller uses pinned multi-architecture build/runtime base image indexes.
 KWOK v0.8.0 assets and image are content-addressed. The complete input lock for
 SBOM and provenance generation is in `release/inputs.json`.
+
+The exact Kubernetes patch/image validation lock and the CI evidence cadence
+are documented in [Kubernetes compatibility](kubernetes-compatibility.md).

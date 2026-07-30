@@ -1,0 +1,106 @@
+name: Compatibility scheduling row
+
+on:
+  workflow_call:
+    inputs:
+      kubernetes:
+        required: true
+        type: string
+      classification:
+        required: true
+        type: string
+      node_image:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  scheduling:
+    name: Scheduling Kubernetes ${{ inputs.kubernetes }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Authenticate to GHCR
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install pinned harness tools
+        shell: bash
+        run: |
+          tool_dir="${RUNNER_TEMP}/kasim-compat-tools"
+          mkdir -p "${tool_dir}"
+          curl --fail --location --silent --show-error \
+            https://github.com/kubernetes-sigs/kind/releases/download/v0.32.0/kind-linux-amd64 \
+            --output "${tool_dir}/kind"
+          printf '%s  %s\n' \
+            50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54 \
+            "${tool_dir}/kind" | sha256sum --check -
+          curl --fail --location --silent --show-error \
+            https://dl.k8s.io/release/v1.35.5/bin/linux/amd64/kubectl \
+            --output "${tool_dir}/kubectl"
+          printf '%s  %s\n' \
+            90f75ea6ecc9ea5633262e1c0b83a40560003b30fc94a04cb099404fcef0c224 \
+            "${tool_dir}/kubectl" | sha256sum --check -
+          helm_archive="${RUNNER_TEMP}/helm-v4.2.3-linux-amd64.tar.gz"
+          curl --fail --location --silent --show-error \
+            https://get.helm.sh/helm-v4.2.3-linux-amd64.tar.gz \
+            --output "${helm_archive}"
+          printf '%s  %s\n' \
+            e9b88b4ee95b18c706839c28d3a0220e5bc470e9cd9262410c90793c45ff8b7c \
+            "${helm_archive}" | sha256sum --check -
+          tar --extract --gzip --file "${helm_archive}" \
+            --strip-components=1 --directory "${tool_dir}" linux-amd64/helm
+          chmod 0755 "${tool_dir}/kind" "${tool_dir}/kubectl" "${tool_dir}/helm"
+          printf 'KIND_BIN=%s\n' "${tool_dir}/kind" >> "${GITHUB_ENV}"
+          printf 'KUBECTL_BIN=%s\n' "${tool_dir}/kubectl" >> "${GITHUB_ENV}"
+          printf 'HELM_BIN=%s\n' "${tool_dir}/helm" >> "${GITHUB_ENV}"
+
+      - name: Build product CLI and runtime image
+        shell: bash
+        run: |
+          mkdir -p dist
+          go build -trimpath -o dist/kasim ./cmd/kasim
+          docker build \
+            --build-arg VERSION=0.1.0 \
+            --build-arg SOURCE_REVISION="${GITHUB_SHA}" \
+            --build-arg BUILD_DATE=1970-01-01T00:00:00Z \
+            --tag kasim-controller:0.1.0 \
+            .
+
+      - name: Exercise real scheduling and safety lifecycle
+        env:
+          KASIM_E2E_COMPATIBILITY: "1"
+          KASIM_KUBERNETES_PATCH: ${{ inputs.kubernetes }}
+          KASIM_KIND_NODE_IMAGE: ${{ inputs.node_image }}
+          KASIM_NODE_IMAGE_CLASSIFICATION: ${{ inputs.classification }}
+          KASIM_CONTROLLER_IMAGE: kasim-controller:0.1.0
+          KASIM_CLI_BIN: ${{ github.workspace }}/dist/kasim
+          KASIM_COMPATIBILITY_RECEIPT: ${{ runner.temp }}/compatibility-receipt-${{ inputs.kubernetes }}-scheduling.json
+        run: >-
+          go test -v ./test/e2e
+          -run TestCompatibilitySchedulingLifecycle
+          -count=1
+          -timeout=25m
+
+      - name: Upload compatibility receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: compatibility-receipt-${{ inputs.kubernetes }}-scheduling
+          path: ${{ runner.temp }}/compatibility-receipt-${{ inputs.kubernetes }}-scheduling.json
+          if-no-files-found: error
+          retention-days: 90

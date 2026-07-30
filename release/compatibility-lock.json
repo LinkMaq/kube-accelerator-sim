@@ -1,0 +1,84 @@
+{
+  "schemaVersion": "kasim.io/compatibility-lock/v1alpha1",
+  "checkedAt": "2026-07-30",
+  "kindVersion": "v0.32.0",
+  "kindBinarySHA256": "50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54",
+  "containerProvider": "docker",
+  "hostArchitecture": "linux/amd64",
+  "projectBuiltSourceRevision": "4127f96dda8907a9ac6d1b73b2f3019fe87a704e",
+  "projectBuiltWorkflowRun": "https://github.com/LinkMaq/kube-accelerator-sim/actions/runs/30561224966",
+  "rows": [
+    {
+      "kubernetes": "v1.30.14",
+      "upstreamState": "eol",
+      "classification": "project-built",
+      "nodeImage": "ghcr.io/linkmaq/kube-accelerator-sim-kind-node:v1.30.14-kind-v0.32.0-amd64@sha256:a73107ec2a139b8ced09922eb0c129731eb0f23d0c37f741d038a6def0e39b25",
+      "kubernetesSourceSHA256": "ff77071bcdeb4187a8f7aae0372dcc9e8b776ae054c095fa3ae0c58268b5c694",
+      "modes": [
+        "scheduling"
+      ]
+    },
+    {
+      "kubernetes": "v1.31.14",
+      "upstreamState": "eol",
+      "classification": "kind-release-paired",
+      "nodeImage": "kindest/node:v1.31.14@sha256:6f86cf509dbb42767b6e79debc3f2c32e4ee01386f0489b3b2be24b0a55aac2b",
+      "modes": [
+        "scheduling"
+      ]
+    },
+    {
+      "kubernetes": "v1.32.13",
+      "upstreamState": "eol",
+      "classification": "project-built",
+      "nodeImage": "ghcr.io/linkmaq/kube-accelerator-sim-kind-node:v1.32.13-kind-v0.32.0-amd64@sha256:5fa15086d3d25ca0f2a60b047a625aa31f8ab625d63b1779272dab8156885cf4",
+      "kubernetesSourceSHA256": "92904c52dbb9e90844b3112a5f62e6a1e5d9018fb5c0dcef0a75cd907a7dd4bb",
+      "modes": [
+        "scheduling"
+      ]
+    },
+    {
+      "kubernetes": "v1.33.13",
+      "upstreamState": "eol",
+      "classification": "project-built",
+      "nodeImage": "ghcr.io/linkmaq/kube-accelerator-sim-kind-node:v1.33.13-kind-v0.32.0-amd64@sha256:adf6a89b8b346a7f922faddeea66d347486e099091f91a5c996fb2e289c4d901",
+      "kubernetesSourceSHA256": "96eaf166949ffdf461fdef025c07bd145eaa6d771d027b61f87e8d4fc0842303",
+      "modes": [
+        "scheduling"
+      ]
+    },
+    {
+      "kubernetes": "v1.34.10",
+      "upstreamState": "active",
+      "classification": "project-built",
+      "nodeImage": "ghcr.io/linkmaq/kube-accelerator-sim-kind-node:v1.34.10-kind-v0.32.0-amd64@sha256:392fc6033fb6f89b126061769abc59200c0dbacd9858ad6c53d5a9a412b20fbe",
+      "kubernetesSourceSHA256": "be15fc6e9bd5428a5b5828524928f9c5fca1dd7910a9b6d8011676e820167f80",
+      "modes": [
+        "scheduling",
+        "dra-control-plane"
+      ]
+    },
+    {
+      "kubernetes": "v1.35.7",
+      "upstreamState": "active",
+      "classification": "project-built",
+      "nodeImage": "ghcr.io/linkmaq/kube-accelerator-sim-kind-node:v1.35.7-kind-v0.32.0-amd64@sha256:947caef333dfd456120be6920ea27255401f4014e08864183b55843c2decb093",
+      "kubernetesSourceSHA256": "9df8ebace074f645824325748e645cb80487b481f45bf28bafffa156097c5fc9",
+      "modes": [
+        "scheduling",
+        "dra-control-plane"
+      ]
+    },
+    {
+      "kubernetes": "v1.36.3",
+      "upstreamState": "active",
+      "classification": "project-built",
+      "nodeImage": "ghcr.io/linkmaq/kube-accelerator-sim-kind-node:v1.36.3-kind-v0.32.0-amd64@sha256:91336f2737cf3ae7039c68945de957c66bad889e6db90bf5d3568293f1ab73db",
+      "kubernetesSourceSHA256": "401f6286a17a37b0a546c87d6ba294bc6cee9f54095cf4c793162110e501b02a",
+      "modes": [
+        "scheduling",
+        "dra-control-plane"
+      ]
+    }
+  ]
+}

@@ -142,6 +142,13 @@ func TestChartRendersOwnershipBoundedSecureRuntime(t *testing.T) {
 		"contract-kasim-runtime-controller",
 	)
 	assertControllerDenyList(t, controllerRole)
+	operatorRole := requireObject(
+		t,
+		objects,
+		"ClusterRole",
+		"contract-kasim-runtime-operator",
+	)
+	assertOperatorObservationIsReadOnly(t, operatorRole)
 }
 
 func TestVendoredRuntimeAssetsMatchCanonicalLocks(t *testing.T) {
@@ -514,6 +521,46 @@ func assertControllerDenyList(t *testing.T, role manifest) {
 	} {
 		if strings.Contains(source, forbidden) {
 			t.Errorf("%s grants forbidden permission %s", objectName(role), forbidden)
+		}
+	}
+}
+
+func assertOperatorObservationIsReadOnly(t *testing.T, role manifest) {
+	t.Helper()
+	required := map[string]bool{
+		"/nodes":                         false,
+		"/pods":                          false,
+		"coordination.k8s.io/leases":     false,
+		"resource.k8s.io/deviceclasses":  false,
+		"resource.k8s.io/resourceslices": false,
+		"resource.k8s.io/resourceclaims": false,
+	}
+	for _, rule := range role.Rules {
+		for _, resource := range rule.Resources {
+			key := strings.Join(rule.APIGroups, ",") + "/" + resource
+			if _, observed := required[key]; !observed {
+				continue
+			}
+			if !slices.Contains(rule.Verbs, "get") ||
+				!slices.Contains(rule.Verbs, "list") {
+				t.Errorf("%s lacks read-only observation for %s", objectName(role), key)
+			}
+			for _, forbidden := range []string{"create", "update", "patch", "delete"} {
+				if slices.Contains(rule.Verbs, forbidden) {
+					t.Errorf(
+						"%s grants operator %s on observed resource %s",
+						objectName(role),
+						forbidden,
+						key,
+					)
+				}
+			}
+			required[key] = true
+		}
+	}
+	for resource, found := range required {
+		if !found {
+			t.Errorf("%s lacks observation resource %s", objectName(role), resource)
 		}
 	}
 }

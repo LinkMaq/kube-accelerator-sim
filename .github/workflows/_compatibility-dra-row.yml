@@ -1,0 +1,82 @@
+name: Compatibility DRA row
+
+on:
+  workflow_call:
+    inputs:
+      kubernetes:
+        required: true
+        type: string
+      classification:
+        required: true
+        type: string
+      node_image:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  dra:
+    name: Stable DRA Kubernetes ${{ inputs.kubernetes }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Authenticate to GHCR
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install pinned kind and kubectl
+        shell: bash
+        run: |
+          tool_dir="${RUNNER_TEMP}/kasim-dra-compat-tools"
+          mkdir -p "${tool_dir}"
+          curl --fail --location --silent --show-error \
+            https://github.com/kubernetes-sigs/kind/releases/download/v0.32.0/kind-linux-amd64 \
+            --output "${tool_dir}/kind"
+          printf '%s  %s\n' \
+            50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54 \
+            "${tool_dir}/kind" | sha256sum --check -
+          curl --fail --location --silent --show-error \
+            https://dl.k8s.io/release/v1.35.5/bin/linux/amd64/kubectl \
+            --output "${tool_dir}/kubectl"
+          printf '%s  %s\n' \
+            90f75ea6ecc9ea5633262e1c0b83a40560003b30fc94a04cb099404fcef0c224 \
+            "${tool_dir}/kubectl" | sha256sum --check -
+          chmod 0755 "${tool_dir}/kind" "${tool_dir}/kubectl"
+          printf 'KIND_BIN=%s\n' "${tool_dir}/kind" >> "${GITHUB_ENV}"
+          printf 'KUBECTL_BIN=%s\n' "${tool_dir}/kubectl" >> "${GITHUB_ENV}"
+
+      - name: Exercise stable DRA scheduler allocation
+        env:
+          KASIM_E2E_DRA: "1"
+          KASIM_KUBERNETES_PATCH: ${{ inputs.kubernetes }}
+          KASIM_KIND_NODE_IMAGE: ${{ inputs.node_image }}
+          KASIM_NODE_IMAGE_CLASSIFICATION: ${{ inputs.classification }}
+          KASIM_DRA_RECEIPT: ${{ runner.temp }}/compatibility-receipt-${{ inputs.kubernetes }}-dra.json
+        run: >-
+          go test -v ./test/e2e
+          -run TestStableDRASchedulerAllocation
+          -count=1
+          -timeout=16m
+
+      - name: Upload DRA compatibility receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: compatibility-receipt-${{ inputs.kubernetes }}-dra
+          path: ${{ runner.temp }}/compatibility-receipt-${{ inputs.kubernetes }}-dra.json
+          if-no-files-found: error
+          retention-days: 90

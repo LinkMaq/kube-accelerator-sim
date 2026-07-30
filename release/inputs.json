@@ -27,7 +27,12 @@
   "compatibility": {
     "kubernetesFloor": "1.30",
     "kubernetesCeiling": "1.36",
-    "stableDRAFloor": "1.34"
+    "stableDRAFloor": "1.34",
+    "matrixLock": {
+      "schemaVersion": "kasim.io/compatibility-lock/v1alpha1",
+      "checkedAt": "2026-07-30",
+      "sha256": "4432ace4f7bfeec035c456f3bb5dc80a4085e09085a5fecda8a83db75a32d7bc"
+    }
   },
   "kwok": {
     "version": "v0.8.0",
@@ -43,6 +48,7 @@
   },
   "dependencyLocks": [
     "go.sum",
+    "release/compatibility-lock.json",
     "charts/kasim-runtime/Chart.yaml",
     "charts/kasim-runtime/values.schema.json"
   ]

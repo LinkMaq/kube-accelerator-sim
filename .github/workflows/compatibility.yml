@@ -1,0 +1,116 @@
+name: Kubernetes compatibility
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: compatibility-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+
+jobs:
+  scheduling-fast:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - kubernetes: "1.30.14"
+            classification: project-built
+            node_image: ghcr.io/linkmaq/kube-accelerator-sim-kind-node:v1.30.14-kind-v0.32.0-amd64@sha256:a73107ec2a139b8ced09922eb0c129731eb0f23d0c37f741d038a6def0e39b25
+          - kubernetes: "1.34.10"
+            classification: project-built
+            node_image: ghcr.io/linkmaq/kube-accelerator-sim-kind-node:v1.34.10-kind-v0.32.0-amd64@sha256:392fc6033fb6f89b126061769abc59200c0dbacd9858ad6c53d5a9a412b20fbe
+          - kubernetes: "1.36.3"
+            classification: project-built
+            node_image: ghcr.io/linkmaq/kube-accelerator-sim-kind-node:v1.36.3-kind-v0.32.0-amd64@sha256:91336f2737cf3ae7039c68945de957c66bad889e6db90bf5d3568293f1ab73db
+    uses: ./.github/workflows/_compatibility-scheduling-row.yml
+    with:
+      kubernetes: ${{ matrix.kubernetes }}
+      classification: ${{ matrix.classification }}
+      node_image: ${{ matrix.node_image }}
+    secrets: inherit
+
+  scheduling-full:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - kubernetes: "1.30.14"
+            classification: project-built
+            node_image: ghcr.io/linkmaq/kube-accelerator-sim-kind-node:v1.30.14-kind-v0.32.0-amd64@sha256:a73107ec2a139b8ced09922eb0c129731eb0f23d0c37f741d038a6def0e39b25
+          - kubernetes: "1.31.14"
+            classification: kind-release-paired
+            node_image: kindest/node:v1.31.14@sha256:6f86cf509dbb42767b6e79debc3f2c32e4ee01386f0489b3b2be24b0a55aac2b
+          - kubernetes: "1.32.13"
+            classification: project-built
+            node_image: ghcr.io/linkmaq/kube-accelerator-sim-kind-node:v1.32.13-kind-v0.32.0-amd64@sha256:5fa15086d3d25ca0f2a60b047a625aa31f8ab625d63b1779272dab8156885cf4
+          - kubernetes: "1.33.13"
+            classification: project-built
+            node_image: ghcr.io/linkmaq/kube-accelerator-sim-kind-node:v1.33.13-kind-v0.32.0-amd64@sha256:adf6a89b8b346a7f922faddeea66d347486e099091f91a5c996fb2e289c4d901
+          - kubernetes: "1.34.10"
+            classification: project-built
+            node_image: ghcr.io/linkmaq/kube-accelerator-sim-kind-node:v1.34.10-kind-v0.32.0-amd64@sha256:392fc6033fb6f89b126061769abc59200c0dbacd9858ad6c53d5a9a412b20fbe
+          - kubernetes: "1.35.7"
+            classification: project-built
+            node_image: ghcr.io/linkmaq/kube-accelerator-sim-kind-node:v1.35.7-kind-v0.32.0-amd64@sha256:947caef333dfd456120be6920ea27255401f4014e08864183b55843c2decb093
+          - kubernetes: "1.36.3"
+            classification: project-built
+            node_image: ghcr.io/linkmaq/kube-accelerator-sim-kind-node:v1.36.3-kind-v0.32.0-amd64@sha256:91336f2737cf3ae7039c68945de957c66bad889e6db90bf5d3568293f1ab73db
+    uses: ./.github/workflows/_compatibility-scheduling-row.yml
+    with:
+      kubernetes: ${{ matrix.kubernetes }}
+      classification: ${{ matrix.classification }}
+      node_image: ${{ matrix.node_image }}
+    secrets: inherit
+
+  dra-fast:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - kubernetes: "1.34.10"
+            classification: project-built
+            node_image: ghcr.io/linkmaq/kube-accelerator-sim-kind-node:v1.34.10-kind-v0.32.0-amd64@sha256:392fc6033fb6f89b126061769abc59200c0dbacd9858ad6c53d5a9a412b20fbe
+          - kubernetes: "1.36.3"
+            classification: project-built
+            node_image: ghcr.io/linkmaq/kube-accelerator-sim-kind-node:v1.36.3-kind-v0.32.0-amd64@sha256:91336f2737cf3ae7039c68945de957c66bad889e6db90bf5d3568293f1ab73db
+    uses: ./.github/workflows/_compatibility-dra-row.yml
+    with:
+      kubernetes: ${{ matrix.kubernetes }}
+      classification: ${{ matrix.classification }}
+      node_image: ${{ matrix.node_image }}
+    secrets: inherit
+
+  dra-full:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - kubernetes: "1.34.10"
+            classification: project-built
+            node_image: ghcr.io/linkmaq/kube-accelerator-sim-kind-node:v1.34.10-kind-v0.32.0-amd64@sha256:392fc6033fb6f89b126061769abc59200c0dbacd9858ad6c53d5a9a412b20fbe
+          - kubernetes: "1.35.7"
+            classification: project-built
+            node_image: ghcr.io/linkmaq/kube-accelerator-sim-kind-node:v1.35.7-kind-v0.32.0-amd64@sha256:947caef333dfd456120be6920ea27255401f4014e08864183b55843c2decb093
+          - kubernetes: "1.36.3"
+            classification: project-built
+            node_image: ghcr.io/linkmaq/kube-accelerator-sim-kind-node:v1.36.3-kind-v0.32.0-amd64@sha256:91336f2737cf3ae7039c68945de957c66bad889e6db90bf5d3568293f1ab73db
+    uses: ./.github/workflows/_compatibility-dra-row.yml
+    with:
+      kubernetes: ${{ matrix.kubernetes }}
+      classification: ${{ matrix.classification }}
+      node_image: ${{ matrix.node_image }}
+    secrets: inherit
