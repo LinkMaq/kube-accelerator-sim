@@ -1,0 +1,428 @@
+{
+  "schemaVersion": "v1alpha1",
+  "revision": "2026-07-30",
+  "profiles": [
+    {
+      "id": "nvidia",
+      "displayName": "NVIDIA",
+      "class": "verified",
+      "evidence": [
+        {
+          "id": "contract",
+          "grade": "A",
+          "source": "https://github.com/NVIDIA/k8s-device-plugin/commit/5f27eeeee7eb7f7a4c0581aa10abeda7e4604ed2",
+          "revision": "5f27eeeee7eb7f7a4c0581aa10abeda7e4604ed2",
+          "checkedAt": "2026-07-30"
+        },
+        {
+          "id": "dra",
+          "grade": "A",
+          "source": "https://github.com/kubernetes-sigs/dra-driver-nvidia-gpu/commit/16c671c4f7f1e9d3de0d46bb9f1d9b9a6a449fa6",
+          "revision": "16c671c4f7f1e9d3de0d46bb9f1d9b9a6a449fa6",
+          "checkedAt": "2026-07-30"
+        }
+      ],
+      "contracts": [
+        {
+          "id": "device-plugin",
+          "kind": "extended-resource",
+          "providerScope": "any-kubernetes",
+          "fidelityModes": [
+            "scheduling"
+          ],
+          "resources": [
+            {
+              "alias": "gpu",
+              "name": "nvidia.com/gpu",
+              "unit": "device"
+            }
+          ],
+          "identitySignals": [
+            {
+              "kind": "node-label",
+              "key": "nvidia.com/gpu.product"
+            }
+          ],
+          "capabilities": {
+            "health": "verified",
+            "topology": "not-public",
+            "sharing": "verified",
+            "partitioning": "verified"
+          },
+          "evidenceRefs": ["contract"]
+        },
+        {
+          "id": "dra",
+          "kind": "dra",
+          "providerScope": "any-kubernetes",
+          "fidelityModes": ["dra-control-plane"],
+          "resources": [{"alias":"device","name":"gpu.nvidia.com","unit":"device"}],
+          "identitySignals":[{"kind":"dra-attribute","key":"gpu.nvidia.com/productName"}],
+          "capabilities":{"health":"verified","topology":"verified","sharing":"verified","partitioning":"verified"},
+          "evidenceRefs":["dra"]
+        }
+      ],
+      "models": [
+        {"id":"nvidia-a100-40gb","displayName":"NVIDIA A100 40GB","aliases":["A100-40GB"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"nvidia-a100-80gb","displayName":"NVIDIA A100 80GB","aliases":["A100-80GB"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"nvidia-h100","displayName":"NVIDIA H100","aliases":["H100"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"nvidia-h200","displayName":"NVIDIA H200","aliases":["H200"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"nvidia-l40s","displayName":"NVIDIA L40S","aliases":["L40S"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"nvidia-b200","displayName":"NVIDIA B200","aliases":["B200"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"nvidia-b300","displayName":"NVIDIA B300","aliases":["B300"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"nvidia-a800","displayName":"NVIDIA A800","aliases":["A800"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"nvidia-h800","displayName":"NVIDIA H800","aliases":["H800"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"nvidia-h20","displayName":"NVIDIA H20","aliases":["H20"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]}
+      ]
+    },
+    {
+      "id":"amd",
+      "displayName":"AMD Instinct",
+      "class":"verified",
+      "evidence":[{"id":"contract","grade":"A","source":"https://github.com/ROCm/k8s-device-plugin/commit/2af2fdbf29472b9e9c84087118c87e1bf2f804cd","revision":"2af2fdbf29472b9e9c84087118c87e1bf2f804cd","checkedAt":"2026-07-30"},{"id":"dra","grade":"A","source":"https://github.com/ROCm/k8s-gpu-dra-driver/commit/ecb882a4fda352a282e845ec1c0ed62a73793f68","revision":"ecb882a4fda352a282e845ec1c0ed62a73793f68","checkedAt":"2026-07-30"}],
+      "contracts":[
+        {
+          "id":"device-plugin","kind":"extended-resource","providerScope":"any-kubernetes","fidelityModes":["scheduling"],
+          "resources":[{"alias":"gpu","name":"amd.com/gpu","unit":"device"},{"alias":"cpx-nps4","name":"amd.com/cpx_nps4","unit":"partition"},{"alias":"spx-nps1","name":"amd.com/spx_nps1","unit":"partition"}],
+          "identitySignals":[{"kind":"node-label","key":"amd.com/gpu.product-name"},{"kind":"node-label","key":"amd.com/gpu.vram"}],
+          "capabilities":{"health":"verified","topology":"verified","sharing":"not-public","partitioning":"verified"},
+          "evidenceRefs":["contract"]
+        },
+        {
+          "id":"dra","kind":"dra","providerScope":"any-kubernetes","fidelityModes":["dra-control-plane"],
+          "resources":[{"alias":"device","name":"gpu.amd.com","unit":"device"}],
+          "identitySignals":[{"kind":"dra-attribute","key":"gpu.amd.com/productName"}],
+          "capabilities":{"health":"not-public","topology":"verified","sharing":"not-public","partitioning":"verified"},
+          "evidenceRefs":["dra"]
+        }
+      ],
+      "models":[
+        {"id":"amd-mi210","displayName":"AMD Instinct MI210","aliases":["MI210"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"amd-mi250x","displayName":"AMD Instinct MI250X","aliases":["MI250X"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"amd-mi300a","displayName":"AMD Instinct MI300A","aliases":["MI300A"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"amd-mi300x","displayName":"AMD Instinct MI300X","aliases":["MI300X"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"amd-mi325x","displayName":"AMD Instinct MI325X","aliases":["MI325X"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"amd-mi350x","displayName":"AMD Instinct MI350X","aliases":["MI350X"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"amd-mi355x","displayName":"AMD Instinct MI355X","aliases":["MI355X"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","device"],"evidenceRefs":["contract","dra"]}
+      ]
+    },
+    {
+      "id":"intel-gpu",
+      "displayName":"Intel Data Center GPU",
+      "class":"verified",
+      "evidence":[{"id":"contract","grade":"A","source":"https://github.com/intel/intel-device-plugins-for-kubernetes/commit/6460392f95275dd68774aeef3c39f14538ddb3d9","revision":"6460392f95275dd68774aeef3c39f14538ddb3d9","checkedAt":"2026-07-30"}],
+      "contracts":[{
+        "id":"device-plugin","kind":"extended-resource","providerScope":"any-kubernetes","fidelityModes":["scheduling"],
+        "resources":[{"alias":"i915","name":"gpu.intel.com/i915","unit":"device"},{"alias":"xe","name":"gpu.intel.com/xe","unit":"device"}],
+        "identitySignals":[],
+        "capabilities":{"health":"verified","topology":"verified","sharing":"verified","partitioning":"verified"},
+        "evidenceRefs":["contract"]
+      }],
+      "models":[
+        {"id":"intel-flex-140","displayName":"Intel Data Center GPU Flex 140","aliases":["Flex 140"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["i915","xe"],"evidenceRefs":["contract"]},
+        {"id":"intel-flex-170","displayName":"Intel Data Center GPU Flex 170","aliases":["Flex 170"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["i915","xe"],"evidenceRefs":["contract"]},
+        {"id":"intel-flex-170v","displayName":"Intel Data Center GPU Flex 170V","aliases":["Flex 170V"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["i915","xe"],"evidenceRefs":["contract"]},
+        {"id":"intel-max-1100","displayName":"Intel Data Center GPU Max 1100","aliases":["Max 1100"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["i915","xe"],"evidenceRefs":["contract"]},
+        {"id":"intel-max-1550","displayName":"Intel Data Center GPU Max 1550","aliases":["Max 1550"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["i915","xe"],"evidenceRefs":["contract"]}
+      ]
+    },
+    {
+      "id":"intel-gaudi",
+      "displayName":"Intel Gaudi",
+      "class":"verified",
+      "evidence":[{"id":"contract","grade":"A","source":"https://github.com/HabanaAI/gaudi-device-plugin/commit/2d8e327c8f31dcc996467e3c42924aae206a71e0","revision":"2d8e327c8f31dcc996467e3c42924aae206a71e0","checkedAt":"2026-07-30"}],
+      "contracts":[{
+        "id":"device-plugin","kind":"extended-resource","providerScope":"any-kubernetes","fidelityModes":["scheduling"],
+        "resources":[{"alias":"gaudi","name":"habana.ai/gaudi","unit":"device"}],
+        "identitySignals":[],
+        "capabilities":{"health":"verified","topology":"not-public","sharing":"not-public","partitioning":"not-public"},
+        "evidenceRefs":["contract"]
+      }],
+      "models":[
+        {"id":"intel-gaudi2","displayName":"Intel Gaudi2","aliases":["Gaudi2"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gaudi"],"evidenceRefs":["contract"]},
+        {"id":"intel-gaudi3","displayName":"Intel Gaudi3","aliases":["Gaudi3"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gaudi"],"evidenceRefs":["contract"]}
+      ]
+    },
+    {
+      "id":"huawei-ascend",
+      "displayName":"Huawei Ascend",
+      "class":"verified",
+      "evidence":[{"id":"contract","grade":"A","source":"https://gitee.com/ascend/mind-cluster/tree/97641a5566914158b9c0eb227c05a223d275e68d","revision":"97641a5566914158b9c0eb227c05a223d275e68d","checkedAt":"2026-07-30"}],
+      "contracts":[{
+        "id":"device-plugin","kind":"extended-resource","providerScope":"any-kubernetes","fidelityModes":["scheduling"],
+        "resources":[{"alias":"ascend310","name":"huawei.com/Ascend310","unit":"device"},{"alias":"ascend310p","name":"huawei.com/Ascend310P","unit":"device"},{"alias":"ascend910","name":"huawei.com/Ascend910","unit":"device"},{"alias":"npu-core","name":"huawei.com/npu-core","unit":"virtual-core"}],
+        "identitySignals":[],
+        "capabilities":{"health":"verified","topology":"not-public","sharing":"not-public","partitioning":"verified"},
+        "evidenceRefs":["contract"]
+      }],
+      "models":[
+        {"id":"huawei-ascend-310","displayName":"Huawei Ascend 310","aliases":["Ascend 310"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend310"],"evidenceRefs":["contract"]},
+        {"id":"huawei-ascend-310p","displayName":"Huawei Ascend 310P","aliases":["Ascend 310P"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend310p"],"evidenceRefs":["contract"]},
+        {"id":"huawei-ascend-910","displayName":"Huawei Ascend 910","aliases":["Ascend 910"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend910"],"evidenceRefs":["contract"]},
+        {"id":"huawei-atlas-a2","displayName":"Huawei Atlas A2","aliases":["Atlas A2"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend910"],"evidenceRefs":["contract"]},
+        {"id":"huawei-atlas-a3","displayName":"Huawei Atlas A3","aliases":["Atlas A3"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend910"],"evidenceRefs":["contract"]}
+      ]
+    },
+    {
+      "id":"cambricon",
+      "displayName":"Cambricon MLU",
+      "class":"verified",
+      "evidence":[{"id":"contract","grade":"A","source":"https://github.com/Cambricon/cambricon-k8s-device-plugin/commit/cc0f7735f208810df14c4178a888d2ad50613a8d","revision":"cc0f7735f208810df14c4178a888d2ad50613a8d","checkedAt":"2026-07-30"}],
+      "contracts":[{
+        "id":"device-plugin","kind":"extended-resource","providerScope":"any-kubernetes","fidelityModes":["scheduling"],
+        "resources":[{"alias":"mlu","name":"cambricon.com/mlu","unit":"device"},{"alias":"mlu370","name":"cambricon.com/mlu370","unit":"device"},{"alias":"mlu370-mim-2m-8gb","name":"cambricon.com/mlu370.mim-2m.8gb","unit":"partition"}],
+        "identitySignals":[{"kind":"node-label","key":"Model"}],
+        "capabilities":{"health":"verified","topology":"verified","sharing":"verified","partitioning":"verified"},
+        "evidenceRefs":["contract"]
+      }],
+      "models":[
+        {"id":"cambricon-mlu370","displayName":"Cambricon MLU370","aliases":["MLU370"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["mlu","mlu370","mlu370-mim-2m-8gb"],"evidenceRefs":["contract"]},
+        {"id":"cambricon-mlu590","displayName":"Cambricon MLU590","aliases":["MLU590"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["mlu"],"evidenceRefs":["contract"]},
+        {"id":"cambricon-mlu270","displayName":"Cambricon MLU270","aliases":["MLU270"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin"],"resourceAliases":["mlu"],"evidenceRefs":["contract"]},
+        {"id":"cambricon-mlu290","displayName":"Cambricon MLU290","aliases":["MLU290"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin"],"resourceAliases":["mlu"],"evidenceRefs":["contract"]}
+      ]
+    },
+    {
+      "id":"biren",
+      "displayName":"Biren",
+      "class":"verified",
+      "evidence":[{"id":"contract","grade":"A","source":"https://gitee.com/BirenTechnology/k8s-device-plugin/tree/a9984054f975d3430c61cd1f068691b7137da9a6","revision":"a9984054f975d3430c61cd1f068691b7137da9a6","checkedAt":"2026-07-30"}],
+      "contracts":[{
+        "id":"device-plugin","kind":"extended-resource","providerScope":"any-kubernetes","fidelityModes":["scheduling"],
+        "resources":[{"alias":"gpu","name":"birentech.com/gpu","unit":"device"},{"alias":"quarter-gpu","name":"birentech.com/1-4-gpu","unit":"partition"},{"alias":"half-gpu","name":"birentech.com/1-2-gpu","unit":"partition"}],
+        "identitySignals":[],
+        "capabilities":{"health":"verified","topology":"verified","sharing":"not-public","partitioning":"verified"},
+        "evidenceRefs":["contract"]
+      }],
+      "models":[
+        {"id":"biren-br100","displayName":"Biren BR100 Series","aliases":["BR100"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu","quarter-gpu","half-gpu"],"evidenceRefs":["contract"]}
+      ]
+    },
+    {
+      "id":"iluvatar",
+      "displayName":"Iluvatar CoreX",
+      "class":"verified",
+      "evidence":[{"id":"contract","grade":"A","source":"https://gitee.com/deep-spark/ix-device-plugin/tree/2fcca7862b62c002ed4ba45169efb82b7433e5f8","revision":"2fcca7862b62c002ed4ba45169efb82b7433e5f8","checkedAt":"2026-07-30"}],
+      "contracts":[{
+        "id":"device-plugin","kind":"extended-resource","providerScope":"any-kubernetes","fidelityModes":["scheduling"],
+        "resources":[{"alias":"gpu","name":"iluvatar.com/gpu","unit":"device"},{"alias":"legacy-gpu","name":"iluvatar.ai/gpu","unit":"device"}],
+        "identitySignals":[],
+        "capabilities":{"health":"verified","topology":"verified","sharing":"verified","partitioning":"verified"},
+        "evidenceRefs":["contract"]
+      }],
+      "models":[
+        {"id":"iluvatar-bi-v150","displayName":"Iluvatar BI-V150","aliases":["BI-V150"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu","legacy-gpu"],"evidenceRefs":["contract"]},
+        {"id":"iluvatar-bi-v150s","displayName":"Iluvatar BI-V150S","aliases":["BI-V150S"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu","legacy-gpu"],"evidenceRefs":["contract"]}
+      ]
+    },
+    {
+      "id":"enflame",
+      "displayName":"Enflame",
+      "class":"verified",
+      "evidence":[{"id":"contract","grade":"A","source":"https://github.com/EnflameTechnology/gcushare/commit/ee04a65c2e28b397f49d8aced1be11d761856074","revision":"ee04a65c2e28b397f49d8aced1be11d761856074","checkedAt":"2026-07-30"}],
+      "contracts":[{
+        "id":"device-plugin","kind":"extended-resource","providerScope":"any-kubernetes","fidelityModes":["scheduling"],
+        "resources":[{"alias":"gcu","name":"enflame.com/gcu","unit":"device"},{"alias":"shared-gcu","name":"enflame.com/shared-gcu","unit":"shared-device"},{"alias":"drs-gcu","name":"enflame.com/drs-gcu","unit":"shared-device"},{"alias":"gcu-count","name":"enflame.com/gcu-count","unit":"count"}],
+        "identitySignals":[],
+        "capabilities":{"health":"verified","topology":"not-public","sharing":"verified","partitioning":"not-public"},
+        "evidenceRefs":["contract"]
+      }],
+      "models":[
+        {"id":"enflame-s60","displayName":"Enflame S60","aliases":["S60"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gcu","shared-gcu","drs-gcu"],"evidenceRefs":["contract"]},
+        {"id":"enflame-s60g","displayName":"Enflame S60G","aliases":["S60G"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gcu","shared-gcu","drs-gcu"],"evidenceRefs":["contract"]}
+      ]
+    },
+    {
+      "id":"moore-threads",
+      "displayName":"Moore Threads",
+      "class":"verified",
+      "evidence":[{"id":"contract","grade":"A","source":"https://docs.mthreads.com/en/cloud-native/cloud-native-doc-online/install_guide/","revision":"checked-page-2026-07-30","checkedAt":"2026-07-30"}],
+      "contracts":[{
+        "id":"device-plugin","kind":"extended-resource","providerScope":"any-kubernetes","fidelityModes":["scheduling"],
+        "resources":[{"alias":"gpu","name":"mthreads.com/gpu","unit":"device"},{"alias":"sgpu-core","name":"mthreads.com/sgpu-core","unit":"virtual-core"},{"alias":"sgpu-memory","name":"mthreads.com/sgpu-memory","unit":"memory"}],
+        "identitySignals":[{"kind":"node-label","key":"mthreads.com/gpu"}],
+        "capabilities":{"health":"verified","topology":"not-public","sharing":"verified","partitioning":"verified"},
+        "evidenceRefs":["contract"]
+      }],
+      "models":[
+        {"id":"moore-threads-mtt-s3000","displayName":"Moore Threads MTT S3000","aliases":["MTT S3000"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu","sgpu-core","sgpu-memory"],"evidenceRefs":["contract"]},
+        {"id":"moore-threads-mtt-s80","displayName":"Moore Threads MTT S80","aliases":["MTT S80"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu"],"evidenceRefs":["contract"]},
+        {"id":"moore-threads-mtt-s2000","displayName":"Moore Threads MTT S2000","aliases":["MTT S2000"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu"],"evidenceRefs":["contract"]}
+      ]
+    },
+    {
+      "id":"furiosa",
+      "displayName":"FuriosaAI",
+      "class":"verified",
+      "evidence":[{"id":"contract","grade":"A","source":"https://github.com/furiosa-ai/furiosa-device-plugin/commit/f09450c6025dbe6f435bb1e191c906ca7dcece7c","revision":"f09450c6025dbe6f435bb1e191c906ca7dcece7c","checkedAt":"2026-07-30"}],
+      "contracts":[{
+        "id":"device-plugin","kind":"extended-resource","providerScope":"any-kubernetes","fidelityModes":["scheduling"],
+        "resources":[{"alias":"rngd","name":"furiosa.ai/rngd","unit":"device"}],
+        "identitySignals":[],
+        "capabilities":{"health":"verified","topology":"not-public","sharing":"not-public","partitioning":"not-public"},
+        "evidenceRefs":["contract"]
+      }],
+      "models":[
+        {"id":"furiosa-rngd","displayName":"FuriosaAI RNGD","aliases":["RNGD"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["rngd"],"evidenceRefs":["contract"]}
+      ]
+    },
+    {
+      "id":"graphcore",
+      "displayName":"Graphcore",
+      "class":"verified",
+      "evidence":[{"id":"contract","grade":"A","source":"https://docs.graphcore.ai/projects/kubernetes-ipu-device-plugin-user-guide/en/latest/createpod.html","revision":"checked-page-2026-07-30","checkedAt":"2026-07-30"}],
+      "contracts":[{
+        "id":"device-plugin","kind":"extended-resource","providerScope":"graphcore-c600","fidelityModes":["scheduling"],
+        "resources":[{"alias":"ipu","name":"c600.graphcore.ai/ipu","unit":"ipu"}],
+        "identitySignals":[],
+        "capabilities":{"health":"verified","topology":"not-public","sharing":"not-public","partitioning":"not-public"},
+        "evidenceRefs":["contract"]
+      }],
+      "models":[
+        {"id":"graphcore-gc200","displayName":"Graphcore GC200","aliases":["GC200","C600"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ipu"],"evidenceRefs":["contract"]},
+        {"id":"graphcore-m2000","displayName":"Graphcore M2000","aliases":["M2000"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ipu"],"evidenceRefs":["contract"]},
+        {"id":"graphcore-ipu-pod","displayName":"Graphcore IPU-POD","aliases":["IPU-POD"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ipu"],"evidenceRefs":["contract"]}
+      ]
+    },
+    {
+      "id":"aws-neuron",
+      "displayName":"AWS Neuron",
+      "class":"verified",
+      "evidence":[{"id":"contract","grade":"A","source":"https://github.com/aws-neuron/aws-neuron-sdk/commit/cf6d0882076b34425d07ab850045e2f54584b667","revision":"cf6d0882076b34425d07ab850045e2f54584b667","checkedAt":"2026-07-30"}],
+      "contracts":[
+        {
+          "id":"device-plugin","kind":"extended-resource","providerScope":"aws-ec2-eks","fidelityModes":["scheduling"],
+          "resources":[{"alias":"neuroncore","name":"aws.amazon.com/neuroncore","unit":"core"},{"alias":"neuron","name":"aws.amazon.com/neuron","unit":"device"}],
+          "identitySignals":[],
+          "capabilities":{"health":"verified","topology":"verified","sharing":"not-public","partitioning":"verified"},
+          "evidenceRefs":["contract"]
+        },
+        {
+          "id":"dra","kind":"dra","providerScope":"aws-ec2-eks","fidelityModes":["dra-control-plane"],
+          "resources":[{"alias":"device","name":"neuron.aws.com","unit":"device"}],
+          "identitySignals":[{"kind":"dra-attribute","key":"instanceType"}],
+          "capabilities":{"health":"not-public","topology":"verified","sharing":"not-public","partitioning":"verified"},
+          "evidenceRefs":["contract"]
+        }
+      ],
+      "models":[
+        {"id":"aws-inferentia1","displayName":"AWS Inferentia","aliases":["Inferentia1","Inf1"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["neuroncore","neuron","device"],"evidenceRefs":["contract"]},
+        {"id":"aws-inferentia2","displayName":"AWS Inferentia2","aliases":["Inferentia2","Inf2"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["neuroncore","neuron","device"],"evidenceRefs":["contract"]},
+        {"id":"aws-trainium1","displayName":"AWS Trainium","aliases":["Trainium1","Trn1"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["neuroncore","neuron","device"],"evidenceRefs":["contract"]},
+        {"id":"aws-trainium2","displayName":"AWS Trainium2","aliases":["Trainium2","Trn2"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["neuroncore","neuron","device"],"evidenceRefs":["contract"]},
+        {"id":"aws-trainium3","displayName":"AWS Trainium3","aliases":["Trainium3","Trn3"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["neuroncore","neuron","device"],"evidenceRefs":["contract"]}
+      ]
+    },
+    {
+      "id":"google-tpu",
+      "displayName":"Google Cloud TPU",
+      "class":"verified",
+      "evidence":[{"id":"contract","grade":"A","source":"https://cloud.google.com/kubernetes-engine/docs/concepts/tpus","revision":"checked-page-2026-07-30","checkedAt":"2026-07-30"}],
+      "contracts":[{
+        "id":"gke","kind":"extended-resource","providerScope":"google-gke","fidelityModes":["scheduling"],
+        "resources":[{"alias":"tpu","name":"google.com/tpu","unit":"chip"}],
+        "identitySignals":[{"kind":"node-label","key":"cloud.google.com/gke-tpu-accelerator"},{"kind":"node-label","key":"cloud.google.com/gke-tpu-topology"}],
+        "capabilities":{"health":"not-public","topology":"verified","sharing":"not-applicable","partitioning":"verified"},
+        "evidenceRefs":["contract"]
+      }],
+      "models":[
+        {"id":"google-tpu-v4","displayName":"Google Cloud TPU v4","aliases":["TPU v4"],"lifecycle":"deployed-retention","selectable":true,"contracts":["gke"],"resourceAliases":["tpu"],"evidenceRefs":["contract"]},
+        {"id":"google-tpu-v5e","displayName":"Google Cloud TPU v5e","aliases":["TPU v5e"],"lifecycle":"current-product","selectable":true,"contracts":["gke"],"resourceAliases":["tpu"],"evidenceRefs":["contract"]},
+        {"id":"google-tpu-v5p","displayName":"Google Cloud TPU v5p","aliases":["TPU v5p"],"lifecycle":"current-product","selectable":true,"contracts":["gke"],"resourceAliases":["tpu"],"evidenceRefs":["contract"]},
+        {"id":"google-tpu-v6e","displayName":"Google Cloud TPU v6e","aliases":["TPU v6e","Trillium"],"lifecycle":"current-product","selectable":true,"contracts":["gke"],"resourceAliases":["tpu"],"evidenceRefs":["contract"]},
+        {"id":"google-tpu7x","displayName":"Google Cloud TPU7x","aliases":["TPU7x","Ironwood"],"lifecycle":"current-product","selectable":true,"contracts":["gke"],"resourceAliases":["tpu"],"evidenceRefs":["contract"]}
+      ]
+    },
+    {
+      "id":"metax",
+      "displayName":"MetaX",
+      "class":"provisional",
+      "evidence":[{"id":"contract","grade":"B","source":"https://developer.metax-tech.com/forum/t/k8san-zhuang-wen-ti/344/","revision":"checked-page-2026-07-30","checkedAt":"2026-07-30"},{"id":"models","grade":"B","source":"https://developer.metax-tech.com/doc/221","revision":"checked-page-2026-07-30","checkedAt":"2026-07-30"}],
+      "contracts":[{
+        "id":"device-plugin","kind":"extended-resource","providerScope":"any-kubernetes","fidelityModes":["scheduling"],
+        "resources":[{"alias":"gpu","name":"metax-tech.com/gpu","unit":"device"}],
+        "identitySignals":[],
+        "capabilities":{"health":"verified","topology":"verified","sharing":"not-public","partitioning":"not-public"},
+        "evidenceRefs":["contract"]
+      }],
+      "models":[
+        {"id":"metax-c500","displayName":"MetaX C500","aliases":["C500"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu"],"evidenceRefs":["models"]},
+        {"id":"metax-c500-p","displayName":"MetaX C500-P","aliases":["C500-P"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu"],"evidenceRefs":["models"]},
+        {"id":"metax-c500x","displayName":"MetaX C500X","aliases":["C500X"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu"],"evidenceRefs":["models"]},
+        {"id":"metax-c280","displayName":"MetaX C280","aliases":["C280"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu"],"evidenceRefs":["models"]},
+        {"id":"metax-c290","displayName":"MetaX C290","aliases":["C290"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu"],"evidenceRefs":["models"]},
+        {"id":"metax-c550","displayName":"MetaX C550","aliases":["C550"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu"],"evidenceRefs":["models"]},
+        {"id":"metax-n260","displayName":"MetaX N260","aliases":["N260"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu"],"evidenceRefs":["models"]}
+      ]
+    },
+    {
+      "id":"hygon",
+      "displayName":"Hygon DCU",
+      "class":"provisional",
+      "evidence":[{"id":"contract","grade":"B","source":"https://developer.sourcefind.cn/servicelist","revision":"checked-page-2026-07-30","checkedAt":"2026-07-30"},{"id":"models","grade":"B","source":"https://developer.sourcefind.cn/document","revision":"checked-page-2026-07-30","checkedAt":"2026-07-30"}],
+      "contracts":[{
+        "id":"device-plugin","kind":"extended-resource","providerScope":"any-kubernetes","fidelityModes":["scheduling"],
+        "resources":[{"alias":"dcu","name":"hygon.com/dcu","unit":"device"}],
+        "identitySignals":[],
+        "capabilities":{"health":"verified","topology":"not-public","sharing":"not-public","partitioning":"not-public"},
+        "evidenceRefs":["contract"]
+      }],
+      "models":[
+        {"id":"hygon-k100-ai","displayName":"Hygon K100_AI","aliases":["K100_AI"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu"],"evidenceRefs":["models"]},
+        {"id":"hygon-bw200","displayName":"Hygon BW200","aliases":["BW200"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu"],"evidenceRefs":["models"]}
+      ]
+    },
+    {
+      "id":"kunlunxin",
+      "displayName":"Kunlunxin",
+      "class":"provisional",
+      "evidence":[{"id":"contract","grade":"C","source":"https://github.com/Project-HAMi/HAMi/commit/e831337db299f331b170a46d6ca3dba256b9d6f1","revision":"e831337db299f331b170a46d6ca3dba256b9d6f1","checkedAt":"2026-07-30"}],
+      "contracts":[
+        {
+          "id":"hami-device","kind":"extended-resource","providerScope":"hami-integration","fidelityModes":["scheduling"],
+          "resources":[{"alias":"xpu","name":"kunlunxin.com/xpu","unit":"device"}],
+          "identitySignals":[],
+          "capabilities":{"health":"not-public","topology":"verified","sharing":"not-public","partitioning":"not-public"},
+          "evidenceRefs":["contract"]
+        },
+        {
+          "id":"hami-vxpu","kind":"extended-resource","providerScope":"hami-integration","fidelityModes":["scheduling"],
+          "resources":[{"alias":"vxpu","name":"kunlunxin.com/vxpu","unit":"virtual-device"},{"alias":"vxpu-memory","name":"kunlunxin.com/vxpu-memory","unit":"memory"}],
+          "identitySignals":[],
+          "capabilities":{"health":"not-public","topology":"not-public","sharing":"verified","partitioning":"verified"},
+          "evidenceRefs":["contract"]
+        }
+      ],
+      "models":[
+        {"id":"kunlunxin-p800","displayName":"Kunlunxin P800","aliases":["P800"],"lifecycle":"current-product","selectable":true,"contracts":["hami-device","hami-vxpu"],"resourceAliases":["xpu","vxpu","vxpu-memory"],"evidenceRefs":["contract"]},
+        {"id":"kunlunxin-r480","displayName":"Kunlunxin R480","aliases":["R480"],"lifecycle":"deployed-retention","selectable":true,"contracts":["hami-device","hami-vxpu"],"resourceAliases":["xpu","vxpu","vxpu-memory"],"evidenceRefs":["contract"]}
+      ]
+    },
+    {
+      "id":"vastai",
+      "displayName":"Vastai",
+      "class":"provisional",
+      "evidence":[{"id":"contract","grade":"C","source":"https://github.com/Project-HAMi/HAMi/commit/e831337db299f331b170a46d6ca3dba256b9d6f1","revision":"e831337db299f331b170a46d6ca3dba256b9d6f1","checkedAt":"2026-07-30"}],
+      "contracts":[{
+        "id":"hami-device","kind":"extended-resource","providerScope":"hami-integration","fidelityModes":["scheduling"],
+        "resources":[{"alias":"va","name":"vastaitech.com/va","unit":"device"}],
+        "identitySignals":[],
+        "capabilities":{"health":"not-public","topology":"not-public","sharing":"not-public","partitioning":"not-public"},
+        "evidenceRefs":["contract"]
+      }],
+      "models":[]
+    },
+    {
+      "id":"qualcomm-cloud-ai-100",
+      "displayName":"Qualcomm Cloud AI 100",
+      "class":"provisional",
+      "evidence":[{"id":"models","grade":"B","source":"https://quic.github.io/cloud-ai-sdk-pages/1.20/Getting-Started/Installation/Docker/k8s/index.html","revision":"cloud-ai-sdk-1.20","checkedAt":"2026-07-30"}],
+      "contracts":[],
+      "models":[
+        {"id":"qualcomm-cloud-ai-100-standard","displayName":"Qualcomm Cloud AI 100 Standard","aliases":["Cloud AI 100 Standard"],"lifecycle":"catalog-only","selectable":false,"contracts":[],"resourceAliases":[],"evidenceRefs":["models"]},
+        {"id":"qualcomm-cloud-ai-100-pro","displayName":"Qualcomm Cloud AI 100 Pro","aliases":["Cloud AI 100 Pro"],"lifecycle":"catalog-only","selectable":false,"contracts":[],"resourceAliases":[],"evidenceRefs":["models"]},
+        {"id":"qualcomm-cloud-ai-100-ultra","displayName":"Qualcomm Cloud AI 100 Ultra","aliases":["Cloud AI 100 Ultra"],"lifecycle":"catalog-only","selectable":false,"contracts":[],"resourceAliases":[],"evidenceRefs":["models"]}
+      ]
+    }
+  ]
+}

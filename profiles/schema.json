@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/LinkMaq/kube-accelerator-sim/profiles/schema.json",
+  "title": "kube-accelerator-sim profile catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "revision", "profiles"],
+  "properties": {
+    "schemaVersion": {"const": "v1alpha1"},
+    "revision": {"type": "string", "minLength": 1, "maxLength": 128},
+    "profiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/profile"}
+    }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "grade", "source", "revision", "checkedAt"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "grade": {"enum": ["A", "B", "C", "D"]},
+        "source": {"type": "string", "format": "uri", "pattern": "^https?://"},
+        "revision": {"type": "string", "minLength": 1, "maxLength": 128},
+        "checkedAt": {"type": "string", "format": "date"}
+      }
+    },
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alias", "name", "unit"],
+      "properties": {
+        "alias": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$",
+          "maxLength": 63
+        },
+        "name": {"type": "string", "minLength": 1, "maxLength": 317},
+        "unit": {"type": "string", "minLength": 1, "maxLength": 64}
+      }
+    },
+    "identitySignal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "key"],
+      "properties": {
+        "kind": {"enum": ["node-label", "annotation", "dra-attribute"]},
+        "key": {"type": "string", "minLength": 1, "maxLength": 317}
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["health", "topology", "sharing", "partitioning"],
+      "properties": {
+        "health": {"$ref": "#/$defs/evidenceState"},
+        "topology": {"$ref": "#/$defs/evidenceState"},
+        "sharing": {"$ref": "#/$defs/evidenceState"},
+        "partitioning": {"$ref": "#/$defs/evidenceState"}
+      }
+    },
+    "evidenceState": {
+      "enum": ["verified", "not-public", "not-applicable"]
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "providerScope",
+        "fidelityModes",
+        "resources",
+        "identitySignals",
+        "capabilities",
+        "evidenceRefs"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$",
+          "maxLength": 63
+        },
+        "kind": {"enum": ["extended-resource", "dra"]},
+        "providerScope": {"type": "string", "minLength": 1, "maxLength": 128},
+        "fidelityModes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["scheduling", "dra-control-plane"]}
+        },
+        "resources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/resource"}
+        },
+        "identitySignals": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/identitySignal"}
+        },
+        "capabilities": {"$ref": "#/$defs/capabilities"},
+        "evidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 128}
+        }
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "displayName",
+        "aliases",
+        "lifecycle",
+        "selectable",
+        "contracts",
+        "resourceAliases",
+        "evidenceRefs"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$",
+          "maxLength": 63
+        },
+        "displayName": {"type": "string", "minLength": 1, "maxLength": 256},
+        "aliases": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 256}
+        },
+        "lifecycle": {
+          "enum": [
+            "k8s-identified",
+            "current-product",
+            "deployed-retention",
+            "catalog-only"
+          ]
+        },
+        "selectable": {"type": "boolean"},
+        "contracts": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 63}
+        },
+        "resourceAliases": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 63}
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 128}
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "displayName",
+        "class",
+        "evidence",
+        "contracts",
+        "models"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$",
+          "maxLength": 63
+        },
+        "displayName": {"type": "string", "minLength": 1, "maxLength": 256},
+        "class": {"enum": ["verified", "provisional", "custom"]},
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/evidence"}
+        },
+        "contracts": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/contract"}
+        },
+        "models": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/model"}
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"class": {"const": "verified"}}},
+          "then": {
+            "properties": {
+              "contracts": {"minItems": 1},
+              "models": {"minItems": 1}
+            }
+          }
+        }
+      ]
+    }
+  }
+}
