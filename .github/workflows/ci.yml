@@ -27,6 +27,15 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Install pinned envtest control plane
+        shell: bash
+        run: |
+          tool_dir="${RUNNER_TEMP}/kasim-tools"
+          mkdir -p "${tool_dir}"
+          GOBIN="${tool_dir}" go install sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.24.2-0.20260713111223-0f529e22d5c0
+          assets="$("${tool_dir}/setup-envtest" use -p path 1.36.2)"
+          printf 'KUBEBUILDER_ASSETS=%s\n' "${assets}" >> "${GITHUB_ENV}"
+
       - name: Verify source
         run: make verify
 
