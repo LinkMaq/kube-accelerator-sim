@@ -673,6 +673,8 @@ spec:
 		"delete",
 		"pod/compat-placement",
 		"pod/compat-exhaustion",
+		"--force",
+		"--grace-period=0",
 		"--wait=true",
 		"--timeout=120s",
 	)
