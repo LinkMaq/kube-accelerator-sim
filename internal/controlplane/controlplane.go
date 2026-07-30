@@ -15,6 +15,7 @@ import (
 const (
 	MaximumStatusPools       = 1024
 	MaximumStatusInventory   = 64
+	MaximumStatusFidelity    = 32
 	MaximumStatusDiagnostics = 32
 	MaximumStatusConditions  = 6
 )
@@ -144,6 +145,12 @@ type InventoryEntry struct {
 	Count      int32
 }
 
+// FidelitySurfaceStatus records one bounded, reader-facing truth claim.
+type FidelitySurfaceStatus struct {
+	Surface string
+	State   string
+}
+
 // DiagnosticStatus preserves stable automation signals after acceptance.
 type DiagnosticStatus struct {
 	Code             string
@@ -171,6 +178,8 @@ type InstanceStatus struct {
 	PoolsTruncated       bool
 	Inventory            []InventoryEntry
 	InventoryTruncated   bool
+	Fidelity             []FidelitySurfaceStatus
+	FidelityTruncated    bool
 	Diagnostics          []DiagnosticStatus
 	DiagnosticsTruncated bool
 	Conditions           []ConditionStatus
@@ -368,6 +377,10 @@ func CloneRecord(record InstanceRecord) InstanceRecord {
 	}
 	cloned.Status.Pools = append([]PoolStatus(nil), record.Status.Pools...)
 	cloned.Status.Inventory = append([]InventoryEntry(nil), record.Status.Inventory...)
+	cloned.Status.Fidelity = append(
+		[]FidelitySurfaceStatus(nil),
+		record.Status.Fidelity...,
+	)
 	cloned.Status.Diagnostics = append(
 		[]DiagnosticStatus(nil),
 		record.Status.Diagnostics...,

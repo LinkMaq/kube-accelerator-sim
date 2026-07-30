@@ -722,6 +722,16 @@ func TestScenarioRuntimeObserveReturnsBoundedTargetBoundSnapshot(t *testing.T) {
 			ObservedGeneration: 1, LastTransitionTime: time.Now().UTC(),
 		}
 	}
+	fidelity := make(
+		[]controlplane.FidelitySurfaceStatus,
+		controlplane.MaximumStatusFidelity+1,
+	)
+	for index := range fidelity {
+		fidelity[index] = controlplane.FidelitySurfaceStatus{
+			Surface: "surface",
+			State:   "achieved",
+		}
+	}
 	if err := controlAdapter.CommitStatus(
 		context.Background(),
 		key,
@@ -737,6 +747,7 @@ func TestScenarioRuntimeObserveReturnsBoundedTargetBoundSnapshot(t *testing.T) {
 			Inventory: []controlplane.InventoryEntry{{
 				APIVersion: "v1", Kind: "Node", Count: 1,
 			}},
+			Fidelity:   fidelity,
 			Conditions: conditions,
 		},
 	); err != nil {
@@ -780,6 +791,8 @@ func TestScenarioRuntimeObserveReturnsBoundedTargetBoundSnapshot(t *testing.T) {
 		result.Snapshot.Phase != "Ready" ||
 		len(result.Snapshot.Pools) != 1 ||
 		len(result.Snapshot.Inventory) != 1 ||
+		len(result.Snapshot.Fidelity) != controlplane.MaximumStatusFidelity ||
+		!result.Snapshot.FidelityTruncated ||
 		len(result.Snapshot.Conditions) != controlplane.MaximumStatusConditions ||
 		!result.Snapshot.ConditionsTruncated ||
 		!result.Receipt.RevisionAccepted() ||

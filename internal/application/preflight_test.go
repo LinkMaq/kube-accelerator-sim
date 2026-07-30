@@ -261,6 +261,183 @@ func TestApplyPreflightStopsWhenRuntimeDiscoveryIsUnavailable(t *testing.T) {
 	}
 }
 
+func TestApplyPreflightRejectsUnsupportedStableDRABeforeAuthorizationOrAcceptance(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		capabilities cluster.TargetCapabilities
+		wantCode     cluster.ErrorCode
+	}{
+		{
+			name:         "Kubernetes 1.33",
+			capabilities: stableDRACapabilities(33),
+			wantCode:     cluster.ErrorKubernetesVersionUnsupported,
+		},
+		{
+			name: "beta only",
+			capabilities: cluster.TargetCapabilities{
+				ServerVersion:   "v1.34.0",
+				KubernetesMinor: 34,
+				Resources: []cluster.ResourceCapability{{
+					GroupVersion: "resource.k8s.io/v1beta2",
+					Resource:     "deviceclasses",
+					Verbs:        []string{"get", "list", "watch", "create", "patch", "delete"},
+				}},
+			},
+			wantCode: cluster.ErrorCapabilityUnavailable,
+		},
+		{
+			name: "missing ResourceClaim watch",
+			capabilities: mutateResourceCapability(
+				stableDRACapabilities(34),
+				"resource.k8s.io/v1",
+				"resourceclaims",
+				func(capability *cluster.ResourceCapability) {
+					capability.Verbs = []string{"get", "list"}
+				},
+			),
+			wantCode: cluster.ErrorCapabilityUnavailable,
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			trace := []string{}
+			command := revisionCommand(t, 1, "first")
+			dra, err := domain.ParseFidelityMode("dra-control-plane")
+			if err != nil {
+				t.Fatal(err)
+			}
+			command.Fidelity = dra
+			controlAdapter := memory.New(memory.Options{})
+			clusterAdapter := recording.New(recording.Options{
+				Capabilities: test.capabilities,
+			})
+			connection := application.ConnectedTarget{
+				Receipt:      targetReceipt(command.Target),
+				Target:       command.Target,
+				ControlPlane: &tracedControlPlane{trace: &trace, delegate: controlAdapter},
+				Cluster:      &tracedCluster{trace: &trace, delegate: clusterAdapter},
+			}
+			_, err = application.PreflightApply(
+				context.Background(),
+				application.PreflightApplyRequest{
+					Selection: cluster.TargetSelection{
+						KubeconfigPath: "/explicit/config",
+						ContextName:    "test-context",
+					},
+					Intent: intentOf(command),
+					RequiredAccess: []cluster.AccessRequirement{{
+						Verb:     "create",
+						Group:    "simulation.kasim.io",
+						Resource: "scenarioinstances",
+					}},
+				},
+				func(
+					context.Context,
+					cluster.TargetSelection,
+				) (application.ConnectedTarget, error) {
+					trace = append(trace, "connect")
+					return connection, nil
+				},
+			)
+			if cluster.ErrorCodeOf(err) != test.wantCode {
+				t.Fatalf("preflight error = %v, want %s", err, test.wantCode)
+			}
+			if got, want := trace, []string{"connect", "probe", "discover"}; !reflect.DeepEqual(got, want) {
+				t.Fatalf("DRA rejection trace = %#v, want %#v", got, want)
+			}
+			if _, err := controlAdapter.Read(
+				context.Background(),
+				controlplane.InstanceKey{
+					TargetFingerprint: command.Target.Fingerprint,
+					Name:              command.Name,
+				},
+			); controlplane.ErrorCodeOf(err) != controlplane.ErrorNotFound {
+				t.Fatalf("unsupported DRA preflight persisted a revision: %v", err)
+			}
+		})
+	}
+}
+
+func TestApplyPreflightRejectsMissingDRAReadPermissionBeforeAcceptance(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	trace := []string{}
+	command := revisionCommand(t, 1, "first")
+	draFidelity, err := domain.ParseFidelityMode("dra-control-plane")
+	if err != nil {
+		t.Fatal(err)
+	}
+	command.Fidelity = draFidelity
+	denied := cluster.AccessRequirement{
+		Verb:          "list",
+		Group:         "resource.k8s.io",
+		Resource:      "resourceclaims",
+		Namespaced:    true,
+		AllNamespaces: true,
+	}
+	controlAdapter := memory.New(memory.Options{})
+	clusterAdapter := recording.New(recording.Options{
+		Capabilities: stableDRACapabilities(34),
+		Denied:       []cluster.AccessRequirement{denied},
+	})
+	connection := application.ConnectedTarget{
+		Receipt:      targetReceipt(command.Target),
+		Target:       command.Target,
+		ControlPlane: &tracedControlPlane{trace: &trace, delegate: controlAdapter},
+		Cluster:      &tracedCluster{trace: &trace, delegate: clusterAdapter},
+	}
+	_, err = application.PreflightApply(
+		context.Background(),
+		application.PreflightApplyRequest{
+			Selection: cluster.TargetSelection{
+				KubeconfigPath: "/explicit/config",
+				ContextName:    "test-context",
+			},
+			Intent: intentOf(command),
+			RequiredAccess: []cluster.AccessRequirement{{
+				Verb:     "create",
+				Group:    "simulation.kasim.io",
+				Resource: "scenarioinstances",
+			}},
+		},
+		func(
+			context.Context,
+			cluster.TargetSelection,
+		) (application.ConnectedTarget, error) {
+			trace = append(trace, "connect")
+			return connection, nil
+		},
+	)
+	if cluster.ErrorCodeOf(err) != cluster.ErrorAuthorizationDenied {
+		t.Fatalf("DRA authorization error = %v", err)
+	}
+	if got, want := trace, []string{
+		"connect",
+		"probe",
+		"discover",
+		"authorize",
+	}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("DRA authorization rejection trace = %#v, want %#v", got, want)
+	}
+	if _, err := controlAdapter.Read(
+		context.Background(),
+		controlplane.InstanceKey{
+			TargetFingerprint: command.Target.Fingerprint,
+			Name:              command.Name,
+		},
+	); controlplane.ErrorCodeOf(err) != controlplane.ErrorNotFound {
+		t.Fatalf("DRA permission rejection persisted a revision: %v", err)
+	}
+}
+
 type tracedControlPlane struct {
 	trace    *[]string
 	delegate controlplane.ScenarioControlPlane
@@ -412,6 +589,59 @@ func targetReceipt(
 		TargetFingerprint:       target.Fingerprint,
 		CADigest:                target.Fingerprint,
 	}
+}
+
+func stableDRACapabilities(minor int) cluster.TargetCapabilities {
+	mutateVerbs := []string{"get", "list", "watch", "create", "patch", "delete"}
+	return cluster.TargetCapabilities{
+		ServerVersion:   "v1.34.0",
+		KubernetesMinor: minor,
+		Resources: []cluster.ResourceCapability{
+			{
+				GroupVersion: "resource.k8s.io/v1",
+				Resource:     "deviceclasses",
+				Verbs:        mutateVerbs,
+			},
+			{
+				GroupVersion: "resource.k8s.io/v1",
+				Resource:     "resourceslices",
+				Verbs:        mutateVerbs,
+			},
+			{
+				GroupVersion: "resource.k8s.io/v1",
+				Resource:     "resourceclaims",
+				Namespaced:   true,
+				Verbs:        []string{"get", "list", "watch"},
+			},
+			{
+				GroupVersion: "v1",
+				Resource:     "pods",
+				Namespaced:   true,
+				Verbs:        []string{"get", "list", "watch"},
+			},
+		},
+	}
+}
+
+func mutateResourceCapability(
+	capabilities cluster.TargetCapabilities,
+	groupVersion,
+	resource string,
+	mutate func(*cluster.ResourceCapability),
+) cluster.TargetCapabilities {
+	result := capabilities
+	result.Resources = append([]cluster.ResourceCapability(nil), capabilities.Resources...)
+	for index := range result.Resources {
+		result.Resources[index].Verbs = append(
+			[]string(nil),
+			result.Resources[index].Verbs...,
+		)
+		if result.Resources[index].GroupVersion == groupVersion &&
+			result.Resources[index].Resource == resource {
+			mutate(&result.Resources[index])
+		}
+	}
+	return result
 }
 
 func digest(t *testing.T, seed string) domain.Digest {

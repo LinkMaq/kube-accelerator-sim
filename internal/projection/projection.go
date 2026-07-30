@@ -364,7 +364,9 @@ type NodeFragmentInput struct {
 // ProjectionFragment contains only declarative Node fields and fidelity
 // assertions. It contains no Kubernetes object, patch, Pod, or write method.
 type ProjectionFragment struct {
-	nodes []NodeFragment
+	nodes          []NodeFragment
+	deviceClasses  []DeviceClassFragment
+	resourceSlices []ResourceSliceFragment
 }
 
 // NodeFragment is one immutable projection contribution for a Synthetic Node.
@@ -421,10 +423,253 @@ func NewFragment(inputs []NodeFragmentInput) (ProjectionFragment, error) {
 	return ProjectionFragment{nodes: nodes}, nil
 }
 
+// DeviceAttributeKind is the portable stable DRA v1 attribute subset used by
+// the simulator. Other DRA value types and independently gated fields are not
+// part of the initial projection contract.
+type DeviceAttributeKind string
+
+const (
+	DeviceAttributeBool   DeviceAttributeKind = "bool"
+	DeviceAttributeString DeviceAttributeKind = "string"
+)
+
+// DeviceAttributeValue is one immutable, exactly typed stable DRA attribute.
+type DeviceAttributeValue struct {
+	kind        DeviceAttributeKind
+	boolValue   bool
+	stringValue string
+}
+
+func NewBoolDeviceAttribute(value bool) DeviceAttributeValue {
+	return DeviceAttributeValue{kind: DeviceAttributeBool, boolValue: value}
+}
+
+func NewStringDeviceAttribute(value string) (DeviceAttributeValue, error) {
+	if value == "" {
+		return DeviceAttributeValue{}, fmt.Errorf(
+			"string device attribute must not be empty",
+		)
+	}
+	return DeviceAttributeValue{
+		kind:        DeviceAttributeString,
+		stringValue: value,
+	}, nil
+}
+
+func (value DeviceAttributeValue) Kind() DeviceAttributeKind {
+	return value.kind
+}
+
+func (value DeviceAttributeValue) Bool() bool {
+	return value.boolValue
+}
+
+func (value DeviceAttributeValue) String() string {
+	return value.stringValue
+}
+
+// DeviceFragmentInput is one simulator-owned device in a stable DRA pool.
+type DeviceFragmentInput struct {
+	Name       string
+	Attributes map[string]DeviceAttributeValue
+}
+
+// DeviceClassFragmentInput is the stable v1 DeviceClass intent for one
+// Scenario Accelerator Pool. Selectors are CEL expressions and configuration
+// is deliberately absent because this projector has no node-local driver.
+type DeviceClassFragmentInput struct {
+	Name      string
+	Driver    string
+	Group     string
+	Pool      string
+	Selectors []string
+}
+
+// ResourceSliceFragmentInput is one complete stable-v1 inventory shard. It
+// uses NodeName only and therefore cannot request a gated per-device selector.
+type ResourceSliceFragmentInput struct {
+	Name               string
+	Driver             string
+	Group              string
+	Pool               string
+	PoolName           string
+	PoolGeneration     int64
+	ResourceSliceCount int64
+	NodeName           string
+	Devices            []DeviceFragmentInput
+}
+
+// DeviceClassFragment is one immutable DeviceClass contribution.
+type DeviceClassFragment struct {
+	name      string
+	driver    string
+	group     string
+	pool      string
+	selectors []string
+}
+
+// ResourceSliceFragment is one immutable ResourceSlice contribution.
+type ResourceSliceFragment struct {
+	name               string
+	driver             string
+	group              string
+	pool               string
+	poolName           string
+	poolGeneration     int64
+	resourceSliceCount int64
+	nodeName           string
+	devices            []DeviceFragment
+}
+
+// DeviceFragment is one deterministic simulated device.
+type DeviceFragment struct {
+	name       string
+	attributes map[string]DeviceAttributeValue
+}
+
+// NewDRAFragment validates all stable DRA inventory before it can cross into
+// reconciliation. Nodes remain in the same fragment because DRA scheduling
+// still depends on the synthetic Node lifecycle and scheduling gate.
+func NewDRAFragment(
+	nodeInputs []NodeFragmentInput,
+	classInputs []DeviceClassFragmentInput,
+	sliceInputs []ResourceSliceFragmentInput,
+) (ProjectionFragment, error) {
+	fragment, err := NewFragment(nodeInputs)
+	if err != nil {
+		return ProjectionFragment{}, err
+	}
+	classNames := make(map[string]struct{}, len(classInputs))
+	classes := make([]DeviceClassFragment, 0, len(classInputs))
+	for _, input := range classInputs {
+		if input.Name == "" || input.Driver == "" ||
+			input.Group == "" || input.Pool == "" ||
+			len(input.Selectors) == 0 {
+			return ProjectionFragment{}, fmt.Errorf(
+				"DeviceClass fragment requires name, driver, pool identity, and selectors",
+			)
+		}
+		if _, duplicate := classNames[input.Name]; duplicate {
+			return ProjectionFragment{}, fmt.Errorf(
+				"projection fragment has duplicate DeviceClass %q",
+				input.Name,
+			)
+		}
+		classNames[input.Name] = struct{}{}
+		for _, selector := range input.Selectors {
+			if selector == "" {
+				return ProjectionFragment{}, fmt.Errorf(
+					"DeviceClass %q has an empty selector",
+					input.Name,
+				)
+			}
+		}
+		classes = append(classes, DeviceClassFragment{
+			name:      input.Name,
+			driver:    input.Driver,
+			group:     input.Group,
+			pool:      input.Pool,
+			selectors: append([]string(nil), input.Selectors...),
+		})
+	}
+
+	sliceNames := make(map[string]struct{}, len(sliceInputs))
+	deviceNamesByPool := make(map[string]map[string]struct{})
+	resourceSlices := make([]ResourceSliceFragment, 0, len(sliceInputs))
+	for _, input := range sliceInputs {
+		if input.Name == "" || input.Driver == "" ||
+			input.Group == "" || input.Pool == "" ||
+			input.PoolName == "" || input.PoolGeneration <= 0 ||
+			input.ResourceSliceCount <= 0 || input.NodeName == "" {
+			return ProjectionFragment{}, fmt.Errorf(
+				"ResourceSlice fragment requires exact stable pool and Node identity",
+			)
+		}
+		if len(input.Devices) > 128 {
+			return ProjectionFragment{}, fmt.Errorf(
+				"ResourceSlice %q exceeds the stable 128-device limit",
+				input.Name,
+			)
+		}
+		if _, duplicate := sliceNames[input.Name]; duplicate {
+			return ProjectionFragment{}, fmt.Errorf(
+				"projection fragment has duplicate ResourceSlice %q",
+				input.Name,
+			)
+		}
+		sliceNames[input.Name] = struct{}{}
+		poolIdentity := input.Driver + "\x00" + input.PoolName
+		deviceNames := deviceNamesByPool[poolIdentity]
+		if deviceNames == nil {
+			deviceNames = make(map[string]struct{})
+			deviceNamesByPool[poolIdentity] = deviceNames
+		}
+		devices := make([]DeviceFragment, 0, len(input.Devices))
+		for _, device := range input.Devices {
+			if device.Name == "" {
+				return ProjectionFragment{}, fmt.Errorf(
+					"ResourceSlice %q has a device without a name",
+					input.Name,
+				)
+			}
+			if _, duplicate := deviceNames[device.Name]; duplicate {
+				return ProjectionFragment{}, fmt.Errorf(
+					"stable DRA pool %q has duplicate device %q",
+					input.PoolName,
+					device.Name,
+				)
+			}
+			deviceNames[device.Name] = struct{}{}
+			attributes := cloneDeviceAttributes(device.Attributes)
+			for key, value := range attributes {
+				if key == "" ||
+					(value.kind != DeviceAttributeBool &&
+						value.kind != DeviceAttributeString) ||
+					(value.kind == DeviceAttributeString && value.stringValue == "") {
+					return ProjectionFragment{}, fmt.Errorf(
+						"device %q has invalid attribute %q",
+						device.Name,
+						key,
+					)
+				}
+			}
+			devices = append(devices, DeviceFragment{
+				name:       device.Name,
+				attributes: attributes,
+			})
+		}
+		slices.SortFunc(devices, func(left, right DeviceFragment) int {
+			return strings.Compare(left.name, right.name)
+		})
+		resourceSlices = append(resourceSlices, ResourceSliceFragment{
+			name:               input.Name,
+			driver:             input.Driver,
+			group:              input.Group,
+			pool:               input.Pool,
+			poolName:           input.PoolName,
+			poolGeneration:     input.PoolGeneration,
+			resourceSliceCount: input.ResourceSliceCount,
+			nodeName:           input.NodeName,
+			devices:            devices,
+		})
+	}
+	slices.SortFunc(classes, func(left, right DeviceClassFragment) int {
+		return strings.Compare(left.name, right.name)
+	})
+	slices.SortFunc(resourceSlices, func(left, right ResourceSliceFragment) int {
+		return strings.Compare(left.name, right.name)
+	})
+	fragment.deviceClasses = classes
+	fragment.resourceSlices = resourceSlices
+	return fragment, nil
+}
+
 // Merge combines distinct projection contributions and fails closed when two
 // Adapters claim the same label or resource identity on one Node.
 func Merge(fragments ...ProjectionFragment) (ProjectionFragment, error) {
 	merged := make(map[string]NodeFragment)
+	classInputs := make([]DeviceClassFragmentInput, 0)
+	sliceInputs := make([]ResourceSliceFragmentInput, 0)
 	for _, fragment := range fragments {
 		for _, node := range fragment.nodes {
 			current, found := merged[node.name]
@@ -466,6 +711,35 @@ func Merge(fragments ...ProjectionFragment) (ProjectionFragment, error) {
 			current.requiresLease = current.requiresLease || node.requiresLease
 			merged[node.name] = current
 		}
+		for _, class := range fragment.deviceClasses {
+			classInputs = append(classInputs, DeviceClassFragmentInput{
+				Name:      class.name,
+				Driver:    class.driver,
+				Group:     class.group,
+				Pool:      class.pool,
+				Selectors: append([]string(nil), class.selectors...),
+			})
+		}
+		for _, resourceSlice := range fragment.resourceSlices {
+			devices := make([]DeviceFragmentInput, 0, len(resourceSlice.devices))
+			for _, device := range resourceSlice.devices {
+				devices = append(devices, DeviceFragmentInput{
+					Name:       device.name,
+					Attributes: cloneDeviceAttributes(device.attributes),
+				})
+			}
+			sliceInputs = append(sliceInputs, ResourceSliceFragmentInput{
+				Name:               resourceSlice.name,
+				Driver:             resourceSlice.driver,
+				Group:              resourceSlice.group,
+				Pool:               resourceSlice.pool,
+				PoolName:           resourceSlice.poolName,
+				PoolGeneration:     resourceSlice.poolGeneration,
+				ResourceSliceCount: resourceSlice.resourceSliceCount,
+				NodeName:           resourceSlice.nodeName,
+				Devices:            devices,
+			})
+		}
 	}
 	inputs := make([]NodeFragmentInput, 0, len(merged))
 	for _, node := range merged {
@@ -478,7 +752,10 @@ func Merge(fragments ...ProjectionFragment) (ProjectionFragment, error) {
 			RequiresLease:  node.requiresLease,
 		})
 	}
-	return NewFragment(inputs)
+	if len(classInputs) == 0 && len(sliceInputs) == 0 {
+		return NewFragment(inputs)
+	}
+	return NewDRAFragment(inputs, classInputs, sliceInputs)
 }
 
 func (fragment ProjectionFragment) Nodes() []NodeFragment {
@@ -489,13 +766,43 @@ func (fragment ProjectionFragment) Nodes() []NodeFragment {
 	return nodes
 }
 
+func (fragment ProjectionFragment) DeviceClasses() []DeviceClassFragment {
+	result := make([]DeviceClassFragment, 0, len(fragment.deviceClasses))
+	for _, value := range fragment.deviceClasses {
+		value.selectors = append([]string(nil), value.selectors...)
+		result = append(result, value)
+	}
+	return result
+}
+
+func (fragment ProjectionFragment) ResourceSlices() []ResourceSliceFragment {
+	result := make([]ResourceSliceFragment, 0, len(fragment.resourceSlices))
+	for _, value := range fragment.resourceSlices {
+		value.devices = cloneDevices(value.devices)
+		result = append(result, value)
+	}
+	return result
+}
+
 // ObjectKinds is deliberately closed: resource projection never owns or
 // mutates Pods.
 func (fragment ProjectionFragment) ObjectKinds() []string {
-	if len(fragment.nodes) == 0 {
+	if len(fragment.nodes) == 0 &&
+		len(fragment.deviceClasses) == 0 &&
+		len(fragment.resourceSlices) == 0 {
 		return nil
 	}
-	return []string{"Node"}
+	kinds := make([]string, 0, 3)
+	if len(fragment.deviceClasses) != 0 {
+		kinds = append(kinds, "DeviceClass")
+	}
+	if len(fragment.nodes) != 0 {
+		kinds = append(kinds, "Node")
+	}
+	if len(fragment.resourceSlices) != 0 {
+		kinds = append(kinds, "ResourceSlice")
+	}
+	return kinds
 }
 
 func (node NodeFragment) Name() string {
@@ -522,6 +829,77 @@ func (node NodeFragment) RequiresLease() bool {
 	return node.requiresLease
 }
 
+func (fragment DeviceClassFragment) Name() string {
+	return fragment.name
+}
+
+func (fragment DeviceClassFragment) Driver() string {
+	return fragment.driver
+}
+
+func (fragment DeviceClassFragment) Group() string {
+	return fragment.group
+}
+
+func (fragment DeviceClassFragment) Pool() string {
+	return fragment.pool
+}
+
+func (fragment DeviceClassFragment) Selectors() []string {
+	return append([]string(nil), fragment.selectors...)
+}
+
+func (fragment ResourceSliceFragment) Name() string {
+	return fragment.name
+}
+
+func (fragment ResourceSliceFragment) Driver() string {
+	return fragment.driver
+}
+
+func (fragment ResourceSliceFragment) Group() string {
+	return fragment.group
+}
+
+func (fragment ResourceSliceFragment) Pool() string {
+	return fragment.pool
+}
+
+func (fragment ResourceSliceFragment) PoolName() string {
+	return fragment.poolName
+}
+
+func (fragment ResourceSliceFragment) PoolGeneration() int64 {
+	return fragment.poolGeneration
+}
+
+func (fragment ResourceSliceFragment) ResourceSliceCount() int64 {
+	return fragment.resourceSliceCount
+}
+
+func (fragment ResourceSliceFragment) NodeName() string {
+	return fragment.nodeName
+}
+
+func (fragment ResourceSliceFragment) Devices() []DeviceFragment {
+	return cloneDevices(fragment.devices)
+}
+
+func (device DeviceFragment) Name() string {
+	return device.name
+}
+
+func (device DeviceFragment) Attributes() map[string]DeviceAttributeValue {
+	return cloneDeviceAttributes(device.attributes)
+}
+
+func (device DeviceFragment) Attribute(
+	key string,
+) (DeviceAttributeValue, bool) {
+	value, found := device.attributes[key]
+	return value, found
+}
+
 // ObservedNodeInput contains already-aggregated Kubernetes observations. Pod
 // requests are read-only accounting; no projection operation can mutate Pods.
 type ObservedNodeInput struct {
@@ -539,7 +917,11 @@ type ObservedNodeInput struct {
 // ObservedGraph is the immutable scheduler-visible state assessed by a
 // projection Adapter.
 type ObservedGraph struct {
-	nodes []ObservedNode
+	nodes          []ObservedNode
+	deviceClasses  []ObservedDeviceClass
+	resourceSlices []ObservedResourceSlice
+	resourceClaims []ObservedResourceClaim
+	pods           []ObservedPod
 }
 
 type ObservedNode struct {
@@ -554,7 +936,129 @@ type ObservedNode struct {
 	unschedulable bool
 }
 
-func NewObservedGraph(inputs []ObservedNodeInput) (ObservedGraph, error) {
+// DRAObservedInput adds the stable DRA objects that the projection owns and
+// assesses. ResourceClaims and Pods remain read-only workload evidence on the
+// Cluster port and are never projection-owned objects.
+type DRAObservedInput struct {
+	DeviceClasses  []ObservedDeviceClassInput
+	ResourceSlices []ObservedResourceSliceInput
+	ResourceClaims []ObservedResourceClaimInput
+	Pods           []ObservedPodInput
+}
+
+type ObservedDeviceClassInput struct {
+	Name      string
+	Exists    bool
+	Selectors []string
+}
+
+type ObservedResourceSliceInput struct {
+	Name               string
+	Exists             bool
+	Driver             string
+	PoolName           string
+	PoolGeneration     int64
+	ResourceSliceCount int64
+	NodeName           string
+	Devices            []ObservedDeviceInput
+}
+
+type ObservedDeviceInput struct {
+	Name       string
+	Attributes map[string]DeviceAttributeValue
+}
+
+type ObservedResourceClaimInput struct {
+	Namespace        string
+	Name             string
+	DeviceClassNames []string
+	Allocations      []ObservedAllocationInput
+	ReservedFor      []ObservedConsumerReferenceInput
+}
+
+type ObservedAllocationInput struct {
+	Request string
+	Driver  string
+	Pool    string
+	Device  string
+}
+
+type ObservedConsumerReferenceInput struct {
+	APIGroup string
+	Resource string
+	Name     string
+	UID      string
+}
+
+type ObservedPodInput struct {
+	Namespace      string
+	Name           string
+	UID            string
+	NodeName       string
+	ResourceClaims []string
+}
+
+type ObservedDeviceClass struct {
+	name      string
+	exists    bool
+	selectors []string
+}
+
+type ObservedResourceSlice struct {
+	name               string
+	exists             bool
+	driver             string
+	poolName           string
+	poolGeneration     int64
+	resourceSliceCount int64
+	nodeName           string
+	devices            []ObservedDevice
+}
+
+type ObservedDevice struct {
+	name       string
+	attributes map[string]DeviceAttributeValue
+}
+
+type ObservedResourceClaim struct {
+	namespace        string
+	name             string
+	deviceClassNames []string
+	allocations      []ObservedAllocation
+	reservedFor      []ObservedConsumerReference
+}
+
+type ObservedAllocation struct {
+	request string
+	driver  string
+	pool    string
+	device  string
+}
+
+type ObservedConsumerReference struct {
+	apiGroup string
+	resource string
+	name     string
+	uid      string
+}
+
+type ObservedPod struct {
+	namespace      string
+	name           string
+	uid            string
+	nodeName       string
+	resourceClaims []string
+}
+
+func NewObservedGraph(
+	inputs []ObservedNodeInput,
+	draInputs ...DRAObservedInput,
+) (ObservedGraph, error) {
+	if len(draInputs) > 1 {
+		return ObservedGraph{}, fmt.Errorf(
+			"observed graph accepts at most one stable DRA observation",
+		)
+	}
 	nodes := make([]ObservedNode, 0, len(inputs))
 	names := make(map[string]struct{}, len(inputs))
 	for _, input := range inputs {
@@ -577,7 +1081,111 @@ func NewObservedGraph(inputs []ObservedNodeInput) (ObservedGraph, error) {
 			unschedulable: input.Unschedulable,
 		})
 	}
-	return ObservedGraph{nodes: nodes}, nil
+	var draInput DRAObservedInput
+	if len(draInputs) == 1 {
+		draInput = draInputs[0]
+	}
+	classNames := make(map[string]struct{}, len(draInput.DeviceClasses))
+	deviceClasses := make(
+		[]ObservedDeviceClass,
+		0,
+		len(draInput.DeviceClasses),
+	)
+	for _, input := range draInput.DeviceClasses {
+		if input.Name == "" {
+			return ObservedGraph{}, fmt.Errorf(
+				"observed DeviceClass requires an exact name",
+			)
+		}
+		if _, duplicate := classNames[input.Name]; duplicate {
+			return ObservedGraph{}, fmt.Errorf(
+				"duplicate observed DeviceClass %q",
+				input.Name,
+			)
+		}
+		classNames[input.Name] = struct{}{}
+		deviceClasses = append(deviceClasses, ObservedDeviceClass{
+			name:      input.Name,
+			exists:    input.Exists,
+			selectors: append([]string(nil), input.Selectors...),
+		})
+	}
+	resourceSliceNames := make(map[string]struct{}, len(draInput.ResourceSlices))
+	resourceSlices := make(
+		[]ObservedResourceSlice,
+		0,
+		len(draInput.ResourceSlices),
+	)
+	for _, input := range draInput.ResourceSlices {
+		if input.Name == "" {
+			return ObservedGraph{}, fmt.Errorf(
+				"observed ResourceSlice requires an exact name",
+			)
+		}
+		if _, duplicate := resourceSliceNames[input.Name]; duplicate {
+			return ObservedGraph{}, fmt.Errorf(
+				"duplicate observed ResourceSlice %q",
+				input.Name,
+			)
+		}
+		resourceSliceNames[input.Name] = struct{}{}
+		devices := make([]ObservedDevice, 0, len(input.Devices))
+		deviceNames := make(map[string]struct{}, len(input.Devices))
+		for _, device := range input.Devices {
+			if device.Name == "" {
+				return ObservedGraph{}, fmt.Errorf(
+					"observed ResourceSlice %q has an unnamed device",
+					input.Name,
+				)
+			}
+			if _, duplicate := deviceNames[device.Name]; duplicate {
+				return ObservedGraph{}, fmt.Errorf(
+					"observed ResourceSlice %q has duplicate device %q",
+					input.Name,
+					device.Name,
+				)
+			}
+			deviceNames[device.Name] = struct{}{}
+			devices = append(devices, ObservedDevice{
+				name:       device.Name,
+				attributes: cloneDeviceAttributes(device.Attributes),
+			})
+		}
+		slices.SortFunc(devices, func(left, right ObservedDevice) int {
+			return strings.Compare(left.name, right.name)
+		})
+		resourceSlices = append(resourceSlices, ObservedResourceSlice{
+			name:               input.Name,
+			exists:             input.Exists,
+			driver:             input.Driver,
+			poolName:           input.PoolName,
+			poolGeneration:     input.PoolGeneration,
+			resourceSliceCount: input.ResourceSliceCount,
+			nodeName:           input.NodeName,
+			devices:            devices,
+		})
+	}
+	slices.SortFunc(deviceClasses, func(left, right ObservedDeviceClass) int {
+		return strings.Compare(left.name, right.name)
+	})
+	slices.SortFunc(resourceSlices, func(left, right ObservedResourceSlice) int {
+		return strings.Compare(left.name, right.name)
+	})
+	resourceClaims, err := observedResourceClaims(draInput.ResourceClaims)
+	if err != nil {
+		return ObservedGraph{}, err
+	}
+	pods, err := observedPods(draInput.Pods)
+	if err != nil {
+		return ObservedGraph{}, err
+	}
+	return ObservedGraph{
+		nodes:          nodes,
+		deviceClasses:  deviceClasses,
+		resourceSlices: resourceSlices,
+		resourceClaims: resourceClaims,
+		pods:           pods,
+	}, nil
 }
 
 func (graph ObservedGraph) Nodes() []ObservedNode {
@@ -586,6 +1194,41 @@ func (graph ObservedGraph) Nodes() []ObservedNode {
 		nodes = append(nodes, cloneObservedNode(node))
 	}
 	return nodes
+}
+
+func (graph ObservedGraph) DeviceClasses() []ObservedDeviceClass {
+	result := make([]ObservedDeviceClass, 0, len(graph.deviceClasses))
+	for _, value := range graph.deviceClasses {
+		value.selectors = append([]string(nil), value.selectors...)
+		result = append(result, value)
+	}
+	return result
+}
+
+func (graph ObservedGraph) ResourceSlices() []ObservedResourceSlice {
+	result := make([]ObservedResourceSlice, 0, len(graph.resourceSlices))
+	for _, value := range graph.resourceSlices {
+		value.devices = cloneObservedDevices(value.devices)
+		result = append(result, value)
+	}
+	return result
+}
+
+func (graph ObservedGraph) ResourceClaims() []ObservedResourceClaim {
+	result := make([]ObservedResourceClaim, 0, len(graph.resourceClaims))
+	for _, value := range graph.resourceClaims {
+		result = append(result, cloneObservedResourceClaim(value))
+	}
+	return result
+}
+
+func (graph ObservedGraph) Pods() []ObservedPod {
+	result := make([]ObservedPod, 0, len(graph.pods))
+	for _, value := range graph.pods {
+		value.resourceClaims = append([]string(nil), value.resourceClaims...)
+		result = append(result, value)
+	}
+	return result
 }
 
 func (node ObservedNode) Name() string {
@@ -624,12 +1267,138 @@ func (node ObservedNode) Unschedulable() bool {
 	return node.unschedulable
 }
 
+func (value ObservedDeviceClass) Name() string {
+	return value.name
+}
+
+func (value ObservedDeviceClass) Exists() bool {
+	return value.exists
+}
+
+func (value ObservedDeviceClass) Selectors() []string {
+	return append([]string(nil), value.selectors...)
+}
+
+func (value ObservedResourceSlice) Name() string {
+	return value.name
+}
+
+func (value ObservedResourceSlice) Exists() bool {
+	return value.exists
+}
+
+func (value ObservedResourceSlice) Driver() string {
+	return value.driver
+}
+
+func (value ObservedResourceSlice) PoolName() string {
+	return value.poolName
+}
+
+func (value ObservedResourceSlice) PoolGeneration() int64 {
+	return value.poolGeneration
+}
+
+func (value ObservedResourceSlice) ResourceSliceCount() int64 {
+	return value.resourceSliceCount
+}
+
+func (value ObservedResourceSlice) NodeName() string {
+	return value.nodeName
+}
+
+func (value ObservedResourceSlice) Devices() []ObservedDevice {
+	return cloneObservedDevices(value.devices)
+}
+
+func (value ObservedDevice) Name() string {
+	return value.name
+}
+
+func (value ObservedDevice) Attributes() map[string]DeviceAttributeValue {
+	return cloneDeviceAttributes(value.attributes)
+}
+
+func (value ObservedResourceClaim) Namespace() string {
+	return value.namespace
+}
+
+func (value ObservedResourceClaim) Name() string {
+	return value.name
+}
+
+func (value ObservedResourceClaim) DeviceClassNames() []string {
+	return append([]string(nil), value.deviceClassNames...)
+}
+
+func (value ObservedResourceClaim) Allocations() []ObservedAllocation {
+	return append([]ObservedAllocation(nil), value.allocations...)
+}
+
+func (value ObservedResourceClaim) ReservedFor() []ObservedConsumerReference {
+	return append([]ObservedConsumerReference(nil), value.reservedFor...)
+}
+
+func (value ObservedAllocation) Request() string {
+	return value.request
+}
+
+func (value ObservedAllocation) Driver() string {
+	return value.driver
+}
+
+func (value ObservedAllocation) Pool() string {
+	return value.pool
+}
+
+func (value ObservedAllocation) Device() string {
+	return value.device
+}
+
+func (value ObservedConsumerReference) APIGroup() string {
+	return value.apiGroup
+}
+
+func (value ObservedConsumerReference) Resource() string {
+	return value.resource
+}
+
+func (value ObservedConsumerReference) Name() string {
+	return value.name
+}
+
+func (value ObservedConsumerReference) UID() string {
+	return value.uid
+}
+
+func (value ObservedPod) Namespace() string {
+	return value.namespace
+}
+
+func (value ObservedPod) Name() string {
+	return value.name
+}
+
+func (value ObservedPod) UID() string {
+	return value.uid
+}
+
+func (value ObservedPod) NodeName() string {
+	return value.nodeName
+}
+
+func (value ObservedPod) ResourceClaims() []string {
+	return append([]string(nil), value.resourceClaims...)
+}
+
 // SurfaceState follows the product's four-state fidelity vocabulary.
 type SurfaceState string
 
 const (
 	SurfaceAchieved    SurfaceState = "achieved"
+	SurfaceExcluded    SurfaceState = "excluded"
 	SurfaceUnavailable SurfaceState = "unavailable"
+	SurfaceOutOfScope  SurfaceState = "out-of-scope"
 )
 
 // SurfaceAssessment is one Node/resource/runtime fact checked from observed
@@ -698,6 +1467,194 @@ func (report FidelityReport) FidelitySatisfied() bool {
 	return report.fidelitySatisfied
 }
 
+func observedResourceClaims(
+	inputs []ObservedResourceClaimInput,
+) ([]ObservedResourceClaim, error) {
+	if len(inputs) > cluster.MaximumObservedClaims {
+		return nil, fmt.Errorf("observed ResourceClaim limit exceeded")
+	}
+	result := make([]ObservedResourceClaim, 0, len(inputs))
+	names := make(map[string]struct{}, len(inputs))
+	for _, input := range inputs {
+		if input.Namespace == "" || input.Name == "" {
+			return nil, fmt.Errorf(
+				"observed ResourceClaim requires an exact namespace and name",
+			)
+		}
+		key := input.Namespace + "\x00" + input.Name
+		if _, duplicate := names[key]; duplicate {
+			return nil, fmt.Errorf(
+				"duplicate observed ResourceClaim %s/%s",
+				input.Namespace,
+				input.Name,
+			)
+		}
+		names[key] = struct{}{}
+		classes := append([]string(nil), input.DeviceClassNames...)
+		slices.Sort(classes)
+		for index, name := range classes {
+			if name == "" {
+				return nil, fmt.Errorf(
+					"observed ResourceClaim %s/%s has an empty DeviceClass",
+					input.Namespace,
+					input.Name,
+				)
+			}
+			if index != 0 && classes[index-1] == name {
+				return nil, fmt.Errorf(
+					"observed ResourceClaim %s/%s repeats DeviceClass %q",
+					input.Namespace,
+					input.Name,
+					name,
+				)
+			}
+		}
+		allocations := make([]ObservedAllocation, 0, len(input.Allocations))
+		for _, allocation := range input.Allocations {
+			if allocation.Request == "" || allocation.Driver == "" ||
+				allocation.Pool == "" || allocation.Device == "" {
+				return nil, fmt.Errorf(
+					"observed ResourceClaim %s/%s has an incomplete allocation",
+					input.Namespace,
+					input.Name,
+				)
+			}
+			allocations = append(allocations, ObservedAllocation{
+				request: allocation.Request,
+				driver:  allocation.Driver,
+				pool:    allocation.Pool,
+				device:  allocation.Device,
+			})
+		}
+		slices.SortFunc(
+			allocations,
+			func(left, right ObservedAllocation) int {
+				return strings.Compare(
+					left.request+"\x00"+left.driver+"\x00"+
+						left.pool+"\x00"+left.device,
+					right.request+"\x00"+right.driver+"\x00"+
+						right.pool+"\x00"+right.device,
+				)
+			},
+		)
+		reservations := make(
+			[]ObservedConsumerReference,
+			0,
+			len(input.ReservedFor),
+		)
+		for _, reservation := range input.ReservedFor {
+			if reservation.Resource == "" || reservation.Name == "" ||
+				reservation.UID == "" {
+				return nil, fmt.Errorf(
+					"observed ResourceClaim %s/%s has an incomplete reservation",
+					input.Namespace,
+					input.Name,
+				)
+			}
+			reservations = append(reservations, ObservedConsumerReference{
+				apiGroup: reservation.APIGroup,
+				resource: reservation.Resource,
+				name:     reservation.Name,
+				uid:      reservation.UID,
+			})
+		}
+		slices.SortFunc(
+			reservations,
+			func(left, right ObservedConsumerReference) int {
+				return strings.Compare(
+					left.apiGroup+"\x00"+left.resource+"\x00"+
+						left.name+"\x00"+left.uid,
+					right.apiGroup+"\x00"+right.resource+"\x00"+
+						right.name+"\x00"+right.uid,
+				)
+			},
+		)
+		result = append(result, ObservedResourceClaim{
+			namespace:        input.Namespace,
+			name:             input.Name,
+			deviceClassNames: classes,
+			allocations:      allocations,
+			reservedFor:      reservations,
+		})
+	}
+	slices.SortFunc(result, func(left, right ObservedResourceClaim) int {
+		return strings.Compare(
+			left.namespace+"\x00"+left.name,
+			right.namespace+"\x00"+right.name,
+		)
+	})
+	return result, nil
+}
+
+func observedPods(inputs []ObservedPodInput) ([]ObservedPod, error) {
+	if len(inputs) > cluster.MaximumObservedPods {
+		return nil, fmt.Errorf("observed Pod limit exceeded")
+	}
+	result := make([]ObservedPod, 0, len(inputs))
+	names := make(map[string]struct{}, len(inputs))
+	for _, input := range inputs {
+		if input.Namespace == "" || input.Name == "" || input.UID == "" {
+			return nil, fmt.Errorf(
+				"observed Pod requires an exact namespace, name, and UID",
+			)
+		}
+		key := input.Namespace + "\x00" + input.Name
+		if _, duplicate := names[key]; duplicate {
+			return nil, fmt.Errorf(
+				"duplicate observed Pod %s/%s",
+				input.Namespace,
+				input.Name,
+			)
+		}
+		names[key] = struct{}{}
+		claims := append([]string(nil), input.ResourceClaims...)
+		slices.Sort(claims)
+		for index, claim := range claims {
+			if claim == "" {
+				return nil, fmt.Errorf(
+					"observed Pod %s/%s has an empty ResourceClaim reference",
+					input.Namespace,
+					input.Name,
+				)
+			}
+			if index != 0 && claims[index-1] == claim {
+				return nil, fmt.Errorf(
+					"observed Pod %s/%s repeats ResourceClaim %q",
+					input.Namespace,
+					input.Name,
+					claim,
+				)
+			}
+		}
+		result = append(result, ObservedPod{
+			namespace:      input.Namespace,
+			name:           input.Name,
+			uid:            input.UID,
+			nodeName:       input.NodeName,
+			resourceClaims: claims,
+		})
+	}
+	slices.SortFunc(result, func(left, right ObservedPod) int {
+		return strings.Compare(
+			left.namespace+"\x00"+left.name,
+			right.namespace+"\x00"+right.name,
+		)
+	})
+	return result, nil
+}
+
+func cloneObservedResourceClaim(
+	value ObservedResourceClaim,
+) ObservedResourceClaim {
+	value.deviceClassNames = append([]string(nil), value.deviceClassNames...)
+	value.allocations = append([]ObservedAllocation(nil), value.allocations...)
+	value.reservedFor = append(
+		[]ObservedConsumerReference(nil),
+		value.reservedFor...,
+	)
+	return value
+}
+
 func cloneDesiredNodes(values []DesiredNode) []DesiredNode {
 	cloned := make([]DesiredNode, 0, len(values))
 	for _, value := range values {
@@ -733,6 +1690,37 @@ func cloneObservedNode(value ObservedNode) ObservedNode {
 	value.allocatable = cloneUint64Map(value.allocatable)
 	value.requested = cloneUint64Map(value.requested)
 	return value
+}
+
+func cloneDevices(values []DeviceFragment) []DeviceFragment {
+	result := make([]DeviceFragment, 0, len(values))
+	for _, value := range values {
+		value.attributes = cloneDeviceAttributes(value.attributes)
+		result = append(result, value)
+	}
+	return result
+}
+
+func cloneObservedDevices(values []ObservedDevice) []ObservedDevice {
+	result := make([]ObservedDevice, 0, len(values))
+	for _, value := range values {
+		value.attributes = cloneDeviceAttributes(value.attributes)
+		result = append(result, value)
+	}
+	return result
+}
+
+func cloneDeviceAttributes(
+	values map[string]DeviceAttributeValue,
+) map[string]DeviceAttributeValue {
+	if values == nil {
+		return make(map[string]DeviceAttributeValue)
+	}
+	cloned := make(map[string]DeviceAttributeValue, len(values))
+	for key, value := range values {
+		cloned[key] = value
+	}
+	return cloned
 }
 
 func cloneStringMap(values map[string]string) map[string]string {

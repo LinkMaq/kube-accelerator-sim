@@ -55,15 +55,22 @@ type InventoryEntry struct {
 	Count      int32  `json:"count"`
 }
 
+// FidelitySurfaceStatus records one explicit simulation truth boundary.
+type FidelitySurfaceStatus struct {
+	Surface string `json:"surface"`
+	State   string `json:"state"`
+}
+
 // ScenarioInstanceStatus is deliberately bounded independently of scale.
 type ScenarioInstanceStatus struct {
-	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
-	RevisionDigest     string             `json:"revisionDigest,omitempty"`
-	Phase              string             `json:"phase,omitempty"`
-	Pools              []PoolStatus       `json:"pools,omitempty"`
-	Inventory          []InventoryEntry   `json:"inventory,omitempty"`
-	Diagnostics        []DiagnosticStatus `json:"diagnostics,omitempty"`
-	Conditions         []metav1.Condition `json:"conditions,omitempty"`
+	ObservedGeneration int64                   `json:"observedGeneration,omitempty"`
+	RevisionDigest     string                  `json:"revisionDigest,omitempty"`
+	Phase              string                  `json:"phase,omitempty"`
+	Pools              []PoolStatus            `json:"pools,omitempty"`
+	Inventory          []InventoryEntry        `json:"inventory,omitempty"`
+	Fidelity           []FidelitySurfaceStatus `json:"fidelity,omitempty"`
+	Diagnostics        []DiagnosticStatus      `json:"diagnostics,omitempty"`
+	Conditions         []metav1.Condition      `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true

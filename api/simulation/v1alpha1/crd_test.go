@@ -45,6 +45,13 @@ func TestPublishedCRDIsStructuralBoundedAndHasStatusSubresource(t *testing.T) {
 		status.Properties["inventory"].MaxItems == nil {
 		t.Fatal("status collections are not structurally bounded")
 	}
+	fidelity := status.Properties["fidelity"]
+	if fidelity.MaxItems == nil || *fidelity.MaxItems != 32 ||
+		fidelity.XListType == nil || *fidelity.XListType != "map" ||
+		len(fidelity.XListMapKeys) != 1 ||
+		fidelity.XListMapKeys[0] != "surface" {
+		t.Fatal("fidelity surfaces are not a bounded map keyed by surface")
+	}
 	revisions := spec.Properties["revisions"]
 	canonical := spec.Properties["canonicalScenario"]
 	if canonical.MaxLength == nil || *canonical.MaxLength != 1<<20 {

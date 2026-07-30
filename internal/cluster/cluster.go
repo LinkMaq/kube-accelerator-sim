@@ -21,6 +21,8 @@ const (
 	MaximumOwnedChanges    = 4096
 	MaximumObservedObjects = 16384
 	MaximumObservedPods    = 65536
+	MaximumObservedClaims  = 65536
+	MaximumDevicesPerSlice = 128
 )
 
 // TargetSelection identifies exactly one context in exactly one kubeconfig.
@@ -43,13 +45,14 @@ type ConnectionReceipt struct {
 // AccessRequirement is one exact SelfSubjectAccessReview request. Group is
 // empty only for the Kubernetes core group.
 type AccessRequirement struct {
-	Verb        string
-	Group       string
-	Resource    string
-	Subresource string
-	Namespace   string
-	Name        string
-	Namespaced  bool
+	Verb          string
+	Group         string
+	Resource      string
+	Subresource   string
+	Namespace     string
+	Name          string
+	Namespaced    bool
+	AllNamespaces bool
 }
 
 // Validate rejects wildcards and fields that would make an authorization
@@ -74,11 +77,30 @@ func (requirement AccessRequirement) Validate() error {
 		strings.Contains(requirement.Subresource, "/") {
 		return fmt.Errorf("resource and subresource must be separate exact fields")
 	}
-	if requirement.Namespaced && requirement.Namespace == "" {
-		return fmt.Errorf("namespaced authorization requires an exact namespace")
+	if requirement.Namespaced &&
+		requirement.Namespace == "" &&
+		!requirement.AllNamespaces {
+		return fmt.Errorf(
+			"namespaced authorization requires an exact namespace or explicit all-namespace scope",
+		)
 	}
-	if !requirement.Namespaced && requirement.Namespace != "" {
-		return fmt.Errorf("cluster-scoped authorization must not carry a namespace")
+	if requirement.Namespaced &&
+		requirement.Namespace != "" &&
+		requirement.AllNamespaces {
+		return fmt.Errorf(
+			"namespaced authorization cannot combine an exact namespace with all-namespace scope",
+		)
+	}
+	if !requirement.Namespaced &&
+		(requirement.Namespace != "" || requirement.AllNamespaces) {
+		return fmt.Errorf(
+			"cluster-scoped authorization must not carry a namespace scope",
+		)
+	}
+	if requirement.AllNamespaces && requirement.Name != "" {
+		return fmt.Errorf(
+			"all-namespace authorization cannot carry an ambiguous object name",
+		)
 	}
 	return nil
 }
@@ -89,6 +111,7 @@ type OwnershipScope struct {
 	instanceName      domain.Name
 	instanceUID       domain.InstanceUID
 	desiredGeneration domain.Generation
+	fidelity          domain.FidelityMode
 }
 
 // NewOwnershipScope rejects a missing UID and the create-precondition
@@ -145,6 +168,27 @@ func (scope OwnershipScope) ManagedBy() string {
 	return ManagedByValue
 }
 
+// ForFidelity narrows observation to the object families required by one
+// accepted Scenario Instance. In particular, scheduling-only instances do not
+// require DRA list/watch permissions.
+func (scope OwnershipScope) ForFidelity(
+	fidelity domain.FidelityMode,
+) (OwnershipScope, error) {
+	switch fidelity.String() {
+	case "scheduling", "dra-control-plane":
+		scope.fidelity = fidelity
+		return scope, nil
+	default:
+		return OwnershipScope{}, fmt.Errorf(
+			"ownership observation requires an accepted Fidelity Mode",
+		)
+	}
+}
+
+func (scope OwnershipScope) Fidelity() domain.FidelityMode {
+	return scope.fidelity
+}
+
 // TargetCapabilities is the versioned, bounded discovery result consumed by
 // lifecycle Modules.
 type TargetCapabilities struct {
@@ -179,9 +223,11 @@ type AuthorizationReport struct {
 type ObjectKind string
 
 const (
-	ObjectKindNode       ObjectKind = "Node"
-	ObjectKindNodeStatus ObjectKind = "NodeStatus"
-	ObjectKindLease      ObjectKind = "Lease"
+	ObjectKindNode          ObjectKind = "Node"
+	ObjectKindNodeStatus    ObjectKind = "NodeStatus"
+	ObjectKindLease         ObjectKind = "Lease"
+	ObjectKindDeviceClass   ObjectKind = "DeviceClass"
+	ObjectKindResourceSlice ObjectKind = "ResourceSlice"
 )
 
 // ObjectKey identifies one allowlisted Kubernetes object.
@@ -197,9 +243,12 @@ func NewObjectKey(kind ObjectKind, namespace, name string) (ObjectKey, error) {
 		return ObjectKey{}, fmt.Errorf("owned object requires one exact name")
 	}
 	switch kind {
-	case ObjectKindNode, ObjectKindNodeStatus:
+	case ObjectKindNode,
+		ObjectKindNodeStatus,
+		ObjectKindDeviceClass,
+		ObjectKindResourceSlice:
 		if namespace != "" {
-			return ObjectKey{}, fmt.Errorf("Node is cluster-scoped")
+			return ObjectKey{}, fmt.Errorf("%s is cluster-scoped", kind)
 		}
 	case ObjectKindLease:
 		if namespace == "" {
@@ -239,6 +288,8 @@ type ObservedObject struct {
 	DesiredGeneration domain.Generation
 	Node              *ObservedNodeState
 	Lease             *ObservedLeaseState
+	DeviceClass       *ObservedDeviceClassState
+	ResourceSlice     *ObservedResourceSliceState
 }
 
 // ObservedNodeState is the bounded scheduler-visible state of an exactly
@@ -260,22 +311,118 @@ type ObservedLeaseState struct {
 	RenewTime            time.Time
 }
 
+// DeviceAttributeKind is the stable DRA v1 subset the Cluster port can carry.
+type DeviceAttributeKind string
+
+const (
+	DeviceAttributeBool   DeviceAttributeKind = "bool"
+	DeviceAttributeString DeviceAttributeKind = "string"
+)
+
+// DeviceAttributeValue prevents optional and feature-gated DRA fields from
+// leaking into the portable mutation contract.
+type DeviceAttributeValue struct {
+	kind        DeviceAttributeKind
+	boolValue   bool
+	stringValue string
+}
+
+func NewBoolDeviceAttribute(value bool) DeviceAttributeValue {
+	return DeviceAttributeValue{kind: DeviceAttributeBool, boolValue: value}
+}
+
+func NewStringDeviceAttribute(value string) (DeviceAttributeValue, error) {
+	if value == "" || len(value) > 64 {
+		return DeviceAttributeValue{}, fmt.Errorf(
+			"stable DRA string attribute must contain 1 to 64 bytes",
+		)
+	}
+	return DeviceAttributeValue{
+		kind:        DeviceAttributeString,
+		stringValue: value,
+	}, nil
+}
+
+func (value DeviceAttributeValue) Kind() DeviceAttributeKind {
+	return value.kind
+}
+
+func (value DeviceAttributeValue) Bool() bool {
+	return value.boolValue
+}
+
+func (value DeviceAttributeValue) String() string {
+	return value.stringValue
+}
+
+// DRADevice is one deterministic device from a simulator-owned pool.
+type DRADevice struct {
+	Name       string
+	Attributes map[string]DeviceAttributeValue
+}
+
+// ObservedDeviceClassState is the complete portable DeviceClass spec subset.
+type ObservedDeviceClassState struct {
+	Selectors []string
+}
+
+// ObservedResourceSliceState is the complete portable ResourceSlice spec
+// subset. It deliberately has no gated per-device fields.
+type ObservedResourceSliceState struct {
+	Driver             string
+	PoolName           string
+	PoolGeneration     int64
+	ResourceSliceCount int64
+	NodeName           string
+	Devices            []DRADevice
+}
+
+// DRAAllocationResult is the scheduler-owned tuple from ResourceClaim status.
+type DRAAllocationResult struct {
+	Request string
+	Driver  string
+	Pool    string
+	Device  string
+}
+
+// DRAConsumerReference is one exact scheduler-owned reservation.
+type DRAConsumerReference struct {
+	APIGroup string
+	Resource string
+	Name     string
+	UID      string
+}
+
+// ObservedResourceClaim is read-only allocation and cleanup evidence. Claims
+// never enter ObjectKinds or an OwnedChangeSet.
+type ObservedResourceClaim struct {
+	Namespace        string
+	Name             string
+	UID              string
+	ResourceVersion  string
+	DeviceClassNames []string
+	Allocations      []DRAAllocationResult
+	ReservedFor      []DRAConsumerReference
+}
+
 // ObservedPod is read-only blocker and resource-accounting evidence for a Pod
 // bound to an owned Synthetic Node. Pods are intentionally not ObjectKinds
 // and can never enter an OwnedChangeSet.
 type ObservedPod struct {
-	Namespace string
-	Name      string
-	UID       string
-	NodeName  string
-	Phase     string
-	Requested map[string]string
+	Namespace      string
+	Name           string
+	UID            string
+	NodeName       string
+	Phase          string
+	Requested      map[string]string
+	ResourceClaims []string
 }
 
 // ObservedGraph is a bounded exact-UID observation.
 type ObservedGraph struct {
-	Objects []ObservedObject
-	Pods    []ObservedPod
+	Objects        []ObservedObject
+	Pods           []ObservedPod
+	ResourceClaims []ObservedResourceClaim
 }
 
 // ChangeKind is a closed intention, not a Kubernetes verb or patch type.
@@ -285,6 +432,8 @@ const (
 	ChangeApplySyntheticNode        ChangeKind = "ApplySyntheticNode"
 	ChangeUpdateSyntheticNodeStatus ChangeKind = "UpdateSyntheticNodeStatus"
 	ChangeApplyLease                ChangeKind = "ApplyLease"
+	ChangeApplyDeviceClass          ChangeKind = "ApplyDeviceClass"
+	ChangeApplyResourceSlice        ChangeKind = "ApplyResourceSlice"
 	ChangeDeleteOwnedObject         ChangeKind = "DeleteOwnedObject"
 )
 
@@ -309,7 +458,10 @@ func NewDeleteOwnedObject(
 	preconditions ObjectPreconditions,
 ) (OwnedChange, error) {
 	if key.name == "" ||
-		(key.kind != ObjectKindNode && key.kind != ObjectKindLease) {
+		(key.kind != ObjectKindNode &&
+			key.kind != ObjectKindLease &&
+			key.kind != ObjectKindDeviceClass &&
+			key.kind != ObjectKindResourceSlice) {
 		return nil, fmt.Errorf("delete requires an allowlisted object key")
 	}
 	if preconditions.UID == "" || preconditions.ResourceVersion == "" {
@@ -336,6 +488,197 @@ func (change DeleteOwnedObject) Preconditions() ObjectPreconditions {
 }
 
 func (DeleteOwnedObject) isOwnedChange() {}
+
+// DeviceClassInput contains only the portable stable-v1 selector contract.
+// Driver configuration and extendedResourceName are excluded.
+type DeviceClassInput struct {
+	Selectors []string
+}
+
+// ApplyDeviceClass is one exact server-side apply intention.
+type ApplyDeviceClass struct {
+	key           ObjectKey
+	preconditions ObjectPreconditions
+	selectors     []string
+}
+
+func NewApplyDeviceClass(
+	key ObjectKey,
+	preconditions ObjectPreconditions,
+	input DeviceClassInput,
+) (OwnedChange, error) {
+	if key.kind != ObjectKindDeviceClass {
+		return nil, fmt.Errorf("DeviceClass apply requires a DeviceClass key")
+	}
+	if (preconditions.UID == "") != (preconditions.ResourceVersion == "") {
+		return nil, fmt.Errorf(
+			"DeviceClass update requires both UID and resourceVersion",
+		)
+	}
+	if len(input.Selectors) == 0 {
+		return nil, fmt.Errorf("DeviceClass apply requires at least one CEL selector")
+	}
+	for _, selector := range input.Selectors {
+		if selector == "" {
+			return nil, fmt.Errorf("DeviceClass CEL selector must not be empty")
+		}
+	}
+	return ApplyDeviceClass{
+		key:           key,
+		preconditions: preconditions,
+		selectors:     append([]string(nil), input.Selectors...),
+	}, nil
+}
+
+func (change ApplyDeviceClass) Kind() ChangeKind {
+	return ChangeApplyDeviceClass
+}
+
+func (change ApplyDeviceClass) Key() ObjectKey {
+	return change.key
+}
+
+func (change ApplyDeviceClass) Preconditions() ObjectPreconditions {
+	return change.preconditions
+}
+
+func (change ApplyDeviceClass) Selectors() []string {
+	return append([]string(nil), change.selectors...)
+}
+
+func (ApplyDeviceClass) isOwnedChange() {}
+
+// ResourceSliceInput contains only fields present in the Kubernetes 1.34
+// stable portable subset.
+type ResourceSliceInput struct {
+	Driver             string
+	PoolName           string
+	PoolGeneration     int64
+	ResourceSliceCount int64
+	NodeName           string
+	Devices            []DRADevice
+}
+
+// ApplyResourceSlice is one exact server-side apply intention.
+type ApplyResourceSlice struct {
+	key                ObjectKey
+	preconditions      ObjectPreconditions
+	driver             string
+	poolName           string
+	poolGeneration     int64
+	resourceSliceCount int64
+	nodeName           string
+	devices            []DRADevice
+}
+
+func NewApplyResourceSlice(
+	key ObjectKey,
+	preconditions ObjectPreconditions,
+	input ResourceSliceInput,
+) (OwnedChange, error) {
+	if key.kind != ObjectKindResourceSlice {
+		return nil, fmt.Errorf("ResourceSlice apply requires a ResourceSlice key")
+	}
+	if (preconditions.UID == "") != (preconditions.ResourceVersion == "") {
+		return nil, fmt.Errorf(
+			"ResourceSlice update requires both UID and resourceVersion",
+		)
+	}
+	if input.Driver == "" || input.PoolName == "" ||
+		input.PoolGeneration <= 0 || input.ResourceSliceCount <= 0 ||
+		input.NodeName == "" {
+		return nil, fmt.Errorf(
+			"ResourceSlice apply requires exact driver, pool, generation, count, and Node",
+		)
+	}
+	if len(input.Devices) > MaximumDevicesPerSlice {
+		return nil, fmt.Errorf(
+			"ResourceSlice exceeds the %d-device portable limit",
+			MaximumDevicesPerSlice,
+		)
+	}
+	devices := cloneDRADevices(input.Devices)
+	names := make(map[string]struct{}, len(devices))
+	for _, device := range devices {
+		if device.Name == "" {
+			return nil, fmt.Errorf("ResourceSlice device requires an exact name")
+		}
+		if _, duplicate := names[device.Name]; duplicate {
+			return nil, fmt.Errorf(
+				"ResourceSlice has duplicate device %q",
+				device.Name,
+			)
+		}
+		names[device.Name] = struct{}{}
+		if len(device.Attributes) > 32 {
+			return nil, fmt.Errorf(
+				"device %q exceeds the portable attribute limit",
+				device.Name,
+			)
+		}
+		for key, value := range device.Attributes {
+			if key == "" ||
+				(value.kind != DeviceAttributeBool &&
+					value.kind != DeviceAttributeString) ||
+				(value.kind == DeviceAttributeString &&
+					(value.stringValue == "" || len(value.stringValue) > 64)) {
+				return nil, fmt.Errorf(
+					"device %q has invalid stable DRA attribute %q",
+					device.Name,
+					key,
+				)
+			}
+		}
+	}
+	return ApplyResourceSlice{
+		key:                key,
+		preconditions:      preconditions,
+		driver:             input.Driver,
+		poolName:           input.PoolName,
+		poolGeneration:     input.PoolGeneration,
+		resourceSliceCount: input.ResourceSliceCount,
+		nodeName:           input.NodeName,
+		devices:            devices,
+	}, nil
+}
+
+func (change ApplyResourceSlice) Kind() ChangeKind {
+	return ChangeApplyResourceSlice
+}
+
+func (change ApplyResourceSlice) Key() ObjectKey {
+	return change.key
+}
+
+func (change ApplyResourceSlice) Preconditions() ObjectPreconditions {
+	return change.preconditions
+}
+
+func (change ApplyResourceSlice) Driver() string {
+	return change.driver
+}
+
+func (change ApplyResourceSlice) PoolName() string {
+	return change.poolName
+}
+
+func (change ApplyResourceSlice) PoolGeneration() int64 {
+	return change.poolGeneration
+}
+
+func (change ApplyResourceSlice) ResourceSliceCount() int64 {
+	return change.resourceSliceCount
+}
+
+func (change ApplyResourceSlice) NodeName() string {
+	return change.nodeName
+}
+
+func (change ApplyResourceSlice) Devices() []DRADevice {
+	return cloneDRADevices(change.devices)
+}
+
+func (ApplyResourceSlice) isOwnedChange() {}
 
 // NodeTaint is the transport-neutral subset applied to a Synthetic Node.
 type NodeTaint struct {
@@ -643,6 +986,8 @@ func NewOwnedChangeSet(
 		case ChangeApplySyntheticNode,
 			ChangeUpdateSyntheticNodeStatus,
 			ChangeApplyLease,
+			ChangeApplyDeviceClass,
+			ChangeApplyResourceSlice,
 			ChangeDeleteOwnedObject:
 		default:
 			return OwnedChangeSet{}, fmt.Errorf(
@@ -734,6 +1079,23 @@ func cloneStringMap(input map[string]string) map[string]string {
 	result := make(map[string]string, len(input))
 	for key, value := range input {
 		result[key] = value
+	}
+	return result
+}
+
+func cloneDRADevices(input []DRADevice) []DRADevice {
+	result := make([]DRADevice, len(input))
+	for index, device := range input {
+		result[index] = device
+		if device.Attributes != nil {
+			result[index].Attributes = make(
+				map[string]DeviceAttributeValue,
+				len(device.Attributes),
+			)
+			for key, value := range device.Attributes {
+				result[index].Attributes[key] = value
+			}
+		}
 	}
 	return result
 }

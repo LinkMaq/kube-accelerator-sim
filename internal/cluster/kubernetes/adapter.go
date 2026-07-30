@@ -10,6 +10,7 @@ import (
 	authorizationv1 "k8s.io/api/authorization/v1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,6 +21,7 @@ import (
 	coordinationapplyv1 "k8s.io/client-go/applyconfigurations/coordination/v1"
 	coreapplyv1 "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1apply "k8s.io/client-go/applyconfigurations/meta/v1"
+	resourceapplyv1 "k8s.io/client-go/applyconfigurations/resource/v1"
 	clientset "k8s.io/client-go/kubernetes"
 
 	"github.com/LinkMaq/kube-accelerator-sim/internal/cluster"
@@ -349,8 +351,225 @@ func (adapter *Adapter) Observe(
 			break
 		}
 	}
+	observeDRA := scope.Fidelity().String() == "dra-control-plane"
+	ownedDRA := false
+	ownedClassNames := make(map[string]struct{})
+	ownedDeviceTuples := make(map[string]struct{})
+	continueToken = ""
+	for observeDRA {
+		result, err := adapter.client.ResourceV1().DeviceClasses().List(
+			ctx,
+			metav1.ListOptions{
+				LabelSelector: selector,
+				Limit:         discoveryPageSize,
+				Continue:      continueToken,
+			},
+		)
+		if err != nil {
+			if !apierrors.IsNotFound(err) {
+				return cluster.ObservedGraph{}, classify(
+					"observe owned DeviceClasses",
+					err,
+				)
+			}
+			break
+		}
+		for index := range result.Items {
+			item := &result.Items[index]
+			key, _ := cluster.NewObjectKey(
+				cluster.ObjectKindDeviceClass,
+				"",
+				item.Name,
+			)
+			object, err := observedObject(
+				key,
+				item.UID,
+				item.ResourceVersion,
+				item.Labels,
+				item.OwnerReferences,
+				scope,
+			)
+			if err != nil {
+				return cluster.ObservedGraph{}, err
+			}
+			object.DeviceClass = observedDeviceClassState(item)
+			objects = append(objects, object)
+			ownedClassNames[item.Name] = struct{}{}
+			ownedDRA = true
+			if len(objects) > cluster.MaximumObservedObjects {
+				return cluster.ObservedGraph{}, cluster.NewError(
+					cluster.ErrorCapabilityUnavailable,
+					"owned observation exceeded its bounded object limit",
+					false,
+				)
+			}
+		}
+		continueToken = result.Continue
+		if continueToken == "" {
+			break
+		}
+	}
+	continueToken = ""
+	for observeDRA {
+		result, err := adapter.client.ResourceV1().ResourceSlices().List(
+			ctx,
+			metav1.ListOptions{
+				LabelSelector: selector,
+				Limit:         discoveryPageSize,
+				Continue:      continueToken,
+			},
+		)
+		if err != nil {
+			if !apierrors.IsNotFound(err) {
+				return cluster.ObservedGraph{}, classify(
+					"observe owned ResourceSlices",
+					err,
+				)
+			}
+			break
+		}
+		for index := range result.Items {
+			item := &result.Items[index]
+			key, _ := cluster.NewObjectKey(
+				cluster.ObjectKindResourceSlice,
+				"",
+				item.Name,
+			)
+			object, err := observedObject(
+				key,
+				item.UID,
+				item.ResourceVersion,
+				item.Labels,
+				item.OwnerReferences,
+				scope,
+			)
+			if err != nil {
+				return cluster.ObservedGraph{}, err
+			}
+			object.ResourceSlice = observedResourceSliceState(item)
+			objects = append(objects, object)
+			for _, device := range item.Spec.Devices {
+				ownedDeviceTuples[draTuple(
+					item.Spec.Driver,
+					item.Spec.Pool.Name,
+					device.Name,
+				)] = struct{}{}
+			}
+			ownedDRA = true
+			if len(objects) > cluster.MaximumObservedObjects {
+				return cluster.ObservedGraph{}, cluster.NewError(
+					cluster.ErrorCapabilityUnavailable,
+					"owned observation exceeded its bounded object limit",
+					false,
+				)
+			}
+		}
+		continueToken = result.Continue
+		if continueToken == "" {
+			break
+		}
+	}
+	resourceClaims := make([]cluster.ObservedResourceClaim, 0)
+	if ownedDRA {
+		continueToken = ""
+		for {
+			result, err := adapter.client.ResourceV1().
+				ResourceClaims(metav1.NamespaceAll).
+				List(ctx, metav1.ListOptions{
+					Limit:    discoveryPageSize,
+					Continue: continueToken,
+				})
+			if err != nil {
+				return cluster.ObservedGraph{}, classify(
+					"observe ResourceClaims referencing owned DRA inventory",
+					err,
+				)
+			}
+			for index := range result.Items {
+				claim := observedResourceClaim(&result.Items[index])
+				if !claimReferencesOwnedDRA(
+					claim,
+					ownedClassNames,
+					ownedDeviceTuples,
+				) {
+					continue
+				}
+				resourceClaims = append(resourceClaims, claim)
+				if len(resourceClaims) > cluster.MaximumObservedClaims {
+					return cluster.ObservedGraph{}, cluster.NewError(
+						cluster.ErrorCapabilityUnavailable,
+						"DRA ResourceClaim observation exceeded its bounded limit",
+						false,
+					)
+				}
+			}
+			continueToken = result.Continue
+			if continueToken == "" {
+				break
+			}
+		}
+	}
 	slices.Sort(ownedNodeNames)
 	pods := make([]cluster.ObservedPod, 0)
+	observedPodKeys := make(map[string]struct{})
+	appendPod := func(pod *corev1.Pod) error {
+		key := pod.Namespace + "\x00" + pod.Name
+		if _, duplicate := observedPodKeys[key]; duplicate {
+			return nil
+		}
+		observedPodKeys[key] = struct{}{}
+		pods = append(pods, observedPod(pod))
+		if len(pods) > cluster.MaximumObservedPods {
+			return cluster.NewError(
+				cluster.ErrorCapabilityUnavailable,
+				"owned-node and DRA Pod observation exceeded its bounded limit",
+				false,
+			)
+		}
+		return nil
+	}
+	if len(resourceClaims) != 0 {
+		claimNamesByNamespace := make(map[string]map[string]struct{})
+		for _, claim := range resourceClaims {
+			if claimNamesByNamespace[claim.Namespace] == nil {
+				claimNamesByNamespace[claim.Namespace] =
+					make(map[string]struct{})
+			}
+			claimNamesByNamespace[claim.Namespace][claim.Name] = struct{}{}
+		}
+		continueToken = ""
+		for {
+			result, err := adapter.client.CoreV1().Pods(metav1.NamespaceAll).List(
+				ctx,
+				metav1.ListOptions{
+					Limit:    discoveryPageSize,
+					Continue: continueToken,
+				},
+			)
+			if err != nil {
+				return cluster.ObservedGraph{}, classify(
+					"observe Pods referencing selected DRA ResourceClaims",
+					err,
+				)
+			}
+			for index := range result.Items {
+				pod := &result.Items[index]
+				if !podReferencesResourceClaim(
+					pod,
+					claimNamesByNamespace[pod.Namespace],
+				) {
+					continue
+				}
+				if err := appendPod(pod); err != nil {
+					return cluster.ObservedGraph{}, err
+				}
+			}
+			continueToken = result.Continue
+			if continueToken == "" {
+				break
+			}
+		}
+	}
 	for _, nodeName := range ownedNodeNames {
 		continueToken = ""
 		for {
@@ -379,13 +598,8 @@ func (adapter *Adapter) Observe(
 				if pod.Spec.NodeName != nodeName {
 					continue
 				}
-				pods = append(pods, observedPod(pod))
-				if len(pods) > cluster.MaximumObservedPods {
-					return cluster.ObservedGraph{}, cluster.NewError(
-						cluster.ErrorCapabilityUnavailable,
-						"owned-node Pod observation exceeded its bounded limit",
-						false,
-					)
+				if err := appendPod(pod); err != nil {
+					return cluster.ObservedGraph{}, err
 				}
 			}
 			continueToken = result.Continue
@@ -400,7 +614,20 @@ func (adapter *Adapter) Observe(
 		}
 		return strings.Compare(left.Name, right.Name)
 	})
-	return cluster.ObservedGraph{Objects: objects, Pods: pods}, nil
+	slices.SortFunc(
+		resourceClaims,
+		func(left, right cluster.ObservedResourceClaim) int {
+			if compared := strings.Compare(left.Namespace, right.Namespace); compared != 0 {
+				return compared
+			}
+			return strings.Compare(left.Name, right.Name)
+		},
+	)
+	return cluster.ObservedGraph{
+		Objects:        objects,
+		Pods:           pods,
+		ResourceClaims: resourceClaims,
+	}, nil
 }
 
 func (adapter *Adapter) Execute(
@@ -431,6 +658,20 @@ func (adapter *Adapter) Execute(
 			)
 		case cluster.ApplyLease:
 			err = adapter.applyLease(
+				ctx,
+				changeSet.Scope(),
+				typed,
+				receipt.DryRun,
+			)
+		case cluster.ApplyDeviceClass:
+			err = adapter.applyDeviceClass(
+				ctx,
+				changeSet.Scope(),
+				typed,
+				receipt.DryRun,
+			)
+		case cluster.ApplyResourceSlice:
+			err = adapter.applyResourceSlice(
 				ctx,
 				changeSet.Scope(),
 				typed,
@@ -707,6 +948,173 @@ func (adapter *Adapter) applyLease(
 	return classify("server-side apply exact Synthetic Node Lease", err)
 }
 
+func (adapter *Adapter) applyDeviceClass(
+	ctx context.Context,
+	scope cluster.OwnershipScope,
+	change cluster.ApplyDeviceClass,
+	dryRun bool,
+) error {
+	selectors, applySelectors := deviceClassSelectors(change.Selectors())
+	objectLabels := map[string]string{}
+	addOwnershipLabels(objectLabels, scope)
+	preconditions := change.Preconditions()
+	if preconditions.UID == "" {
+		_, err := adapter.client.ResourceV1().DeviceClasses().Create(
+			ctx,
+			&resourcev1.DeviceClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            change.Key().Name(),
+					Labels:          objectLabels,
+					OwnerReferences: ownerReferences(scope),
+				},
+				Spec: resourcev1.DeviceClassSpec{Selectors: selectors},
+			},
+			draCreateOptions(dryRun),
+		)
+		if apierrors.IsAlreadyExists(err) {
+			return cluster.NewError(
+				cluster.ErrorOwnershipConflict,
+				fmt.Sprintf(
+					"DeviceClass %q appeared before create and was not adopted",
+					change.Key().Name(),
+				),
+				false,
+			)
+		}
+		return classify("create exact stable DRA DeviceClass", err)
+	}
+	current, err := adapter.client.ResourceV1().DeviceClasses().Get(
+		ctx,
+		change.Key().Name(),
+		metav1.GetOptions{},
+	)
+	if err != nil {
+		return classify("revalidate stable DRA DeviceClass before apply", err)
+	}
+	if err := validateOwnedMetadata(
+		change.Key(),
+		current.Labels,
+		current.UID,
+		current.ResourceVersion,
+		current.OwnerReferences,
+		scope,
+		preconditions,
+	); err != nil {
+		return err
+	}
+	configuration := resourceapplyv1.DeviceClass(change.Key().Name()).
+		WithUID(current.UID).
+		WithResourceVersion(current.ResourceVersion).
+		WithLabels(objectLabels).
+		WithSpec(
+			resourceapplyv1.DeviceClassSpec().
+				WithSelectors(applySelectors...),
+		)
+	if owner := ownerReferenceApply(scope); owner != nil {
+		configuration = configuration.WithOwnerReferences(owner)
+	}
+	_, err = adapter.client.ResourceV1().DeviceClasses().Apply(
+		ctx,
+		configuration,
+		draApplyOptions(dryRun),
+	)
+	return classify("server-side apply exact stable DRA DeviceClass", err)
+}
+
+func (adapter *Adapter) applyResourceSlice(
+	ctx context.Context,
+	scope cluster.OwnershipScope,
+	change cluster.ApplyResourceSlice,
+	dryRun bool,
+) error {
+	devices, applyDevices, err := resourceSliceDevices(change.Devices())
+	if err != nil {
+		return err
+	}
+	objectLabels := map[string]string{}
+	addOwnershipLabels(objectLabels, scope)
+	preconditions := change.Preconditions()
+	nodeName := change.NodeName()
+	if preconditions.UID == "" {
+		_, err := adapter.client.ResourceV1().ResourceSlices().Create(
+			ctx,
+			&resourcev1.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            change.Key().Name(),
+					Labels:          objectLabels,
+					OwnerReferences: ownerReferences(scope),
+				},
+				Spec: resourcev1.ResourceSliceSpec{
+					Driver: change.Driver(),
+					Pool: resourcev1.ResourcePool{
+						Name:               change.PoolName(),
+						Generation:         change.PoolGeneration(),
+						ResourceSliceCount: change.ResourceSliceCount(),
+					},
+					NodeName: &nodeName,
+					Devices:  devices,
+				},
+			},
+			draCreateOptions(dryRun),
+		)
+		if apierrors.IsAlreadyExists(err) {
+			return cluster.NewError(
+				cluster.ErrorOwnershipConflict,
+				fmt.Sprintf(
+					"ResourceSlice %q appeared before create and was not adopted",
+					change.Key().Name(),
+				),
+				false,
+			)
+		}
+		return classify("create exact stable DRA ResourceSlice", err)
+	}
+	current, err := adapter.client.ResourceV1().ResourceSlices().Get(
+		ctx,
+		change.Key().Name(),
+		metav1.GetOptions{},
+	)
+	if err != nil {
+		return classify("revalidate stable DRA ResourceSlice before apply", err)
+	}
+	if err := validateOwnedMetadata(
+		change.Key(),
+		current.Labels,
+		current.UID,
+		current.ResourceVersion,
+		current.OwnerReferences,
+		scope,
+		preconditions,
+	); err != nil {
+		return err
+	}
+	configuration := resourceapplyv1.ResourceSlice(change.Key().Name()).
+		WithUID(current.UID).
+		WithResourceVersion(current.ResourceVersion).
+		WithLabels(objectLabels).
+		WithSpec(
+			resourceapplyv1.ResourceSliceSpec().
+				WithDriver(change.Driver()).
+				WithPool(
+					resourceapplyv1.ResourcePool().
+						WithName(change.PoolName()).
+						WithGeneration(change.PoolGeneration()).
+						WithResourceSliceCount(change.ResourceSliceCount()),
+				).
+				WithNodeName(change.NodeName()).
+				WithDevices(applyDevices...),
+		)
+	if owner := ownerReferenceApply(scope); owner != nil {
+		configuration = configuration.WithOwnerReferences(owner)
+	}
+	_, err = adapter.client.ResourceV1().ResourceSlices().Apply(
+		ctx,
+		configuration,
+		draApplyOptions(dryRun),
+	)
+	return classify("server-side apply exact stable DRA ResourceSlice", err)
+}
+
 func (adapter *Adapter) deleteOwned(
 	ctx context.Context,
 	scope cluster.OwnershipScope,
@@ -739,6 +1147,32 @@ func (adapter *Adapter) deleteOwned(
 			Get(ctx, key.Name(), metav1.GetOptions{})
 		if err != nil {
 			return classify("revalidate owned Lease", err)
+		}
+		labels = object.Labels
+		actualUID = object.UID
+		resourceVersion = object.ResourceVersion
+		objectOwnerReferences = object.OwnerReferences
+	case cluster.ObjectKindDeviceClass:
+		object, err := adapter.client.ResourceV1().DeviceClasses().Get(
+			ctx,
+			key.Name(),
+			metav1.GetOptions{},
+		)
+		if err != nil {
+			return classify("revalidate owned DeviceClass", err)
+		}
+		labels = object.Labels
+		actualUID = object.UID
+		resourceVersion = object.ResourceVersion
+		objectOwnerReferences = object.OwnerReferences
+	case cluster.ObjectKindResourceSlice:
+		object, err := adapter.client.ResourceV1().ResourceSlices().Get(
+			ctx,
+			key.Name(),
+			metav1.GetOptions{},
+		)
+		if err != nil {
+			return classify("revalidate owned ResourceSlice", err)
 		}
 		labels = object.Labels
 		actualUID = object.UID
@@ -784,6 +1218,12 @@ func (adapter *Adapter) deleteOwned(
 	case cluster.ObjectKindLease:
 		err = adapter.client.CoordinationV1().
 			Leases(key.Namespace()).
+			Delete(ctx, key.Name(), options)
+	case cluster.ObjectKindDeviceClass:
+		err = adapter.client.ResourceV1().DeviceClasses().
+			Delete(ctx, key.Name(), options)
+	case cluster.ObjectKindResourceSlice:
+		err = adapter.client.ResourceV1().ResourceSlices().
 			Delete(ctx, key.Name(), options)
 	}
 	if err != nil {
@@ -889,6 +1329,114 @@ func applyOptions(dryRun bool) metav1.ApplyOptions {
 		options.DryRun = []string{metav1.DryRunAll}
 	}
 	return options
+}
+
+func draCreateOptions(dryRun bool) metav1.CreateOptions {
+	options := metav1.CreateOptions{
+		FieldValidation: metav1.FieldValidationStrict,
+	}
+	if dryRun {
+		options.DryRun = []string{metav1.DryRunAll}
+	}
+	return options
+}
+
+func draApplyOptions(dryRun bool) metav1.ApplyOptions {
+	options := metav1.ApplyOptions{
+		FieldManager: cluster.ManagedByValue,
+		Force:        false,
+	}
+	if dryRun {
+		options.DryRun = []string{metav1.DryRunAll}
+	}
+	return options
+}
+
+func deviceClassSelectors(
+	expressions []string,
+) ([]resourcev1.DeviceSelector, []*resourceapplyv1.DeviceSelectorApplyConfiguration) {
+	selectors := make([]resourcev1.DeviceSelector, 0, len(expressions))
+	applySelectors := make(
+		[]*resourceapplyv1.DeviceSelectorApplyConfiguration,
+		0,
+		len(expressions),
+	)
+	for _, expression := range expressions {
+		selectors = append(selectors, resourcev1.DeviceSelector{
+			CEL: &resourcev1.CELDeviceSelector{Expression: expression},
+		})
+		applySelectors = append(
+			applySelectors,
+			resourceapplyv1.DeviceSelector().WithCEL(
+				resourceapplyv1.CELDeviceSelector().
+					WithExpression(expression),
+			),
+		)
+	}
+	return selectors, applySelectors
+}
+
+func resourceSliceDevices(
+	values []cluster.DRADevice,
+) ([]resourcev1.Device, []*resourceapplyv1.DeviceApplyConfiguration, error) {
+	devices := make([]resourcev1.Device, 0, len(values))
+	applyDevices := make(
+		[]*resourceapplyv1.DeviceApplyConfiguration,
+		0,
+		len(values),
+	)
+	for _, value := range values {
+		attributes := make(
+			map[resourcev1.QualifiedName]resourcev1.DeviceAttribute,
+			len(value.Attributes),
+		)
+		applyAttributes := make(
+			map[resourcev1.QualifiedName]resourceapplyv1.DeviceAttributeApplyConfiguration,
+			len(value.Attributes),
+		)
+		for key, attribute := range value.Attributes {
+			qualifiedName := resourcev1.QualifiedName(key)
+			switch attribute.Kind() {
+			case cluster.DeviceAttributeBool:
+				boolValue := attribute.Bool()
+				attributes[qualifiedName] = resourcev1.DeviceAttribute{
+					BoolValue: &boolValue,
+				}
+				applyAttributes[qualifiedName] =
+					*resourceapplyv1.DeviceAttribute().
+						WithBoolValue(boolValue)
+			case cluster.DeviceAttributeString:
+				stringValue := attribute.String()
+				attributes[qualifiedName] = resourcev1.DeviceAttribute{
+					StringValue: &stringValue,
+				}
+				applyAttributes[qualifiedName] =
+					*resourceapplyv1.DeviceAttribute().
+						WithStringValue(stringValue)
+			default:
+				return nil, nil, cluster.NewError(
+					cluster.ErrorInvalidIntent,
+					fmt.Sprintf(
+						"device %q has unsupported stable DRA attribute %q",
+						value.Name,
+						key,
+					),
+					false,
+				)
+			}
+		}
+		devices = append(devices, resourcev1.Device{
+			Name:       value.Name,
+			Attributes: attributes,
+		})
+		applyDevices = append(
+			applyDevices,
+			resourceapplyv1.Device().
+				WithName(value.Name).
+				WithAttributes(applyAttributes),
+		)
+	}
+	return devices, applyDevices, nil
 }
 
 func resourceList(values map[string]string) (corev1.ResourceList, error) {
@@ -1034,8 +1582,165 @@ func observedLeaseState(lease *coordinationv1.Lease) *cluster.ObservedLeaseState
 	return state
 }
 
+func observedDeviceClassState(
+	deviceClass *resourcev1.DeviceClass,
+) *cluster.ObservedDeviceClassState {
+	selectors := make([]string, 0, len(deviceClass.Spec.Selectors))
+	for _, selector := range deviceClass.Spec.Selectors {
+		if selector.CEL == nil {
+			selectors = append(selectors, "<unsupported-non-cel-selector>")
+			continue
+		}
+		selectors = append(selectors, selector.CEL.Expression)
+	}
+	return &cluster.ObservedDeviceClassState{Selectors: selectors}
+}
+
+func observedResourceSliceState(
+	resourceSlice *resourcev1.ResourceSlice,
+) *cluster.ObservedResourceSliceState {
+	state := &cluster.ObservedResourceSliceState{
+		Driver:             resourceSlice.Spec.Driver,
+		PoolName:           resourceSlice.Spec.Pool.Name,
+		PoolGeneration:     resourceSlice.Spec.Pool.Generation,
+		ResourceSliceCount: resourceSlice.Spec.Pool.ResourceSliceCount,
+		Devices:            make([]cluster.DRADevice, 0, len(resourceSlice.Spec.Devices)),
+	}
+	if resourceSlice.Spec.NodeName != nil {
+		state.NodeName = *resourceSlice.Spec.NodeName
+	}
+	for _, device := range resourceSlice.Spec.Devices {
+		attributes := make(
+			map[string]cluster.DeviceAttributeValue,
+			len(device.Attributes),
+		)
+		for key, value := range device.Attributes {
+			switch {
+			case value.BoolValue != nil:
+				attributes[string(key)] =
+					cluster.NewBoolDeviceAttribute(*value.BoolValue)
+			case value.StringValue != nil:
+				attribute, err := cluster.NewStringDeviceAttribute(
+					*value.StringValue,
+				)
+				if err != nil {
+					attribute, _ = cluster.NewStringDeviceAttribute(
+						"<unsupported-value>",
+					)
+				}
+				attributes[string(key)] = attribute
+			default:
+				attribute, _ := cluster.NewStringDeviceAttribute(
+					"<unsupported-kind>",
+				)
+				attributes[string(key)] = attribute
+			}
+		}
+		state.Devices = append(state.Devices, cluster.DRADevice{
+			Name:       device.Name,
+			Attributes: attributes,
+		})
+	}
+	return state
+}
+
+func observedResourceClaim(
+	claim *resourcev1.ResourceClaim,
+) cluster.ObservedResourceClaim {
+	result := cluster.ObservedResourceClaim{
+		Namespace:       claim.Namespace,
+		Name:            claim.Name,
+		UID:             string(claim.UID),
+		ResourceVersion: claim.ResourceVersion,
+	}
+	for _, request := range claim.Spec.Devices.Requests {
+		if request.Exactly != nil {
+			result.DeviceClassNames = append(
+				result.DeviceClassNames,
+				request.Exactly.DeviceClassName,
+			)
+		}
+		for _, subrequest := range request.FirstAvailable {
+			result.DeviceClassNames = append(
+				result.DeviceClassNames,
+				subrequest.DeviceClassName,
+			)
+		}
+	}
+	slices.Sort(result.DeviceClassNames)
+	if claim.Status.Allocation != nil {
+		for _, allocation := range claim.Status.Allocation.Devices.Results {
+			result.Allocations = append(
+				result.Allocations,
+				cluster.DRAAllocationResult{
+					Request: allocation.Request,
+					Driver:  allocation.Driver,
+					Pool:    allocation.Pool,
+					Device:  allocation.Device,
+				},
+			)
+		}
+	}
+	for _, reservation := range claim.Status.ReservedFor {
+		result.ReservedFor = append(
+			result.ReservedFor,
+			cluster.DRAConsumerReference{
+				APIGroup: reservation.APIGroup,
+				Resource: reservation.Resource,
+				Name:     reservation.Name,
+				UID:      string(reservation.UID),
+			},
+		)
+	}
+	return result
+}
+
+func claimReferencesOwnedDRA(
+	claim cluster.ObservedResourceClaim,
+	classNames,
+	deviceTuples map[string]struct{},
+) bool {
+	for _, name := range claim.DeviceClassNames {
+		if _, found := classNames[name]; found {
+			return true
+		}
+	}
+	for _, allocation := range claim.Allocations {
+		if _, found := deviceTuples[draTuple(
+			allocation.Driver,
+			allocation.Pool,
+			allocation.Device,
+		)]; found {
+			return true
+		}
+	}
+	return false
+}
+
+func draTuple(driver, pool, device string) string {
+	return driver + "\x00" + pool + "\x00" + device
+}
+
+func podReferencesResourceClaim(
+	pod *corev1.Pod,
+	claimNames map[string]struct{},
+) bool {
+	if len(claimNames) == 0 {
+		return false
+	}
+	for _, claim := range pod.Spec.ResourceClaims {
+		if claim.ResourceClaimName == nil {
+			continue
+		}
+		if _, found := claimNames[*claim.ResourceClaimName]; found {
+			return true
+		}
+	}
+	return false
+}
+
 func observedPod(pod *corev1.Pod) cluster.ObservedPod {
-	return cluster.ObservedPod{
+	result := cluster.ObservedPod{
 		Namespace: pod.Namespace,
 		Name:      pod.Name,
 		UID:       string(pod.UID),
@@ -1043,6 +1748,16 @@ func observedPod(pod *corev1.Pod) cluster.ObservedPod {
 		Phase:     string(pod.Status.Phase),
 		Requested: encodedResourceList(effectivePodRequests(pod)),
 	}
+	for _, claim := range pod.Spec.ResourceClaims {
+		if claim.ResourceClaimName != nil {
+			result.ResourceClaims = append(
+				result.ResourceClaims,
+				*claim.ResourceClaimName,
+			)
+		}
+	}
+	slices.Sort(result.ResourceClaims)
+	return result
 }
 
 func effectivePodRequests(pod *corev1.Pod) corev1.ResourceList {

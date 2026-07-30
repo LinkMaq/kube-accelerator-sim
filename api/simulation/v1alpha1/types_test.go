@@ -33,12 +33,18 @@ func TestScenarioInstanceRegistersAndDeepCopiesMutableTransportData(t *testing.T
 		Kind:  "Node",
 		Count: 2,
 	}}
+	instance.Status.Fidelity = []simulationv1alpha1.FidelitySurfaceStatus{{
+		Surface: "resource-slice-inventory",
+		State:   "achieved",
+	}}
 
 	cloned := instance.DeepCopy()
 	cloned.Spec.Revisions[0].Profiles[0].ID = "forged"
 	cloned.Status.Inventory[0].Count = 99
+	cloned.Status.Fidelity[0].State = "unavailable"
 	if instance.Spec.Revisions[0].Profiles[0].ID != "nvidia" ||
-		instance.Status.Inventory[0].Count != 2 {
+		instance.Status.Inventory[0].Count != 2 ||
+		instance.Status.Fidelity[0].State != "achieved" {
 		t.Fatal("DeepCopy shared mutable transport storage")
 	}
 }

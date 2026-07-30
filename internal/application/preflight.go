@@ -62,6 +62,16 @@ func PreflightApply(
 	if err := controlplane.ValidateRevisionIntent(intent); err != nil {
 		return PreflightApplyResult{}, err
 	}
+	requiredAccess := append(
+		[]cluster.AccessRequirement(nil),
+		request.RequiredAccess...,
+	)
+	if intent.Fidelity.String() == "dra-control-plane" {
+		requiredAccess = append(
+			requiredAccess,
+			draObservationAccessRequirements()...,
+		)
+	}
 	if request.Selection.KubeconfigPath == "" ||
 		request.Selection.ContextName == "" {
 		return PreflightApplyResult{}, cluster.NewError(
@@ -70,14 +80,14 @@ func PreflightApply(
 			false,
 		)
 	}
-	if len(request.RequiredAccess) == 0 {
+	if len(requiredAccess) == 0 {
 		return PreflightApplyResult{}, cluster.NewError(
 			cluster.ErrorInvalidIntent,
 			"apply preflight requires exact authorization operations",
 			false,
 		)
 	}
-	for _, requirement := range request.RequiredAccess {
+	for _, requirement := range requiredAccess {
 		if err := requirement.Validate(); err != nil {
 			return PreflightApplyResult{}, cluster.NewError(
 				cluster.ErrorInvalidIntent,
@@ -152,14 +162,17 @@ func PreflightApply(
 	if err != nil {
 		return PreflightApplyResult{}, err
 	}
+	if err := validateFidelityCapabilities(intent.Fidelity.String(), result.Cluster); err != nil {
+		return PreflightApplyResult{}, err
+	}
 	result.Authorization, err = connection.Cluster.Authorize(
 		ctx,
-		request.RequiredAccess,
+		requiredAccess,
 	)
 	if err != nil {
 		return PreflightApplyResult{}, err
 	}
-	if len(result.Authorization.Decisions) != len(request.RequiredAccess) {
+	if len(result.Authorization.Decisions) != len(requiredAccess) {
 		return PreflightApplyResult{}, cluster.NewError(
 			cluster.ErrorCapabilityUnavailable,
 			"authorization response did not cover every exact operation",
@@ -167,7 +180,7 @@ func PreflightApply(
 		)
 	}
 	for index, decision := range result.Authorization.Decisions {
-		if decision.Requirement != request.RequiredAccess[index] {
+		if decision.Requirement != requiredAccess[index] {
 			return PreflightApplyResult{}, cluster.NewError(
 				cluster.ErrorCapabilityUnavailable,
 				"authorization response did not preserve exact operation identity",
@@ -215,6 +228,10 @@ func PreflightApply(
 		if err != nil {
 			return PreflightApplyResult{}, err
 		}
+		scope, err = scope.ForFidelity(current.Fidelity)
+		if err != nil {
+			return PreflightApplyResult{}, err
+		}
 		result.Observed, err = connection.Cluster.Observe(ctx, scope)
 		if err != nil {
 			return PreflightApplyResult{}, err
@@ -240,4 +257,140 @@ func PreflightApply(
 	result.Intent = intent
 	result.Warning = serverDryRunWarning
 	return result, nil
+}
+
+func draObservationAccessRequirements() []cluster.AccessRequirement {
+	return []cluster.AccessRequirement{
+		{
+			Verb:     "list",
+			Group:    "resource.k8s.io",
+			Resource: "deviceclasses",
+		},
+		{
+			Verb:     "list",
+			Group:    "resource.k8s.io",
+			Resource: "resourceslices",
+		},
+		{
+			Verb:          "list",
+			Group:         "resource.k8s.io",
+			Resource:      "resourceclaims",
+			Namespaced:    true,
+			AllNamespaces: true,
+		},
+		{
+			Verb:          "list",
+			Resource:      "pods",
+			Namespaced:    true,
+			AllNamespaces: true,
+		},
+	}
+}
+
+func validateFidelityCapabilities(
+	fidelity string,
+	capabilities cluster.TargetCapabilities,
+) error {
+	if fidelity != "dra-control-plane" {
+		return nil
+	}
+	switch {
+	case capabilities.KubernetesMinor < 34:
+		return cluster.NewError(
+			cluster.ErrorKubernetesVersionUnsupported,
+			"stable DRA control-plane projection requires Kubernetes 1.34 or newer",
+			false,
+		)
+	case capabilities.KubernetesMinor > 36:
+		return cluster.NewError(
+			cluster.ErrorKubernetesVersionUntested,
+			"stable DRA control-plane projection is validated only through Kubernetes 1.36",
+			false,
+		)
+	}
+	type requirement struct {
+		groupVersion string
+		resource     string
+		namespaced   bool
+		verbs        []string
+	}
+	requirements := []requirement{
+		{
+			groupVersion: "resource.k8s.io/v1",
+			resource:     "deviceclasses",
+			verbs:        []string{"get", "list", "watch", "create", "patch", "delete"},
+		},
+		{
+			groupVersion: "resource.k8s.io/v1",
+			resource:     "resourceslices",
+			verbs:        []string{"get", "list", "watch", "create", "patch", "delete"},
+		},
+		{
+			groupVersion: "resource.k8s.io/v1",
+			resource:     "resourceclaims",
+			namespaced:   true,
+			verbs:        []string{"get", "list", "watch"},
+		},
+		{
+			groupVersion: "v1",
+			resource:     "pods",
+			namespaced:   true,
+			verbs:        []string{"get", "list", "watch"},
+		},
+	}
+	for _, required := range requirements {
+		var found *cluster.ResourceCapability
+		for index := range capabilities.Resources {
+			capability := &capabilities.Resources[index]
+			if capability.GroupVersion == required.groupVersion &&
+				capability.Resource == required.resource {
+				found = capability
+				break
+			}
+		}
+		if found == nil {
+			return cluster.NewError(
+				cluster.ErrorCapabilityUnavailable,
+				fmt.Sprintf(
+					"stable DRA requires %s/%s; alpha and beta APIs are not accepted",
+					required.groupVersion,
+					required.resource,
+				),
+				false,
+			)
+		}
+		if found.Namespaced != required.namespaced {
+			return cluster.NewError(
+				cluster.ErrorCapabilityUnavailable,
+				fmt.Sprintf(
+					"stable DRA resource %s/%s has an incompatible scope",
+					required.groupVersion,
+					required.resource,
+				),
+				false,
+			)
+		}
+		for _, verb := range required.verbs {
+			present := false
+			for _, actual := range found.Verbs {
+				if actual == verb {
+					present = true
+					break
+				}
+			}
+			if !present {
+				return cluster.NewError(
+					cluster.ErrorCapabilityUnavailable,
+					fmt.Sprintf(
+						"stable DRA resource %s/%s lacks required verb %s",
+						required.groupVersion,
+						required.resource,
+						verb,
+					),
+					false,
+				)
+			}
+		}
+	}
+	return nil
 }

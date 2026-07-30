@@ -221,6 +221,11 @@ type InventoryResult struct {
 	Count      int32  `json:"count" yaml:"count"`
 }
 
+type FidelitySurfaceResult struct {
+	Surface string `json:"surface" yaml:"surface"`
+	State   string `json:"state" yaml:"state"`
+}
+
 type SnapshotDiagnosticResult struct {
 	Code             string `json:"code" yaml:"code"`
 	Message          string `json:"message" yaml:"message"`
@@ -252,6 +257,8 @@ type SnapshotResult struct {
 	PoolsTruncated       bool                       `json:"poolsTruncated" yaml:"poolsTruncated"`
 	Inventory            []InventoryResult          `json:"inventory" yaml:"inventory"`
 	InventoryTruncated   bool                       `json:"inventoryTruncated" yaml:"inventoryTruncated"`
+	Fidelity             []FidelitySurfaceResult    `json:"fidelity" yaml:"fidelity"`
+	FidelityTruncated    bool                       `json:"fidelityTruncated" yaml:"fidelityTruncated"`
 	Diagnostics          []SnapshotDiagnosticResult `json:"diagnostics" yaml:"diagnostics"`
 	DiagnosticsTruncated bool                       `json:"diagnosticsTruncated" yaml:"diagnosticsTruncated"`
 	Conditions           []ConditionResult          `json:"conditions" yaml:"conditions"`
@@ -520,10 +527,11 @@ func renderLifecycleHuman(output *strings.Builder, result LifecycleResult) {
 	if result.Snapshot != nil {
 		fmt.Fprintf(
 			output,
-			"Phase: %s  pools=%d inventory=%d diagnostics=%d conditions=%d\n",
+			"Phase: %s  pools=%d inventory=%d fidelity=%d diagnostics=%d conditions=%d\n",
 			result.Snapshot.Phase,
 			len(result.Snapshot.Pools),
 			len(result.Snapshot.Inventory),
+			len(result.Snapshot.Fidelity),
 			len(result.Snapshot.Diagnostics),
 			len(result.Snapshot.Conditions),
 		)
@@ -570,6 +578,11 @@ func redactLifecycle(result *LifecycleResult) {
 		inventory := &snapshot.Inventory[index]
 		inventory.APIVersion = redactString(inventory.APIVersion)
 		inventory.Kind = redactString(inventory.Kind)
+	}
+	for index := range snapshot.Fidelity {
+		surface := &snapshot.Fidelity[index]
+		surface.Surface = redactString(surface.Surface)
+		surface.State = redactString(surface.State)
 	}
 	for index := range snapshot.Diagnostics {
 		diagnostic := &snapshot.Diagnostics[index]

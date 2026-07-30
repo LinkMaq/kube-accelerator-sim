@@ -50,6 +50,9 @@ func New(options Options) *Adapter {
 		)
 	}
 	options.Observed.Pods = cloneObservedPods(options.Observed.Pods)
+	options.Observed.ResourceClaims = cloneObservedClaims(
+		options.Observed.ResourceClaims,
+	)
 	options.Denied = append([]cluster.AccessRequirement(nil), options.Denied...)
 	errorsByCall := make(map[Call]error, len(options.Errors))
 	for call, err := range options.Errors {
@@ -119,6 +122,9 @@ func (adapter *Adapter) Observe(
 	return cluster.ObservedGraph{
 		Objects: cloneObservedObjects(adapter.options.Observed.Objects),
 		Pods:    cloneObservedPods(adapter.options.Observed.Pods),
+		ResourceClaims: cloneObservedClaims(
+			adapter.options.Observed.ResourceClaims,
+		),
 	}, nil
 }
 
@@ -233,6 +239,19 @@ func cloneObservedObject(
 		lease := *input.Lease
 		result.Lease = &lease
 	}
+	if input.DeviceClass != nil {
+		deviceClass := *input.DeviceClass
+		deviceClass.Selectors = append(
+			[]string(nil),
+			input.DeviceClass.Selectors...,
+		)
+		result.DeviceClass = &deviceClass
+	}
+	if input.ResourceSlice != nil {
+		resourceSlice := *input.ResourceSlice
+		resourceSlice.Devices = cloneDRADevices(input.ResourceSlice.Devices)
+		result.ResourceSlice = &resourceSlice
+	}
 	return result
 }
 
@@ -241,6 +260,47 @@ func cloneObservedPods(input []cluster.ObservedPod) []cluster.ObservedPod {
 	for index, pod := range input {
 		result[index] = pod
 		result[index].Requested = cloneStringMap(pod.Requested)
+		result[index].ResourceClaims = append(
+			[]string(nil),
+			pod.ResourceClaims...,
+		)
+	}
+	return result
+}
+
+func cloneObservedClaims(
+	input []cluster.ObservedResourceClaim,
+) []cluster.ObservedResourceClaim {
+	result := make([]cluster.ObservedResourceClaim, len(input))
+	for index, claim := range input {
+		result[index] = claim
+		result[index].DeviceClassNames = append(
+			[]string(nil),
+			claim.DeviceClassNames...,
+		)
+		result[index].Allocations = append(
+			[]cluster.DRAAllocationResult(nil),
+			claim.Allocations...,
+		)
+		result[index].ReservedFor = append(
+			[]cluster.DRAConsumerReference(nil),
+			claim.ReservedFor...,
+		)
+	}
+	return result
+}
+
+func cloneDRADevices(input []cluster.DRADevice) []cluster.DRADevice {
+	result := make([]cluster.DRADevice, len(input))
+	for index, device := range input {
+		result[index] = device
+		result[index].Attributes = make(
+			map[string]cluster.DeviceAttributeValue,
+			len(device.Attributes),
+		)
+		for key, value := range device.Attributes {
+			result[index].Attributes[key] = value
+		}
 	}
 	return result
 }

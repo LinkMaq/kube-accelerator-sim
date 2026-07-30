@@ -48,6 +48,17 @@ func TestAccessRequirementRejectsBroadOrAmbiguousAuthorizationChecks(t *testing.
 				Name:       "node-lease",
 			},
 		},
+		{
+			name: "all namespaces with exact name",
+			requirement: cluster.AccessRequirement{
+				Verb:          "get",
+				Group:         "resource.k8s.io",
+				Resource:      "resourceclaims",
+				Namespaced:    true,
+				AllNamespaces: true,
+				Name:          "ambiguous-namespace",
+			},
+		},
 	}
 	for _, test := range tests {
 		test := test
@@ -68,6 +79,16 @@ func TestAccessRequirementRejectsBroadOrAmbiguousAuthorizationChecks(t *testing.
 	}
 	if err := exact.Validate(); err != nil {
 		t.Fatalf("exact authorization requirement failed: %v", err)
+	}
+	allNamespaces := cluster.AccessRequirement{
+		Verb:          "list",
+		Group:         "resource.k8s.io",
+		Resource:      "resourceclaims",
+		Namespaced:    true,
+		AllNamespaces: true,
+	}
+	if err := allNamespaces.Validate(); err != nil {
+		t.Fatalf("all-namespace list authorization failed: %v", err)
 	}
 }
 
@@ -152,5 +173,80 @@ func TestOwnedChangeSetRequiresAllowlistedKindAndExactDeletePreconditions(t *tes
 
 	if _, err := cluster.NewObjectKey(cluster.ObjectKind("Secret"), "", "secret"); err == nil {
 		t.Fatal("unsupported object kind unexpectedly entered the Cluster port")
+	}
+}
+
+func TestStableDRAChangesAreTypedAndResourceClaimsRemainReadOnly(t *testing.T) {
+	t.Parallel()
+
+	classKey, err := cluster.NewObjectKey(
+		cluster.ObjectKindDeviceClass,
+		"",
+		"kasim-class-a",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	classChange, err := cluster.NewApplyDeviceClass(
+		classKey,
+		cluster.ObjectPreconditions{},
+		cluster.DeviceClassInput{
+			Selectors: []string{`device.driver == "gpu.nvidia.com"`},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	typedClass := classChange.(cluster.ApplyDeviceClass)
+	if typedClass.Kind() != cluster.ChangeApplyDeviceClass ||
+		typedClass.Selectors()[0] != `device.driver == "gpu.nvidia.com"` {
+		t.Fatalf("DeviceClass change lost intent: %#v", typedClass)
+	}
+
+	sliceKey, err := cluster.NewObjectKey(
+		cluster.ObjectKindResourceSlice,
+		"",
+		"kasim-slice-a",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	attributes := map[string]cluster.DeviceAttributeValue{
+		"simulation.kasim.io/simulated": cluster.NewBoolDeviceAttribute(true),
+	}
+	sliceChange, err := cluster.NewApplyResourceSlice(
+		sliceKey,
+		cluster.ObjectPreconditions{},
+		cluster.ResourceSliceInput{
+			Driver:             "gpu.nvidia.com",
+			PoolName:           "kasim-pool-a",
+			PoolGeneration:     1,
+			ResourceSliceCount: 1,
+			NodeName:           "kasim-node-a",
+			Devices: []cluster.DRADevice{{
+				Name:       "kasim-device-a",
+				Attributes: attributes,
+			}},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	attributes["simulation.kasim.io/simulated"] =
+		cluster.NewBoolDeviceAttribute(false)
+	typedSlice := sliceChange.(cluster.ApplyResourceSlice)
+	if typedSlice.Kind() != cluster.ChangeApplyResourceSlice ||
+		!typedSlice.Devices()[0].
+			Attributes["simulation.kasim.io/simulated"].
+			Bool() {
+		t.Fatalf("ResourceSlice change was not immutable: %#v", typedSlice)
+	}
+
+	if _, err := cluster.NewObjectKey(
+		cluster.ObjectKind("ResourceClaim"),
+		"team-a",
+		"claim-a",
+	); err == nil {
+		t.Fatal("ResourceClaim unexpectedly became a mutable owned object kind")
 	}
 }

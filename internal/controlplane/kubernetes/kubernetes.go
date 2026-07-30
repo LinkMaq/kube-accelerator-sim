@@ -610,6 +610,10 @@ func fromTransportStatus(
 		status.Inventory,
 		controlplane.MaximumStatusInventory,
 	)
+	fidelity, fidelityTruncated := bounded(
+		status.Fidelity,
+		controlplane.MaximumStatusFidelity,
+	)
 	diagnostics, diagnosticsTruncated := bounded(
 		status.Diagnostics,
 		controlplane.MaximumStatusDiagnostics,
@@ -641,6 +645,20 @@ func fromTransportStatus(
 				APIVersion: entry.APIVersion,
 				Kind:       entry.Kind,
 				Count:      entry.Count,
+			},
+		)
+	}
+	translatedFidelity := make(
+		[]controlplane.FidelitySurfaceStatus,
+		0,
+		len(fidelity),
+	)
+	for _, surface := range fidelity {
+		translatedFidelity = append(
+			translatedFidelity,
+			controlplane.FidelitySurfaceStatus{
+				Surface: surface.Surface,
+				State:   surface.State,
 			},
 		)
 	}
@@ -686,6 +704,8 @@ func fromTransportStatus(
 		PoolsTruncated:       poolsTruncated,
 		Inventory:            translatedInventory,
 		InventoryTruncated:   inventoryTruncated,
+		Fidelity:             translatedFidelity,
+		FidelityTruncated:    fidelityTruncated,
 		Diagnostics:          translatedDiagnostics,
 		DiagnosticsTruncated: diagnosticsTruncated,
 		Conditions:           translatedConditions,

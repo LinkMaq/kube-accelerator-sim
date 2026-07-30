@@ -83,6 +83,15 @@ func TestKubernetesReadBoundsStatusAndRetainsAcceptedRevision(t *testing.T) {
 			},
 		)
 	}
+	for index := 0; index < 40; index++ {
+		instance.Status.Fidelity = append(
+			instance.Status.Fidelity,
+			simulationv1alpha1.FidelitySurfaceStatus{
+				Surface: fmt.Sprintf("surface-%02d", index),
+				State:   "achieved",
+			},
+		)
+	}
 	for index := 0; index < 8; index++ {
 		instance.Status.Conditions = append(instance.Status.Conditions, metav1.Condition{
 			Type:               "Progressing",
@@ -109,6 +118,8 @@ func TestKubernetesReadBoundsStatusAndRetainsAcceptedRevision(t *testing.T) {
 		!record.Status.DiagnosticsTruncated ||
 		len(record.Status.Inventory) != controlplane.MaximumStatusInventory ||
 		!record.Status.InventoryTruncated ||
+		len(record.Status.Fidelity) != controlplane.MaximumStatusFidelity ||
+		!record.Status.FidelityTruncated ||
 		len(record.Status.Conditions) != controlplane.MaximumStatusConditions ||
 		!record.Status.ConditionsTruncated {
 		t.Fatalf("status was not defensively bounded: %#v", record.Status)

@@ -127,6 +127,10 @@ func (reconciler *InstanceReconciler) Reconcile(
 		if err != nil {
 			return reconciler.fail(ctx, key, record, "ConvergenceFailed", err, false)
 		}
+		scope, err = scope.ForFidelity(record.Fidelity)
+		if err != nil {
+			return reconciler.fail(ctx, key, record, "ConvergenceFailed", err, false)
+		}
 		observed, err := reconciler.cluster.Observe(ctx, scope)
 		if err != nil {
 			return reconciler.fail(
@@ -185,6 +189,10 @@ func (reconciler *InstanceReconciler) Reconcile(
 		record.InstanceUID,
 		record.DesiredGeneration,
 	)
+	if err != nil {
+		return reconciler.fail(ctx, key, record, "ConvergenceFailed", err, false)
+	}
+	scope, err = scope.ForFidelity(record.Fidelity)
 	if err != nil {
 		return reconciler.fail(ctx, key, record, "ConvergenceFailed", err, false)
 	}
@@ -252,11 +260,42 @@ func (reconciler *InstanceReconciler) Reconcile(
 			changes,
 		)
 	}
+	changes, err = reconciler.draClassChanges(graph, fragment, observed)
+	if err != nil {
+		return reconciler.fail(ctx, key, record, "ConvergenceFailed", err, false)
+	}
+	if len(changes) != 0 {
+		return reconciler.executeStage(
+			ctx,
+			key,
+			record,
+			graph,
+			observed,
+			scope,
+			changes,
+		)
+	}
+	changes, err = reconciler.draSliceChanges(graph, fragment, observed)
+	if err != nil {
+		return reconciler.fail(ctx, key, record, "ConvergenceFailed", err, false)
+	}
+	if len(changes) != 0 {
+		return reconciler.executeStage(
+			ctx,
+			key,
+			record,
+			graph,
+			observed,
+			scope,
+			changes,
+		)
+	}
 	if result, handled, err := reconciler.reconcileStaleInventory(
 		ctx,
 		key,
 		record,
 		graph,
+		fragment,
 		observed,
 		scope,
 	); handled || err != nil {
@@ -321,6 +360,7 @@ func (reconciler *InstanceReconciler) Reconcile(
 			nil,
 		)
 		intent.ObservedGeneration = record.DesiredGeneration
+		intent.Status.Fidelity = fidelitySurfaceStatus(fidelity)
 		conditions := []controlplane.ConditionStatus{{
 			Type:               "FidelitySatisfied",
 			Status:             "True",
@@ -352,12 +392,6 @@ func (reconciler *InstanceReconciler) Reconcile(
 			})
 		}
 		intent.Status.Conditions = conditions
-		for index := range intent.Status.Pools {
-			intent.Status.Pools[index].ObservedTotal =
-				intent.Status.Pools[index].RequestedTotal
-			intent.Status.Pools[index].ObservedHealthy =
-				intent.Status.Pools[index].RequestedHealthy
-		}
 		if err := reconciler.commit(ctx, intent); err != nil {
 			return Result{}, err
 		}
@@ -373,10 +407,62 @@ func (reconciler *InstanceReconciler) Reconcile(
 		FinalizationEnsure,
 		nil,
 	)
+	intent.Status.Fidelity = fidelitySurfaceStatus(fidelity)
 	if err := reconciler.commit(ctx, intent); err != nil {
 		return Result{}, err
 	}
 	return Result{requeue: true, phase: "Reconciling"}, nil
+}
+
+func fidelitySurfaceStatus(
+	report projection.FidelityReport,
+) []controlplane.FidelitySurfaceStatus {
+	states := make(map[string]projection.SurfaceState)
+	for _, assessment := range report.Assessments() {
+		if assessment.Surface == "" {
+			continue
+		}
+		current, found := states[assessment.Surface]
+		if !found || surfaceStatePriority(assessment.State) >
+			surfaceStatePriority(current) {
+			states[assessment.Surface] = assessment.State
+		}
+	}
+	surfaces := make([]string, 0, len(states))
+	for surface := range states {
+		surfaces = append(surfaces, surface)
+	}
+	slices.Sort(surfaces)
+	if len(surfaces) > controlplane.MaximumStatusFidelity {
+		surfaces = surfaces[:controlplane.MaximumStatusFidelity]
+	}
+	result := make(
+		[]controlplane.FidelitySurfaceStatus,
+		0,
+		len(surfaces),
+	)
+	for _, surface := range surfaces {
+		result = append(result, controlplane.FidelitySurfaceStatus{
+			Surface: surface,
+			State:   string(states[surface]),
+		})
+	}
+	return result
+}
+
+func surfaceStatePriority(state projection.SurfaceState) int {
+	switch state {
+	case projection.SurfaceUnavailable:
+		return 4
+	case projection.SurfaceExcluded:
+		return 3
+	case projection.SurfaceOutOfScope:
+		return 2
+	case projection.SurfaceAchieved:
+		return 1
+	default:
+		return 5
+	}
 }
 
 func (reconciler *InstanceReconciler) reconcileStaleInventory(
@@ -384,6 +470,7 @@ func (reconciler *InstanceReconciler) reconcileStaleInventory(
 	key controlplane.InstanceKey,
 	record controlplane.InstanceRecord,
 	graph projection.DesiredGraph,
+	fragment projection.ProjectionFragment,
 	observed cluster.ObservedGraph,
 	scope cluster.OwnershipScope,
 ) (Result, bool, error) {
@@ -391,8 +478,18 @@ func (reconciler *InstanceReconciler) reconcileStaleInventory(
 	for _, node := range graph.Nodes() {
 		desiredNames[node.Name()] = struct{}{}
 	}
+	desiredClassNames := make(map[string]struct{}, len(fragment.DeviceClasses()))
+	desiredSliceNames := make(map[string]struct{})
+	for _, deviceClass := range fragment.DeviceClasses() {
+		desiredClassNames[deviceClass.Name()] = struct{}{}
+	}
+	for _, resourceSlice := range fragment.ResourceSlices() {
+		desiredSliceNames[resourceSlice.Name()] = struct{}{}
+	}
 	staleNodes := make([]cluster.ObservedObject, 0)
 	staleLeases := make([]cluster.ObservedObject, 0)
+	staleClasses := make([]cluster.ObservedObject, 0)
+	staleSlices := make([]cluster.ObservedObject, 0)
 	staleNodeNames := make(map[string]struct{})
 	for _, object := range observed.Objects {
 		if _, desired := desiredNames[object.Key.Name()]; desired {
@@ -404,9 +501,20 @@ func (reconciler *InstanceReconciler) reconcileStaleInventory(
 			staleNodeNames[object.Key.Name()] = struct{}{}
 		case cluster.ObjectKindLease:
 			staleLeases = append(staleLeases, object)
+		case cluster.ObjectKindDeviceClass:
+			if _, desired := desiredClassNames[object.Key.Name()]; !desired {
+				staleClasses = append(staleClasses, object)
+			}
+		case cluster.ObjectKindResourceSlice:
+			if _, desired := desiredSliceNames[object.Key.Name()]; !desired {
+				staleSlices = append(staleSlices, object)
+			}
 		}
 	}
-	if len(staleNodes) == 0 && len(staleLeases) == 0 {
+	if len(staleNodes) == 0 &&
+		len(staleLeases) == 0 &&
+		len(staleClasses) == 0 &&
+		len(staleSlices) == 0 {
 		return Result{}, false, nil
 	}
 
@@ -484,8 +592,48 @@ func (reconciler *InstanceReconciler) reconcileStaleInventory(
 		}
 		return Result{requeue: true, phase: "Reconciling"}, true, nil
 	}
+	if blockers := draClaimBlockers(
+		observed.ResourceClaims,
+		staleClasses,
+		staleSlices,
+	); len(blockers) != 0 {
+		diagnostic := controlplane.DiagnosticStatus{
+			Code:             "CleanupBlocked",
+			Message:          boundedMessage("scale-down is blocked by DRA claim: " + blockers[0]),
+			Retryable:        true,
+			RevisionAccepted: true,
+			ExitCategory:     5,
+		}
+		intent := reconciler.statusIntent(
+			key,
+			record,
+			graph,
+			observed,
+			"Reconciling",
+			FinalizationEnsure,
+			[]controlplane.DiagnosticStatus{diagnostic},
+		)
+		intent.Status.Conditions = []controlplane.ConditionStatus{{
+			Type:               "CleanupBlocked",
+			Status:             "True",
+			Reason:             "CleanupBlocked",
+			Message:            diagnostic.Message,
+			ObservedGeneration: int64(record.DesiredGeneration.Value()),
+			LastTransitionTime: reconciler.now().UTC(),
+		}}
+		if err := reconciler.commit(ctx, intent); err != nil {
+			return Result{}, true, err
+		}
+		return Result{requeue: true, phase: "Reconciling"}, true, nil
+	}
 
-	staleObjects := staleNodes
+	staleObjects := staleSlices
+	if len(staleObjects) == 0 {
+		staleObjects = staleClasses
+	}
+	if len(staleObjects) == 0 {
+		staleObjects = staleNodes
+	}
 	if len(staleObjects) == 0 {
 		staleObjects = staleLeases
 	}
@@ -590,8 +738,61 @@ func (reconciler *InstanceReconciler) reconcileDeletion(
 		}
 		return Result{requeue: true, phase: "Deleting"}, nil
 	}
+	draObjects := make([]cluster.ObservedObject, 0)
+	for _, object := range observed.Objects {
+		if object.Key.Kind() == cluster.ObjectKindDeviceClass ||
+			object.Key.Kind() == cluster.ObjectKindResourceSlice {
+			draObjects = append(draObjects, object)
+		}
+	}
+	if blockers := draClaimBlockers(
+		observed.ResourceClaims,
+		draObjects,
+		draObjects,
+	); len(blockers) != 0 {
+		diagnostic := controlplane.DiagnosticStatus{
+			Code:             "CleanupBlocked",
+			Message:          boundedMessage("cleanup is blocked by DRA claim: " + blockers[0]),
+			Retryable:        true,
+			RevisionAccepted: true,
+			ExitCategory:     5,
+		}
+		intent := reconciler.statusIntent(
+			key,
+			record,
+			graph,
+			observed,
+			"Deleting",
+			FinalizationRetain,
+			[]controlplane.DiagnosticStatus{diagnostic},
+		)
+		intent.Status.Conditions = []controlplane.ConditionStatus{{
+			Type:               "CleanupBlocked",
+			Status:             "True",
+			Reason:             "CleanupBlocked",
+			Message:            diagnostic.Message,
+			ObservedGeneration: int64(record.DesiredGeneration.Value()),
+			LastTransitionTime: reconciler.now().UTC(),
+		}}
+		if err := reconciler.commit(ctx, intent); err != nil {
+			return Result{}, err
+		}
+		return Result{requeue: true, phase: "Deleting"}, nil
+	}
 
-	deleteChanges := deletionChanges(observed.Objects, cluster.ObjectKindNode)
+	deleteChanges := deletionChanges(
+		observed.Objects,
+		cluster.ObjectKindResourceSlice,
+	)
+	if len(deleteChanges) == 0 {
+		deleteChanges = deletionChanges(
+			observed.Objects,
+			cluster.ObjectKindDeviceClass,
+		)
+	}
+	if len(deleteChanges) == 0 {
+		deleteChanges = deletionChanges(observed.Objects, cluster.ObjectKindNode)
+	}
 	if len(deleteChanges) == 0 {
 		deleteChanges = deletionChanges(observed.Objects, cluster.ObjectKindLease)
 	}
@@ -1159,6 +1360,204 @@ func (reconciler *InstanceReconciler) statusChanges(
 	return changes, nil
 }
 
+func (reconciler *InstanceReconciler) draClassChanges(
+	graph projection.DesiredGraph,
+	fragment projection.ProjectionFragment,
+	observed cluster.ObservedGraph,
+) ([]cluster.OwnedChange, error) {
+	observedByName := make(map[string]cluster.ObservedObject)
+	for _, object := range observed.Objects {
+		if object.Key.Kind() == cluster.ObjectKindDeviceClass {
+			observedByName[object.Key.Name()] = object
+		}
+	}
+	changes := make([]cluster.OwnedChange, 0)
+	for _, desired := range fragment.DeviceClasses() {
+		key, err := cluster.NewObjectKey(
+			cluster.ObjectKindDeviceClass,
+			"",
+			desired.Name(),
+		)
+		if err != nil {
+			return nil, err
+		}
+		actual, found := observedByName[desired.Name()]
+		objectPreconditions := cluster.ObjectPreconditions{}
+		if found {
+			if actual.DeviceClass == nil {
+				return nil, fmt.Errorf(
+					"owned DeviceClass %q has no observable stable DRA state",
+					desired.Name(),
+				)
+			}
+			if actual.DesiredGeneration == graph.Generation() &&
+				slices.Equal(
+					actual.DeviceClass.Selectors,
+					desired.Selectors(),
+				) {
+				continue
+			}
+			objectPreconditions = preconditions(actual)
+		}
+		change, err := cluster.NewApplyDeviceClass(
+			key,
+			objectPreconditions,
+			cluster.DeviceClassInput{Selectors: desired.Selectors()},
+		)
+		if err != nil {
+			return nil, err
+		}
+		changes = append(changes, change)
+	}
+	return changes, nil
+}
+
+func (reconciler *InstanceReconciler) draSliceChanges(
+	graph projection.DesiredGraph,
+	fragment projection.ProjectionFragment,
+	observed cluster.ObservedGraph,
+) ([]cluster.OwnedChange, error) {
+	observedByName := make(map[string]cluster.ObservedObject)
+	for _, object := range observed.Objects {
+		if object.Key.Kind() == cluster.ObjectKindResourceSlice {
+			observedByName[object.Key.Name()] = object
+		}
+	}
+	changes := make([]cluster.OwnedChange, 0)
+	for _, desired := range fragment.ResourceSlices() {
+		key, err := cluster.NewObjectKey(
+			cluster.ObjectKindResourceSlice,
+			"",
+			desired.Name(),
+		)
+		if err != nil {
+			return nil, err
+		}
+		actual, found := observedByName[desired.Name()]
+		objectPreconditions := cluster.ObjectPreconditions{}
+		if found {
+			if actual.ResourceSlice == nil {
+				return nil, fmt.Errorf(
+					"owned ResourceSlice %q has no observable stable DRA state",
+					desired.Name(),
+				)
+			}
+			if actual.DesiredGeneration == graph.Generation() &&
+				resourceSliceStateEqual(
+					actual.ResourceSlice,
+					desired,
+				) {
+				continue
+			}
+			objectPreconditions = preconditions(actual)
+		}
+		devices, err := clusterDevices(desired.Devices())
+		if err != nil {
+			return nil, err
+		}
+		change, err := cluster.NewApplyResourceSlice(
+			key,
+			objectPreconditions,
+			cluster.ResourceSliceInput{
+				Driver:             desired.Driver(),
+				PoolName:           desired.PoolName(),
+				PoolGeneration:     desired.PoolGeneration(),
+				ResourceSliceCount: desired.ResourceSliceCount(),
+				NodeName:           desired.NodeName(),
+				Devices:            devices,
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
+		changes = append(changes, change)
+	}
+	return changes, nil
+}
+
+func resourceSliceStateEqual(
+	actual *cluster.ObservedResourceSliceState,
+	desired projection.ResourceSliceFragment,
+) bool {
+	if actual.Driver != desired.Driver() ||
+		actual.PoolName != desired.PoolName() ||
+		actual.PoolGeneration != desired.PoolGeneration() ||
+		actual.ResourceSliceCount != desired.ResourceSliceCount() ||
+		actual.NodeName != desired.NodeName() ||
+		len(actual.Devices) != len(desired.Devices()) {
+		return false
+	}
+	actualDevices := append([]cluster.DRADevice(nil), actual.Devices...)
+	slices.SortFunc(actualDevices, func(left, right cluster.DRADevice) int {
+		return compareStrings(left.Name, right.Name)
+	})
+	desiredDevices := desired.Devices()
+	for index := range actualDevices {
+		if actualDevices[index].Name != desiredDevices[index].Name() ||
+			!deviceAttributesEqual(
+				actualDevices[index].Attributes,
+				desiredDevices[index].Attributes(),
+			) {
+			return false
+		}
+	}
+	return true
+}
+
+func clusterDevices(
+	devices []projection.DeviceFragment,
+) ([]cluster.DRADevice, error) {
+	result := make([]cluster.DRADevice, 0, len(devices))
+	for _, device := range devices {
+		attributes := make(
+			map[string]cluster.DeviceAttributeValue,
+			len(device.Attributes()),
+		)
+		for key, value := range device.Attributes() {
+			switch value.Kind() {
+			case projection.DeviceAttributeBool:
+				attributes[key] =
+					cluster.NewBoolDeviceAttribute(value.Bool())
+			case projection.DeviceAttributeString:
+				attribute, err := cluster.NewStringDeviceAttribute(value.String())
+				if err != nil {
+					return nil, err
+				}
+				attributes[key] = attribute
+			default:
+				return nil, fmt.Errorf(
+					"device %q has unsupported portable DRA attribute %q",
+					device.Name(),
+					key,
+				)
+			}
+		}
+		result = append(result, cluster.DRADevice{
+			Name:       device.Name(),
+			Attributes: attributes,
+		})
+	}
+	return result, nil
+}
+
+func deviceAttributesEqual(
+	actual map[string]cluster.DeviceAttributeValue,
+	desired map[string]projection.DeviceAttributeValue,
+) bool {
+	if len(actual) != len(desired) {
+		return false
+	}
+	for key, wanted := range desired {
+		value, found := actual[key]
+		if !found || string(value.Kind()) != string(wanted.Kind()) ||
+			value.Bool() != wanted.Bool() ||
+			value.String() != wanted.String() {
+			return false
+		}
+	}
+	return true
+}
+
 func desiredNodeResources(
 	desired projection.DesiredNode,
 	fragment projection.NodeFragment,
@@ -1250,9 +1649,14 @@ func (reconciler *InstanceReconciler) statusIntent(
 		pool  string
 	}
 	observedNodes := make(map[string]*cluster.ObservedNodeState)
+	observedSlices := make([]*cluster.ObservedResourceSliceState, 0)
 	for _, object := range observed.Objects {
 		if object.Key.Kind() == cluster.ObjectKindNode && object.Node != nil {
 			observedNodes[object.Key.Name()] = object.Node
+		}
+		if object.Key.Kind() == cluster.ObjectKindResourceSlice &&
+			object.ResourceSlice != nil {
+			observedSlices = append(observedSlices, object.ResourceSlice)
 		}
 	}
 	poolsByKey := make(map[poolKey]controlplane.PoolStatus)
@@ -1288,6 +1692,31 @@ func (reconciler *InstanceReconciler) statusIntent(
 					)
 				}
 			}
+			if graph.Fidelity().String() == "dra-control-plane" {
+				for _, resourceSlice := range observedSlices {
+					if resourceSlice.Driver != pool.ResourceName() ||
+						resourceSlice.NodeName != node.Name() ||
+						resourceSlice.PoolGeneration !=
+							int64(graph.Generation().Value()) {
+						continue
+					}
+					current.ObservedTotal = saturatingAdd(
+						current.ObservedTotal,
+						uint64(len(resourceSlice.Devices)),
+					)
+					for _, device := range resourceSlice.Devices {
+						allocatable, found := device.Attributes["simulation.kasim.io/allocatable"]
+						if found &&
+							allocatable.Kind() == cluster.DeviceAttributeBool &&
+							allocatable.Bool() {
+							current.ObservedHealthy = saturatingAdd(
+								current.ObservedHealthy,
+								1,
+							)
+						}
+					}
+				}
+			}
 			poolsByKey[key] = current
 		}
 	}
@@ -1315,8 +1744,11 @@ func (reconciler *InstanceReconciler) statusIntent(
 	inventory := make([]controlplane.InventoryEntry, 0, len(inventoryCounts))
 	for kind, count := range inventoryCounts {
 		apiVersion := "v1"
-		if kind == cluster.ObjectKindLease {
+		switch kind {
+		case cluster.ObjectKindLease:
 			apiVersion = "coordination.k8s.io/v1"
+		case cluster.ObjectKindDeviceClass, cluster.ObjectKindResourceSlice:
+			apiVersion = "resource.k8s.io/v1"
 		}
 		inventory = append(inventory, controlplane.InventoryEntry{
 			APIVersion: apiVersion,
@@ -1519,6 +1951,64 @@ func activePodBlockers(
 	return blockers
 }
 
+func draClaimBlockers(
+	claims []cluster.ObservedResourceClaim,
+	classObjects,
+	sliceObjects []cluster.ObservedObject,
+) []string {
+	classNames := make(map[string]struct{})
+	for _, object := range classObjects {
+		if object.Key.Kind() == cluster.ObjectKindDeviceClass {
+			classNames[object.Key.Name()] = struct{}{}
+		}
+	}
+	deviceTuples := make(map[string]struct{})
+	for _, object := range sliceObjects {
+		if object.Key.Kind() != cluster.ObjectKindResourceSlice ||
+			object.ResourceSlice == nil {
+			continue
+		}
+		for _, device := range object.ResourceSlice.Devices {
+			deviceTuples[draAllocationIdentity(
+				object.ResourceSlice.Driver,
+				object.ResourceSlice.PoolName,
+				device.Name,
+			)] = struct{}{}
+		}
+	}
+	blockers := make([]string, 0)
+	for _, claim := range claims {
+		blocked := false
+		for _, className := range claim.DeviceClassNames {
+			if _, found := classNames[className]; found {
+				blocked = true
+				break
+			}
+		}
+		if !blocked {
+			for _, allocation := range claim.Allocations {
+				if _, found := deviceTuples[draAllocationIdentity(
+					allocation.Driver,
+					allocation.Pool,
+					allocation.Device,
+				)]; found {
+					blocked = true
+					break
+				}
+			}
+		}
+		if blocked {
+			blockers = append(blockers, claim.Namespace+"/"+claim.Name)
+		}
+	}
+	slices.Sort(blockers)
+	return blockers
+}
+
+func draAllocationIdentity(driver, pool, device string) string {
+	return driver + "\x00" + pool + "\x00" + device
+}
+
 func deletionChanges(
 	objects []cluster.ObservedObject,
 	kind cluster.ObjectKind,
@@ -1670,7 +2160,150 @@ func observedProjection(
 			Requested:     requested[name],
 		})
 	}
-	return projection.NewObservedGraph(inputs)
+	deviceClasses := make([]projection.ObservedDeviceClassInput, 0)
+	resourceSlices := make([]projection.ObservedResourceSliceInput, 0)
+	for _, object := range observed.Objects {
+		switch object.Key.Kind() {
+		case cluster.ObjectKindDeviceClass:
+			if object.DeviceClass == nil {
+				return projection.ObservedGraph{}, fmt.Errorf(
+					"owned DeviceClass %q has no observable stable DRA state",
+					object.Key.Name(),
+				)
+			}
+			deviceClasses = append(
+				deviceClasses,
+				projection.ObservedDeviceClassInput{
+					Name:      object.Key.Name(),
+					Exists:    true,
+					Selectors: object.DeviceClass.Selectors,
+				},
+			)
+		case cluster.ObjectKindResourceSlice:
+			if object.ResourceSlice == nil {
+				return projection.ObservedGraph{}, fmt.Errorf(
+					"owned ResourceSlice %q has no observable stable DRA state",
+					object.Key.Name(),
+				)
+			}
+			devices := make(
+				[]projection.ObservedDeviceInput,
+				0,
+				len(object.ResourceSlice.Devices),
+			)
+			for _, device := range object.ResourceSlice.Devices {
+				attributes := make(
+					map[string]projection.DeviceAttributeValue,
+					len(device.Attributes),
+				)
+				for key, value := range device.Attributes {
+					switch value.Kind() {
+					case cluster.DeviceAttributeBool:
+						attributes[key] =
+							projection.NewBoolDeviceAttribute(value.Bool())
+					case cluster.DeviceAttributeString:
+						attribute, err := projection.NewStringDeviceAttribute(
+							value.String(),
+						)
+						if err != nil {
+							return projection.ObservedGraph{}, err
+						}
+						attributes[key] = attribute
+					default:
+						return projection.ObservedGraph{}, fmt.Errorf(
+							"observed device %q has an unsupported DRA attribute",
+							device.Name,
+						)
+					}
+				}
+				devices = append(devices, projection.ObservedDeviceInput{
+					Name:       device.Name,
+					Attributes: attributes,
+				})
+			}
+			resourceSlices = append(
+				resourceSlices,
+				projection.ObservedResourceSliceInput{
+					Name:               object.Key.Name(),
+					Exists:             true,
+					Driver:             object.ResourceSlice.Driver,
+					PoolName:           object.ResourceSlice.PoolName,
+					PoolGeneration:     object.ResourceSlice.PoolGeneration,
+					ResourceSliceCount: object.ResourceSlice.ResourceSliceCount,
+					NodeName:           object.ResourceSlice.NodeName,
+					Devices:            devices,
+				},
+			)
+		}
+	}
+	resourceClaims := make(
+		[]projection.ObservedResourceClaimInput,
+		0,
+		len(observed.ResourceClaims),
+	)
+	for _, claim := range observed.ResourceClaims {
+		allocations := make(
+			[]projection.ObservedAllocationInput,
+			0,
+			len(claim.Allocations),
+		)
+		for _, allocation := range claim.Allocations {
+			allocations = append(
+				allocations,
+				projection.ObservedAllocationInput{
+					Request: allocation.Request,
+					Driver:  allocation.Driver,
+					Pool:    allocation.Pool,
+					Device:  allocation.Device,
+				},
+			)
+		}
+		reservations := make(
+			[]projection.ObservedConsumerReferenceInput,
+			0,
+			len(claim.ReservedFor),
+		)
+		for _, reservation := range claim.ReservedFor {
+			reservations = append(
+				reservations,
+				projection.ObservedConsumerReferenceInput{
+					APIGroup: reservation.APIGroup,
+					Resource: reservation.Resource,
+					Name:     reservation.Name,
+					UID:      reservation.UID,
+				},
+			)
+		}
+		resourceClaims = append(
+			resourceClaims,
+			projection.ObservedResourceClaimInput{
+				Namespace:        claim.Namespace,
+				Name:             claim.Name,
+				DeviceClassNames: claim.DeviceClassNames,
+				Allocations:      allocations,
+				ReservedFor:      reservations,
+			},
+		)
+	}
+	pods := make([]projection.ObservedPodInput, 0, len(observed.Pods))
+	for _, pod := range observed.Pods {
+		pods = append(pods, projection.ObservedPodInput{
+			Namespace:      pod.Namespace,
+			Name:           pod.Name,
+			UID:            pod.UID,
+			NodeName:       pod.NodeName,
+			ResourceClaims: pod.ResourceClaims,
+		})
+	}
+	return projection.NewObservedGraph(
+		inputs,
+		projection.DRAObservedInput{
+			DeviceClasses:  deviceClasses,
+			ResourceSlices: resourceSlices,
+			ResourceClaims: resourceClaims,
+			Pods:           pods,
+		},
+	)
 }
 
 func projectedQuantities(

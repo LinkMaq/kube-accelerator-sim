@@ -94,6 +94,8 @@ type Snapshot struct {
 	PoolsTruncated       bool
 	Inventory            []InventorySnapshot
 	InventoryTruncated   bool
+	Fidelity             []FidelitySurfaceSnapshot
+	FidelityTruncated    bool
 	Diagnostics          []DiagnosticSnapshot
 	DiagnosticsTruncated bool
 	Conditions           []ConditionSnapshot
@@ -120,6 +122,11 @@ type InventorySnapshot struct {
 	APIVersion string
 	Kind       string
 	Count      int32
+}
+
+type FidelitySurfaceSnapshot struct {
+	Surface string
+	State   string
 }
 
 type DiagnosticSnapshot struct {
@@ -425,6 +432,10 @@ func (runtime *ScenarioRuntime) applyTyped(
 		current.InstanceUID,
 		current.DesiredGeneration,
 	)
+	if err != nil {
+		return LifecycleResult{}, err
+	}
+	scope, err = scope.ForFidelity(current.Fidelity)
 	if err != nil {
 		return LifecycleResult{}, err
 	}
@@ -1314,6 +1325,23 @@ func snapshotOf(record controlplane.InstanceRecord) Snapshot {
 			Count:      entry.Count,
 		})
 	}
+	statusFidelity := record.Status.Fidelity
+	fidelityTruncated := record.Status.FidelityTruncated
+	if len(statusFidelity) > controlplane.MaximumStatusFidelity {
+		statusFidelity = statusFidelity[:controlplane.MaximumStatusFidelity]
+		fidelityTruncated = true
+	}
+	fidelity := make(
+		[]FidelitySurfaceSnapshot,
+		0,
+		len(statusFidelity),
+	)
+	for _, surface := range statusFidelity {
+		fidelity = append(fidelity, FidelitySurfaceSnapshot{
+			Surface: surface.Surface,
+			State:   surface.State,
+		})
+	}
 	statusDiagnostics := record.Status.Diagnostics
 	diagnosticsTruncated := record.Status.DiagnosticsTruncated
 	if len(statusDiagnostics) > controlplane.MaximumStatusDiagnostics {
@@ -1364,6 +1392,8 @@ func snapshotOf(record controlplane.InstanceRecord) Snapshot {
 		PoolsTruncated:       poolsTruncated,
 		Inventory:            inventory,
 		InventoryTruncated:   inventoryTruncated,
+		Fidelity:             fidelity,
+		FidelityTruncated:    fidelityTruncated,
 		Diagnostics:          diagnostics,
 		DiagnosticsTruncated: diagnosticsTruncated,
 		Conditions:           conditions,

@@ -12,6 +12,7 @@ import (
 	authorizationv1 "k8s.io/api/authorization/v1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,6 +48,15 @@ func TestAdapterDiscoversTheFrozenKubernetesRangeAndRuntimeAPI(t *testing.T) {
 			func(capability cluster.ResourceCapability) bool {
 				return capability.GroupVersion == "simulation.kasim.io/v1alpha1" &&
 					capability.Resource == "scenarioinstances"
+			},
+		) ||
+		!slices.ContainsFunc(
+			capabilities.Resources,
+			func(capability cluster.ResourceCapability) bool {
+				return capability.GroupVersion == "resource.k8s.io/v1" &&
+					capability.Resource == "resourceclaims" &&
+					capability.Namespaced &&
+					slices.Contains(capability.Verbs, "watch")
 			},
 		) {
 		t.Fatalf("unexpected discovery result: %#v", capabilities)
@@ -348,6 +358,279 @@ func TestAdapterObservesSchedulerStateLeaseHeartbeatAndBoundPodRequests(t *testi
 		graph.Pods[0].Phase != "Running" ||
 		graph.Pods[0].Requested["nvidia.com/gpu"] != "5" {
 		t.Fatalf("unexpected observed Pod state: %#v", graph.Pods)
+	}
+}
+
+func TestAdapterObservesOwnedStableDRAInventoryAndSchedulerClaimEvidence(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 3)
+	draFidelity, err := domain.ParseFidelityMode("dra-control-plane")
+	if err != nil {
+		t.Fatal(err)
+	}
+	scope, err = scope.ForFidelity(draFidelity)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ownedLabels := ownershipLabels(scope)
+	trueValue := true
+	allocatable := true
+	className := "kasim-class-a"
+	poolName := "kasim-pool-a"
+	deviceName := "kasim-device-a"
+	kubernetesClient := kubernetesfake.NewSimpleClientset(
+		&resourcev1.DeviceClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            className,
+				UID:             types.UID("class-uid"),
+				ResourceVersion: "21",
+				Labels:          ownedLabels,
+			},
+			Spec: resourcev1.DeviceClassSpec{
+				Selectors: []resourcev1.DeviceSelector{{
+					CEL: &resourcev1.CELDeviceSelector{
+						Expression: `device.driver == "gpu.nvidia.com"`,
+					},
+				}},
+			},
+		},
+		&resourcev1.ResourceSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "kasim-slice-a",
+				UID:             types.UID("slice-uid"),
+				ResourceVersion: "22",
+				Labels:          ownedLabels,
+			},
+			Spec: resourcev1.ResourceSliceSpec{
+				Driver: "gpu.nvidia.com",
+				Pool: resourcev1.ResourcePool{
+					Name: poolName, Generation: 3, ResourceSliceCount: 1,
+				},
+				NodeName: &[]string{"kasim-node-a"}[0],
+				Devices: []resourcev1.Device{{
+					Name: deviceName,
+					Attributes: map[resourcev1.QualifiedName]resourcev1.DeviceAttribute{
+						"simulation.kasim.io/simulated": {
+							BoolValue: &trueValue,
+						},
+						"simulation.kasim.io/allocatable": {
+							BoolValue: &allocatable,
+						},
+					},
+				}},
+			},
+		},
+		&resourcev1.ResourceClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:       "team-a",
+				Name:            "training",
+				UID:             types.UID("claim-uid"),
+				ResourceVersion: "23",
+			},
+			Spec: resourcev1.ResourceClaimSpec{
+				Devices: resourcev1.DeviceClaim{
+					Requests: []resourcev1.DeviceRequest{{
+						Name: "accelerator",
+						Exactly: &resourcev1.ExactDeviceRequest{
+							DeviceClassName: className,
+						},
+					}},
+				},
+			},
+			Status: resourcev1.ResourceClaimStatus{
+				Allocation: &resourcev1.AllocationResult{
+					Devices: resourcev1.DeviceAllocationResult{
+						Results: []resourcev1.DeviceRequestAllocationResult{{
+							Request: "accelerator",
+							Driver:  "gpu.nvidia.com",
+							Pool:    poolName,
+							Device:  deviceName,
+						}},
+					},
+				},
+				ReservedFor: []resourcev1.ResourceClaimConsumerReference{{
+					Resource: "pods",
+					Name:     "workload",
+					UID:      types.UID("pod-uid"),
+				}},
+			},
+		},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "team-a",
+				Name:      "workload",
+				UID:       types.UID("pod-uid"),
+			},
+			Spec: corev1.PodSpec{
+				ResourceClaims: []corev1.PodResourceClaim{{
+					Name:              "accelerator",
+					ResourceClaimName: &[]string{"training"}[0],
+				}},
+			},
+		},
+	)
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+	graph, err := adapter.Observe(context.Background(), scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(graph.Objects) != 2 ||
+		!slices.ContainsFunc(graph.Objects, func(object cluster.ObservedObject) bool {
+			return object.Key.Kind() == cluster.ObjectKindDeviceClass &&
+				object.DeviceClass != nil &&
+				slices.Equal(
+					object.DeviceClass.Selectors,
+					[]string{`device.driver == "gpu.nvidia.com"`},
+				)
+		}) ||
+		!slices.ContainsFunc(graph.Objects, func(object cluster.ObservedObject) bool {
+			return object.Key.Kind() == cluster.ObjectKindResourceSlice &&
+				object.ResourceSlice != nil &&
+				object.ResourceSlice.Driver == "gpu.nvidia.com" &&
+				object.ResourceSlice.PoolName == poolName &&
+				len(object.ResourceSlice.Devices) == 1
+		}) {
+		t.Fatalf("unexpected stable DRA observation: %#v", graph.Objects)
+	}
+	if len(graph.ResourceClaims) != 1 ||
+		!slices.Equal(graph.ResourceClaims[0].DeviceClassNames, []string{className}) ||
+		len(graph.ResourceClaims[0].Allocations) != 1 ||
+		graph.ResourceClaims[0].Allocations[0].Device != deviceName ||
+		len(graph.ResourceClaims[0].ReservedFor) != 1 ||
+		graph.ResourceClaims[0].ReservedFor[0].UID != "pod-uid" {
+		t.Fatalf("unexpected ResourceClaim observation: %#v", graph.ResourceClaims)
+	}
+	if len(graph.Pods) != 1 ||
+		graph.Pods[0].Namespace != "team-a" ||
+		graph.Pods[0].Name != "workload" ||
+		graph.Pods[0].UID != "pod-uid" ||
+		!slices.Equal(graph.Pods[0].ResourceClaims, []string{"training"}) {
+		t.Fatalf("pending DRA Pod was not observed by exact claim reference: %#v", graph.Pods)
+	}
+}
+
+func TestAdapterPersistsOnlyPortableStableDRAFields(t *testing.T) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 3)
+	kubernetesClient := kubernetesfake.NewSimpleClientset()
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+	classKey, _ := cluster.NewObjectKey(
+		cluster.ObjectKindDeviceClass,
+		"",
+		"kasim-class-a",
+	)
+	classChange, err := cluster.NewApplyDeviceClass(
+		classKey,
+		cluster.ObjectPreconditions{},
+		cluster.DeviceClassInput{
+			Selectors: []string{`device.driver == "gpu.nvidia.com"`},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sliceKey, _ := cluster.NewObjectKey(
+		cluster.ObjectKindResourceSlice,
+		"",
+		"kasim-slice-a",
+	)
+	model, err := cluster.NewStringDeviceAttribute("nvidia-h100")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sliceChange, err := cluster.NewApplyResourceSlice(
+		sliceKey,
+		cluster.ObjectPreconditions{},
+		cluster.ResourceSliceInput{
+			Driver:             "gpu.nvidia.com",
+			PoolName:           "kasim-pool-a",
+			PoolGeneration:     3,
+			ResourceSliceCount: 1,
+			NodeName:           "kasim-node-a",
+			Devices: []cluster.DRADevice{{
+				Name: "kasim-device-a",
+				Attributes: map[string]cluster.DeviceAttributeValue{
+					"simulation.kasim.io/simulated":   cluster.NewBoolDeviceAttribute(true),
+					"simulation.kasim.io/allocatable": cluster.NewBoolDeviceAttribute(true),
+					"simulation.kasim.io/model":       model,
+				},
+			}},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changeSet, err := cluster.NewOwnedChangeSet(
+		scope,
+		cluster.ExecutionPersistent,
+		[]cluster.OwnedChange{classChange, sliceChange},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt, err := adapter.Execute(context.Background(), changeSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if receipt.Persisted != 2 {
+		t.Fatalf("receipt = %#v", receipt)
+	}
+	class, err := kubernetesClient.ResourceV1().DeviceClasses().Get(
+		context.Background(),
+		classKey.Name(),
+		metav1.GetOptions{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(class.Spec.Selectors) != 1 ||
+		class.Spec.Selectors[0].CEL == nil ||
+		class.Spec.Selectors[0].CEL.Expression !=
+			`device.driver == "gpu.nvidia.com"` ||
+		len(class.Spec.Config) != 0 ||
+		class.Spec.ExtendedResourceName != nil {
+		t.Fatalf("DeviceClass escaped the portable v1 subset: %#v", class.Spec)
+	}
+	resourceSlice, err := kubernetesClient.ResourceV1().ResourceSlices().Get(
+		context.Background(),
+		sliceKey.Name(),
+		metav1.GetOptions{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resourceSlice.Spec.Driver != "gpu.nvidia.com" ||
+		resourceSlice.Spec.Pool.Name != "kasim-pool-a" ||
+		resourceSlice.Spec.NodeName == nil ||
+		*resourceSlice.Spec.NodeName != "kasim-node-a" ||
+		resourceSlice.Spec.NodeSelector != nil ||
+		resourceSlice.Spec.AllNodes != nil ||
+		resourceSlice.Spec.PerDeviceNodeSelection != nil ||
+		len(resourceSlice.Spec.SharedCounters) != 0 ||
+		len(resourceSlice.Spec.Devices) != 1 {
+		t.Fatalf("ResourceSlice escaped the portable v1 subset: %#v", resourceSlice.Spec)
+	}
+	device := resourceSlice.Spec.Devices[0]
+	if device.NodeName != nil ||
+		device.NodeSelector != nil ||
+		device.AllNodes != nil ||
+		len(device.Taints) != 0 ||
+		device.BindsToNode != nil ||
+		len(device.BindingConditions) != 0 ||
+		device.AllowMultipleAllocations != nil {
+		t.Fatalf("Device escaped the portable v1 subset: %#v", device)
+	}
+	for _, action := range kubernetesClient.Actions() {
+		if action.GetResource().Resource == "resourceclaims" &&
+			action.GetVerb() != "get" &&
+			action.GetVerb() != "list" &&
+			action.GetVerb() != "watch" {
+			t.Fatalf("adapter mutated ResourceClaim through action %#v", action)
+		}
 	}
 }
 
@@ -882,6 +1165,141 @@ func TestEnvtestServerDryRunApplyStatusAndDeleteHaveExactPersistence(t *testing.
 		t.Fatalf("persisted Lease lost owned intent: %#v", lease)
 	}
 
+	classKey, err := cluster.NewObjectKey(
+		cluster.ObjectKindDeviceClass,
+		"",
+		"envtest-device-class",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	classCreate, err := cluster.NewApplyDeviceClass(
+		classKey,
+		cluster.ObjectPreconditions{},
+		cluster.DeviceClassInput{
+			Selectors: []string{
+				`device.driver == "gpu.nvidia.com"`,
+				`device.attributes["simulation.kasim.io/simulated"].bool == true`,
+			},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executeSingle(t, adapter, scope, cluster.ExecutionServerDryRun, classCreate)
+	if _, err := kubernetesClient.ResourceV1().DeviceClasses().Get(
+		context.Background(),
+		classKey.Name(),
+		metav1.GetOptions{},
+	); !apierrors.IsNotFound(err) {
+		t.Fatalf("dry-run DeviceClass create error = %v, want NotFound", err)
+	}
+	executeSingle(t, adapter, scope, cluster.ExecutionPersistent, classCreate)
+	deviceClass, err := kubernetesClient.ResourceV1().DeviceClasses().Get(
+		context.Background(),
+		classKey.Name(),
+		metav1.GetOptions{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	model, err := cluster.NewStringDeviceAttribute("nvidia-h100")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sliceKey, err := cluster.NewObjectKey(
+		cluster.ObjectKindResourceSlice,
+		"",
+		"envtest-resource-slice",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sliceCreate, err := cluster.NewApplyResourceSlice(
+		sliceKey,
+		cluster.ObjectPreconditions{},
+		cluster.ResourceSliceInput{
+			Driver:             "gpu.nvidia.com",
+			PoolName:           "envtest-pool",
+			PoolGeneration:     2,
+			ResourceSliceCount: 1,
+			NodeName:           nodeKey.Name(),
+			Devices: []cluster.DRADevice{{
+				Name: "kasim-device-envtest",
+				Attributes: map[string]cluster.DeviceAttributeValue{
+					"simulation.kasim.io/simulated": cluster.NewBoolDeviceAttribute(true),
+					"simulation.kasim.io/model":     model,
+				},
+			}},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executeSingle(t, adapter, scope, cluster.ExecutionServerDryRun, sliceCreate)
+	if _, err := kubernetesClient.ResourceV1().ResourceSlices().Get(
+		context.Background(),
+		sliceKey.Name(),
+		metav1.GetOptions{},
+	); !apierrors.IsNotFound(err) {
+		t.Fatalf("dry-run ResourceSlice create error = %v, want NotFound", err)
+	}
+	executeSingle(t, adapter, scope, cluster.ExecutionPersistent, sliceCreate)
+	resourceSlice, err := kubernetesClient.ResourceV1().ResourceSlices().Get(
+		context.Background(),
+		sliceKey.Name(),
+		metav1.GetOptions{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resourceSlice.Spec.Driver != "gpu.nvidia.com" ||
+		resourceSlice.Spec.Pool.Generation != 2 ||
+		resourceSlice.Spec.NodeName == nil ||
+		*resourceSlice.Spec.NodeName != nodeKey.Name() ||
+		len(resourceSlice.Spec.Devices) != 1 {
+		t.Fatalf("envtest DRA persistence lost portable intent: %#v", resourceSlice.Spec)
+	}
+	sliceDeletion, err := cluster.NewDeleteOwnedObject(
+		sliceKey,
+		cluster.ObjectPreconditions{
+			UID:             string(resourceSlice.UID),
+			ResourceVersion: resourceSlice.ResourceVersion,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executeSingle(t, adapter, scope, cluster.ExecutionServerDryRun, sliceDeletion)
+	if _, err := kubernetesClient.ResourceV1().ResourceSlices().Get(
+		context.Background(),
+		sliceKey.Name(),
+		metav1.GetOptions{},
+	); err != nil {
+		t.Fatalf("dry-run ResourceSlice delete removed object: %v", err)
+	}
+	executeSingle(t, adapter, scope, cluster.ExecutionPersistent, sliceDeletion)
+	classDeletion, err := cluster.NewDeleteOwnedObject(
+		classKey,
+		cluster.ObjectPreconditions{
+			UID:             string(deviceClass.UID),
+			ResourceVersion: deviceClass.ResourceVersion,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executeSingle(t, adapter, scope, cluster.ExecutionServerDryRun, classDeletion)
+	if _, err := kubernetesClient.ResourceV1().DeviceClasses().Get(
+		context.Background(),
+		classKey.Name(),
+		metav1.GetOptions{},
+	); err != nil {
+		t.Fatalf("dry-run DeviceClass delete removed object: %v", err)
+	}
+	executeSingle(t, adapter, scope, cluster.ExecutionPersistent, classDeletion)
+
 	nodeDeletion, err := cluster.NewDeleteOwnedObject(
 		nodeKey,
 		cluster.ObjectPreconditions{
@@ -936,6 +1354,28 @@ func configureDiscovery(
 		{
 			GroupVersion: "authorization.k8s.io/v1",
 			APIResources: []metav1.APIResource{{Name: "selfsubjectaccessreviews"}},
+		},
+		{
+			GroupVersion: "resource.k8s.io/v1",
+			APIResources: []metav1.APIResource{
+				{
+					Name: "deviceclasses",
+					Verbs: metav1.Verbs{
+						"get", "list", "watch", "create", "patch", "delete",
+					},
+				},
+				{
+					Name: "resourceslices",
+					Verbs: metav1.Verbs{
+						"get", "list", "watch", "create", "patch", "delete",
+					},
+				},
+				{
+					Name:       "resourceclaims",
+					Namespaced: true,
+					Verbs:      metav1.Verbs{"get", "list", "watch"},
+				},
+			},
 		},
 		{
 			GroupVersion: "simulation.kasim.io/v1alpha1",

@@ -1222,6 +1222,20 @@ func lifecycleResult(
 				Count:      item.Count,
 			})
 		}
+		fidelity := make(
+			[]presentation.FidelitySurfaceResult,
+			0,
+			len(snapshot.Fidelity),
+		)
+		for _, surface := range snapshot.Fidelity {
+			fidelity = append(
+				fidelity,
+				presentation.FidelitySurfaceResult{
+					Surface: surface.Surface,
+					State:   surface.State,
+				},
+			)
+		}
 		diagnostics := make(
 			[]presentation.SnapshotDiagnosticResult,
 			0,
@@ -1273,6 +1287,8 @@ func lifecycleResult(
 			PoolsTruncated:       snapshot.PoolsTruncated,
 			Inventory:            inventory,
 			InventoryTruncated:   snapshot.InventoryTruncated,
+			Fidelity:             fidelity,
+			FidelityTruncated:    snapshot.FidelityTruncated,
 			Diagnostics:          diagnostics,
 			DiagnosticsTruncated: snapshot.DiagnosticsTruncated,
 			Conditions:           conditions,

@@ -134,6 +134,24 @@ func transportStatus(
 			},
 		)
 	}
+	fidelity := bounded(
+		intent.Status.Fidelity,
+		controlplane.MaximumStatusFidelity,
+	)
+	transportFidelity := make(
+		[]simulationv1alpha1.FidelitySurfaceStatus,
+		0,
+		len(fidelity),
+	)
+	for _, surface := range fidelity {
+		transportFidelity = append(
+			transportFidelity,
+			simulationv1alpha1.FidelitySurfaceStatus{
+				Surface: surface.Surface,
+				State:   surface.State,
+			},
+		)
+	}
 	diagnostics := bounded(
 		intent.Status.Diagnostics,
 		controlplane.MaximumStatusDiagnostics,
@@ -176,6 +194,7 @@ func transportStatus(
 		Phase:              intent.Status.Phase,
 		Pools:              transportPools,
 		Inventory:          transportInventory,
+		Fidelity:           transportFidelity,
 		Diagnostics:        transportDiagnostics,
 		Conditions:         transportConditions,
 	}

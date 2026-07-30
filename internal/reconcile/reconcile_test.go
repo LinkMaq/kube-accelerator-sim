@@ -2,6 +2,7 @@ package reconcile_test
 
 import (
 	"context"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -13,6 +14,8 @@ import (
 	"github.com/LinkMaq/kube-accelerator-sim/internal/controlplane"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/controlplane/memory"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/domain"
+	"github.com/LinkMaq/kube-accelerator-sim/internal/projection"
+	draprojection "github.com/LinkMaq/kube-accelerator-sim/internal/projection/dra"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/projection/extended"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/reconcile"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/scenario"
@@ -206,6 +209,292 @@ func TestReconcileReportsReadyOnlyAfterOpenedObservedFidelity(t *testing.T) {
 	}
 	if !foundFidelity {
 		t.Fatalf("Ready status has no FidelitySatisfied condition: %#v", fixture.commits[0])
+	}
+}
+
+func TestDRAReconcileConvergesClassThenCompleteInventoryBeforeOpening(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	base := completeDRAObservedGraph(t, true)
+	classFixture := newDRAFixture(t, recording.Options{
+		Capabilities: draCapabilities(),
+		Observed:     base,
+	}, 2, 1, 1)
+	result, err := classFixture.reconciler.Reconcile(
+		context.Background(),
+		classFixture.key,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Requeue() || len(classFixture.cluster.PersistentChangeSets()) != 1 {
+		t.Fatalf("DeviceClass stage result = %#v", result)
+	}
+	classChanges := classFixture.cluster.PersistentChangeSets()[0].Changes()
+	if len(classChanges) != 1 {
+		t.Fatalf("DeviceClass stage changes = %#v", classChanges)
+	}
+	classChange, ok := classChanges[0].(cluster.ApplyDeviceClass)
+	if !ok {
+		t.Fatalf("first DRA change = %T, want ApplyDeviceClass", classChanges[0])
+	}
+
+	withClass := cloneObservedGraph(base)
+	withClass.Objects = append(
+		withClass.Objects,
+		observedDeviceClass(t, classChange),
+	)
+	sliceFixture := newDRAFixture(t, recording.Options{
+		Capabilities: draCapabilities(),
+		Observed:     withClass,
+	}, 2, 1, 1)
+	result, err = sliceFixture.reconciler.Reconcile(
+		context.Background(),
+		sliceFixture.key,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sliceChanges := sliceFixture.cluster.PersistentChangeSets()[0].Changes()
+	if len(sliceChanges) != 1 {
+		t.Fatalf("ResourceSlice stage changes = %#v", sliceChanges)
+	}
+	sliceChange, ok := sliceChanges[0].(cluster.ApplyResourceSlice)
+	if !ok {
+		t.Fatalf("second DRA change = %T, want ApplyResourceSlice", sliceChanges[0])
+	}
+	if len(sliceChange.Devices()) != 2 ||
+		sliceChange.Devices()[0].Name == sliceChange.Devices()[1].Name {
+		t.Fatalf("ResourceSlice lost deterministic devices: %#v", sliceChange)
+	}
+
+	completeClosed := cloneObservedGraph(withClass)
+	completeClosed.Objects = append(
+		completeClosed.Objects,
+		observedResourceSlice(t, sliceChange),
+	)
+	openFixture := newDRAFixture(t, recording.Options{
+		Capabilities: draCapabilities(),
+		Observed:     completeClosed,
+	}, 2, 1, 1)
+	result, err = openFixture.reconciler.Reconcile(
+		context.Background(),
+		openFixture.key,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	openChanges := openFixture.cluster.PersistentChangeSets()[0].Changes()
+	openNode, ok := openChanges[0].(cluster.ApplySyntheticNode)
+	if len(openChanges) != 1 || !ok || openNode.Unschedulable() {
+		t.Fatalf("complete DRA inventory did not open scheduling: %#v", openChanges)
+	}
+
+	completeOpen := cloneObservedGraph(completeClosed)
+	for index := range completeOpen.Objects {
+		if completeOpen.Objects[index].Node != nil {
+			completeOpen.Objects[index].Node.Unschedulable = false
+		}
+	}
+	readyFixture := newDRAFixture(t, recording.Options{
+		Capabilities: draCapabilities(),
+		Observed:     completeOpen,
+	}, 2, 1, 1)
+	result, err = readyFixture.reconciler.Reconcile(
+		context.Background(),
+		readyFixture.key,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Requeue() || result.Phase() != "Ready" ||
+		len(readyFixture.cluster.PersistentChangeSets()) != 0 {
+		t.Fatalf("complete stable DRA projection was not Ready: %#v", result)
+	}
+	if len(readyFixture.commits) != 1 ||
+		readyFixture.commits[0].Status.Pools[0].ObservedTotal != 2 ||
+		readyFixture.commits[0].Status.Pools[0].ObservedHealthy != 1 {
+		t.Fatalf("DRA status did not count observed devices: %#v", readyFixture.commits)
+	}
+	for surface, state := range map[string]string{
+		"device-class":               "achieved",
+		"resource-slice-inventory":   "achieved",
+		"resource-claim-allocation":  "out-of-scope",
+		"resource-claim-reservation": "out-of-scope",
+		"pod-scheduling":             "out-of-scope",
+		"node-prepare-resources":     "excluded",
+		"cdi":                        "out-of-scope",
+		"device-access":              "out-of-scope",
+		"accelerator-compute":        "out-of-scope",
+	} {
+		if !slices.ContainsFunc(
+			readyFixture.commits[0].Status.Fidelity,
+			func(value controlplane.FidelitySurfaceStatus) bool {
+				return value.Surface == surface && value.State == state
+			},
+		) {
+			t.Fatalf(
+				"Ready status omitted fidelity surface %s=%s: %#v",
+				surface,
+				state,
+				readyFixture.commits[0].Status.Fidelity,
+			)
+		}
+	}
+
+	selectedWorkload := cloneObservedGraph(completeOpen)
+	selectedWorkload.ResourceClaims = []cluster.ObservedResourceClaim{{
+		Namespace:        "team-a",
+		Name:             "probe-claim",
+		UID:              "claim-uid",
+		ResourceVersion:  "31",
+		DeviceClassNames: []string{classChange.Key().Name()},
+		Allocations: []cluster.DRAAllocationResult{{
+			Request: "accelerator",
+			Driver:  sliceChange.Driver(),
+			Pool:    sliceChange.PoolName(),
+			Device:  sliceChange.Devices()[0].Name,
+		}},
+		ReservedFor: []cluster.DRAConsumerReference{{
+			Resource: "pods",
+			Name:     "probe-pod",
+			UID:      "probe-pod-uid",
+		}},
+	}}
+	selectedWorkload.Pods = []cluster.ObservedPod{{
+		Namespace:      "team-a",
+		Name:           "probe-pod",
+		UID:            "probe-pod-uid",
+		NodeName:       sliceChange.NodeName(),
+		Phase:          "Running",
+		ResourceClaims: []string{"probe-claim"},
+	}}
+	workloadFixture := newDRAFixture(t, recording.Options{
+		Capabilities: draCapabilities(),
+		Observed:     selectedWorkload,
+	}, 2, 1, 1)
+	result, err = workloadFixture.reconciler.Reconcile(
+		context.Background(),
+		workloadFixture.key,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Requeue() || result.Phase() != "Ready" {
+		t.Fatalf("exact scheduler-owned DRA evidence was not Ready: %#v", result)
+	}
+	for _, surface := range []string{
+		"resource-claim-allocation",
+		"resource-claim-reservation",
+		"pod-scheduling",
+	} {
+		if !slices.ContainsFunc(
+			workloadFixture.commits[0].Status.Fidelity,
+			func(value controlplane.FidelitySurfaceStatus) bool {
+				return value.Surface == surface && value.State == "achieved"
+			},
+		) {
+			t.Fatalf(
+				"selected DRA workload omitted %s=achieved: %#v",
+				surface,
+				workloadFixture.commits[0].Status.Fidelity,
+			)
+		}
+	}
+}
+
+func TestDRADeletionBlocksOnExternalClaimThenDeletesSlicesBeforeClasses(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	base := completeDRAObservedGraph(t, true)
+	classFixture := newDRAFixture(t, recording.Options{
+		Capabilities: draCapabilities(),
+		Observed:     base,
+	}, 1, 1, 1)
+	_, err := classFixture.reconciler.Reconcile(context.Background(), classFixture.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	classChange := classFixture.cluster.PersistentChangeSets()[0].
+		Changes()[0].(cluster.ApplyDeviceClass)
+	withClass := cloneObservedGraph(base)
+	withClass.Objects = append(withClass.Objects, observedDeviceClass(t, classChange))
+	sliceFixture := newDRAFixture(t, recording.Options{
+		Capabilities: draCapabilities(),
+		Observed:     withClass,
+	}, 1, 1, 1)
+	_, err = sliceFixture.reconciler.Reconcile(context.Background(), sliceFixture.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sliceChange := sliceFixture.cluster.PersistentChangeSets()[0].
+		Changes()[0].(cluster.ApplyResourceSlice)
+	complete := cloneObservedGraph(withClass)
+	complete.Objects = append(
+		complete.Objects,
+		observedResourceSlice(t, sliceChange),
+	)
+	complete.ResourceClaims = []cluster.ObservedResourceClaim{{
+		Namespace:        "team-a",
+		Name:             "external",
+		UID:              "claim-uid",
+		ResourceVersion:  "31",
+		DeviceClassNames: []string{classChange.Key().Name()},
+	}}
+	blocked := newDRAFixture(t, recording.Options{
+		Capabilities: draCapabilities(),
+		Observed:     complete,
+	}, 1, 1, 1)
+	requestFixtureDeletion(t, blocked)
+	result, err := blocked.reconciler.Reconcile(context.Background(), blocked.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Requeue() || len(blocked.cluster.PersistentChangeSets()) != 0 ||
+		len(blocked.commits) != 1 ||
+		blocked.commits[0].Status.Diagnostics[0].Code != "CleanupBlocked" {
+		t.Fatalf("external DRA claim did not block deletion: %#v", blocked.commits)
+	}
+
+	unblockedGraph := cloneObservedGraph(complete)
+	unblockedGraph.ResourceClaims = nil
+	unblocked := newDRAFixture(t, recording.Options{
+		Capabilities: draCapabilities(),
+		Observed:     unblockedGraph,
+	}, 1, 1, 1)
+	requestFixtureDeletion(t, unblocked)
+	_, err = unblocked.reconciler.Reconcile(context.Background(), unblocked.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deletion := unblocked.cluster.PersistentChangeSets()[0].Changes()
+	if len(deletion) != 1 ||
+		deletion[0].Key().Kind() != cluster.ObjectKindResourceSlice {
+		t.Fatalf("DRA cleanup did not delete ResourceSlice first: %#v", deletion)
+	}
+
+	classOnly := cloneObservedGraph(withClass)
+	classOnly.Objects = append([]cluster.ObservedObject(nil), withClass.Objects...)
+	classCleanup := newDRAFixture(t, recording.Options{
+		Capabilities: draCapabilities(),
+		Observed:     classOnly,
+	}, 1, 1, 1)
+	requestFixtureDeletion(t, classCleanup)
+	_, err = classCleanup.reconciler.Reconcile(
+		context.Background(),
+		classCleanup.key,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	classDeletion := classCleanup.cluster.PersistentChangeSets()[0].Changes()
+	if len(classDeletion) != 1 ||
+		classDeletion[0].Key().Kind() != cluster.ObjectKindDeviceClass {
+		t.Fatalf("DRA cleanup did not delete DeviceClass second: %#v", classDeletion)
 	}
 }
 
@@ -959,6 +1248,51 @@ func newFixtureScenario(
 	healthy,
 	nodes int64,
 ) *fixture {
+	return newFixtureWithProjection(
+		t,
+		clusterOptions,
+		count,
+		healthy,
+		nodes,
+		"",
+		"",
+		"",
+		extended.New(),
+	)
+}
+
+func newDRAFixture(
+	t *testing.T,
+	clusterOptions recording.Options,
+	count,
+	healthy,
+	nodes int64,
+) *fixture {
+	t.Helper()
+	return newFixtureWithProjection(
+		t,
+		clusterOptions,
+		count,
+		healthy,
+		nodes,
+		"dra-control-plane",
+		"dra",
+		"device",
+		draprojection.New(),
+	)
+}
+
+func newFixtureWithProjection(
+	t *testing.T,
+	clusterOptions recording.Options,
+	count,
+	healthy,
+	nodes int64,
+	fidelity,
+	contract,
+	resourceAlias string,
+	resourceProjection projection.ResourceProjection,
+) *fixture {
 	t.Helper()
 	snapshot, err := catalog.LoadBundled()
 	if err != nil {
@@ -969,6 +1303,9 @@ func newFixtureScenario(
 		Name:                "training-lab",
 		ProfileID:           "nvidia",
 		ModelID:             "nvidia-h100",
+		Fidelity:            fidelity,
+		ContractID:          contract,
+		ResourceAlias:       resourceAlias,
 		Nodes:               nodes,
 		AcceleratorsPerNode: count,
 		HealthyPerNode:      &healthyCopy,
@@ -1046,7 +1383,7 @@ func newFixtureScenario(
 		ControlPlane: controlPlane,
 		Cluster:      clusterAdapter,
 		Catalog:      snapshot,
-		Projection:   extended.New(),
+		Projection:   resourceProjection,
 		Now:          func() time.Time { return fixedTime },
 		Commit: func(_ context.Context, intent reconcile.StatusIntent) error {
 			result.commits = append(result.commits, intent)
@@ -1070,6 +1407,45 @@ func schedulingCapabilities() cluster.TargetCapabilities {
 				GroupVersion: "coordination.k8s.io/v1",
 				Resource:     "leases",
 				Namespaced:   true,
+			},
+		},
+	}
+}
+
+func draCapabilities() cluster.TargetCapabilities {
+	ownedVerbs := []string{"get", "list", "watch", "create", "patch", "delete"}
+	return cluster.TargetCapabilities{
+		ServerVersion:   "v1.36.2",
+		KubernetesMinor: 36,
+		Resources: []cluster.ResourceCapability{
+			{GroupVersion: "v1", Resource: "nodes", Verbs: ownedVerbs},
+			{
+				GroupVersion: "v1",
+				Resource:     "pods",
+				Namespaced:   true,
+				Verbs:        []string{"get", "list", "watch"},
+			},
+			{
+				GroupVersion: "coordination.k8s.io/v1",
+				Resource:     "leases",
+				Namespaced:   true,
+				Verbs:        ownedVerbs,
+			},
+			{
+				GroupVersion: "resource.k8s.io/v1",
+				Resource:     "deviceclasses",
+				Verbs:        ownedVerbs,
+			},
+			{
+				GroupVersion: "resource.k8s.io/v1",
+				Resource:     "resourceslices",
+				Verbs:        ownedVerbs,
+			},
+			{
+				GroupVersion: "resource.k8s.io/v1",
+				Resource:     "resourceclaims",
+				Namespaced:   true,
+				Verbs:        []string{"get", "list", "watch"},
 			},
 		},
 	}
@@ -1233,4 +1609,116 @@ func completeObservedGraphWithResources(
 		},
 		Pods: pods,
 	}
+}
+
+func completeDRAObservedGraph(
+	t *testing.T,
+	unschedulable bool,
+) cluster.ObservedGraph {
+	t.Helper()
+	graph := completeObservedGraphWithResources(t, unschedulable, nil, 0, 0)
+	for index := range graph.Objects {
+		if graph.Objects[index].Node != nil {
+			graph.Objects[index].Node.Capacity = map[string]string{}
+			graph.Objects[index].Node.Allocatable = map[string]string{}
+		}
+	}
+	return graph
+}
+
+func observedDeviceClass(
+	t *testing.T,
+	change cluster.ApplyDeviceClass,
+) cluster.ObservedObject {
+	t.Helper()
+	generation, err := domain.NewGeneration(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cluster.ObservedObject{
+		Key:               change.Key(),
+		UID:               "class-uid",
+		ResourceVersion:   "21",
+		DesiredGeneration: generation,
+		DeviceClass: &cluster.ObservedDeviceClassState{
+			Selectors: change.Selectors(),
+		},
+	}
+}
+
+func observedResourceSlice(
+	t *testing.T,
+	change cluster.ApplyResourceSlice,
+) cluster.ObservedObject {
+	t.Helper()
+	generation, err := domain.NewGeneration(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cluster.ObservedObject{
+		Key:               change.Key(),
+		UID:               "slice-uid",
+		ResourceVersion:   "22",
+		DesiredGeneration: generation,
+		ResourceSlice: &cluster.ObservedResourceSliceState{
+			Driver:             change.Driver(),
+			PoolName:           change.PoolName(),
+			PoolGeneration:     change.PoolGeneration(),
+			ResourceSliceCount: change.ResourceSliceCount(),
+			NodeName:           change.NodeName(),
+			Devices:            change.Devices(),
+		},
+	}
+}
+
+func cloneObservedGraph(input cluster.ObservedGraph) cluster.ObservedGraph {
+	result := cluster.ObservedGraph{
+		Objects: make([]cluster.ObservedObject, len(input.Objects)),
+		Pods:    append([]cluster.ObservedPod(nil), input.Pods...),
+		ResourceClaims: append(
+			[]cluster.ObservedResourceClaim(nil),
+			input.ResourceClaims...,
+		),
+	}
+	for index, object := range input.Objects {
+		result.Objects[index] = object
+		if object.Node != nil {
+			node := *object.Node
+			node.Labels = cloneStringMapForTest(object.Node.Labels)
+			node.Annotations = cloneStringMapForTest(object.Node.Annotations)
+			node.Capacity = cloneStringMapForTest(object.Node.Capacity)
+			node.Allocatable = cloneStringMapForTest(object.Node.Allocatable)
+			node.Taints = append([]cluster.NodeTaint(nil), object.Node.Taints...)
+			result.Objects[index].Node = &node
+		}
+		if object.Lease != nil {
+			lease := *object.Lease
+			result.Objects[index].Lease = &lease
+		}
+		if object.DeviceClass != nil {
+			deviceClass := *object.DeviceClass
+			deviceClass.Selectors = append(
+				[]string(nil),
+				object.DeviceClass.Selectors...,
+			)
+			result.Objects[index].DeviceClass = &deviceClass
+		}
+		if object.ResourceSlice != nil {
+			resourceSlice := *object.ResourceSlice
+			resourceSlice.Devices = append(
+				[]cluster.DRADevice(nil),
+				object.ResourceSlice.Devices...,
+			)
+			result.Objects[index].ResourceSlice = &resourceSlice
+		}
+	}
+	return result
+}
+
+func cloneStringMapForTest(input map[string]string) map[string]string {
+	result := make(map[string]string, len(input))
+	for key, value := range input {
+		result[key] = value
+	}
+	return result
 }

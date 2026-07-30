@@ -496,6 +496,10 @@ func cloneStatus(status controlplane.InstanceStatus) controlplane.InstanceStatus
 		[]controlplane.InventoryEntry(nil),
 		status.Inventory...,
 	)
+	result.Fidelity = append(
+		[]controlplane.FidelitySurfaceStatus(nil),
+		status.Fidelity...,
+	)
 	result.Diagnostics = append(
 		[]controlplane.DiagnosticStatus(nil),
 		status.Diagnostics...,

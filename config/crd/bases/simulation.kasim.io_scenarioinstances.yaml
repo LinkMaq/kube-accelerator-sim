@@ -223,6 +223,29 @@ spec:
                         type: integer
                         format: int32
                         minimum: 0
+                fidelity:
+                  type: array
+                  maxItems: 32
+                  x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys:
+                    - surface
+                  items:
+                    type: object
+                    required:
+                      - surface
+                      - state
+                    properties:
+                      surface:
+                        type: string
+                        minLength: 1
+                        maxLength: 128
+                      state:
+                        type: string
+                        enum:
+                          - achieved
+                          - excluded
+                          - unavailable
+                          - out-of-scope
                 diagnostics:
                   type: array
                   maxItems: 32
