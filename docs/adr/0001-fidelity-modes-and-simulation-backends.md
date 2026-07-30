@@ -73,7 +73,8 @@ The implementation may build an internal immutable plan for zero-write preflight
 - Runtime control Pods cannot be scheduled onto simulator-managed Nodes.
 - DRA and scalar extended resources share Scenario semantics while retaining separate Kubernetes-specific Adapters.
 - The product fails closed on target identity, capability, permission, evidence, ownership, and projection conflicts.
-- The provisional 1,000-Node and 8,000-Accelerator target remains a prototype acceptance target, not a capability claim.
+- The maintained 1,000-Node and 8,000-Accelerator reference scale profile and
+  its bounded capability claim are defined by ADR 0004.
 
 ## Evidence
 
