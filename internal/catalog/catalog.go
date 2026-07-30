@@ -116,16 +116,45 @@ type ProfileView struct {
 	revision     string
 	digest       domain.Digest
 	evidence     []EvidenceReceipt
+	contracts    []ContractSummary
 	models       []ModelSummary
 }
 
 // ModelSummary is the immutable offline view of one Accelerator Model.
 type ModelSummary struct {
-	id          string
-	displayName string
-	aliases     []string
-	lifecycle   string
-	selectable  bool
+	id              string
+	displayName     string
+	aliases         []string
+	lifecycle       string
+	selectable      bool
+	contracts       []string
+	resourceAliases []string
+	evidenceRefs    []string
+}
+
+// ContractSummary is the immutable offline view of one Resource Contract.
+type ContractSummary struct {
+	id              string
+	kind            string
+	providerScope   string
+	fidelityModes   []string
+	resources       []ResourceSummary
+	identitySignals []IdentitySignalSummary
+	capabilities    map[string]string
+	evidenceRefs    []string
+}
+
+// ResourceSummary is one exact portable alias and Kubernetes-facing name.
+type ResourceSummary struct {
+	alias string
+	name  string
+	unit  string
+}
+
+// IdentitySignalSummary is one exact vendor label, annotation, or DRA key.
+type IdentitySignalSummary struct {
+	kind string
+	key  string
 }
 
 // ResolveRequest selects one exact source-backed model and Kubernetes contract.
@@ -776,15 +805,58 @@ func (snapshot Snapshot) Show(profileID string) (ProfileView, error) {
 	models := make([]ModelSummary, 0, len(profile.record.Models))
 	for _, model := range profile.record.Models {
 		models = append(models, ModelSummary{
-			id:          model.ID,
-			displayName: model.DisplayName,
-			aliases:     append([]string(nil), model.Aliases...),
-			lifecycle:   model.Lifecycle,
-			selectable:  model.Selectable,
+			id:              model.ID,
+			displayName:     model.DisplayName,
+			aliases:         append([]string(nil), model.Aliases...),
+			lifecycle:       model.Lifecycle,
+			selectable:      model.Selectable,
+			contracts:       append([]string(nil), model.Contracts...),
+			resourceAliases: append([]string(nil), model.ResourceAliases...),
+			evidenceRefs:    append([]string(nil), model.EvidenceRefs...),
 		})
 	}
 	sort.Slice(models, func(left, right int) bool {
 		return models[left].id < models[right].id
+	})
+	contracts := make([]ContractSummary, 0, len(profile.record.Contracts))
+	for _, contract := range profile.record.Contracts {
+		resources := make([]ResourceSummary, 0, len(contract.Resources))
+		for _, resource := range contract.Resources {
+			resources = append(resources, ResourceSummary{
+				alias: resource.Alias,
+				name:  resource.Name,
+				unit:  resource.Unit,
+			})
+		}
+		sort.Slice(resources, func(left, right int) bool {
+			return resources[left].alias < resources[right].alias
+		})
+		signals := make([]IdentitySignalSummary, 0, len(contract.IdentitySignals))
+		for _, signal := range contract.IdentitySignals {
+			signals = append(signals, IdentitySignalSummary{
+				kind: signal.Kind,
+				key:  signal.Key,
+			})
+		}
+		sort.Slice(signals, func(left, right int) bool {
+			if signals[left].kind != signals[right].kind {
+				return signals[left].kind < signals[right].kind
+			}
+			return signals[left].key < signals[right].key
+		})
+		contracts = append(contracts, ContractSummary{
+			id:              contract.ID,
+			kind:            contract.Kind,
+			providerScope:   contract.ProviderScope,
+			fidelityModes:   append([]string(nil), contract.FidelityModes...),
+			resources:       resources,
+			identitySignals: signals,
+			capabilities:    cloneStringMap(contract.Capabilities),
+			evidenceRefs:    append([]string(nil), contract.EvidenceRefs...),
+		})
+	}
+	sort.Slice(contracts, func(left, right int) bool {
+		return contracts[left].id < contracts[right].id
 	})
 	return ProfileView{
 		id:           profile.record.ID,
@@ -793,6 +865,7 @@ func (snapshot Snapshot) Show(profileID string) (ProfileView, error) {
 		revision:     snapshot.revision,
 		digest:       profile.digest,
 		evidence:     append([]EvidenceReceipt(nil), profile.record.Evidence...),
+		contracts:    contracts,
 		models:       models,
 	}, nil
 }
@@ -800,6 +873,11 @@ func (snapshot Snapshot) Show(profileID string) (ProfileView, error) {
 // ID returns the stable profile identifier.
 func (summary ProfileSummary) ID() string {
 	return summary.id
+}
+
+// DisplayName returns the human-facing Vendor Profile name.
+func (summary ProfileSummary) DisplayName() string {
+	return summary.displayName
 }
 
 // Class returns verified, provisional, or custom.
@@ -822,8 +900,69 @@ func (profile ProfileView) Models() []ModelSummary {
 	models := append([]ModelSummary(nil), profile.models...)
 	for index := range models {
 		models[index].aliases = append([]string(nil), models[index].aliases...)
+		models[index].contracts = append([]string(nil), models[index].contracts...)
+		models[index].resourceAliases = append(
+			[]string(nil),
+			models[index].resourceAliases...,
+		)
+		models[index].evidenceRefs = append([]string(nil), models[index].evidenceRefs...)
 	}
 	return models
+}
+
+// ID returns the exact Vendor Profile identifier.
+func (profile ProfileView) ID() string {
+	return profile.id
+}
+
+// DisplayName returns the human-facing Vendor Profile name.
+func (profile ProfileView) DisplayName() string {
+	return profile.displayName
+}
+
+// Class returns verified, provisional, or custom.
+func (profile ProfileView) Class() string {
+	return profile.profileClass
+}
+
+// Revision returns the catalog revision pinning this view.
+func (profile ProfileView) Revision() string {
+	return profile.revision
+}
+
+// Digest returns the exact immutable Vendor Profile digest.
+func (profile ProfileView) Digest() domain.Digest {
+	return profile.digest
+}
+
+// Evidence returns a copy of the receipts supporting this profile.
+func (profile ProfileView) Evidence() []EvidenceReceipt {
+	return append([]EvidenceReceipt(nil), profile.evidence...)
+}
+
+// Contracts returns deep copies in canonical contract ID order.
+func (profile ProfileView) Contracts() []ContractSummary {
+	contracts := append([]ContractSummary(nil), profile.contracts...)
+	for index := range contracts {
+		contracts[index].fidelityModes = append(
+			[]string(nil),
+			contracts[index].fidelityModes...,
+		)
+		contracts[index].resources = append(
+			[]ResourceSummary(nil),
+			contracts[index].resources...,
+		)
+		contracts[index].identitySignals = append(
+			[]IdentitySignalSummary(nil),
+			contracts[index].identitySignals...,
+		)
+		contracts[index].capabilities = cloneStringMap(contracts[index].capabilities)
+		contracts[index].evidenceRefs = append(
+			[]string(nil),
+			contracts[index].evidenceRefs...,
+		)
+	}
+	return contracts
 }
 
 // ID returns the canonical model ID.
@@ -831,10 +970,105 @@ func (model ModelSummary) ID() string {
 	return model.id
 }
 
+// DisplayName returns the human-facing model name.
+func (model ModelSummary) DisplayName() string {
+	return model.displayName
+}
+
+// Aliases returns exact accepted alternate model names.
+func (model ModelSummary) Aliases() []string {
+	return append([]string(nil), model.aliases...)
+}
+
+// Lifecycle returns the evidence lifecycle classification.
+func (model ModelSummary) Lifecycle() string {
+	return model.lifecycle
+}
+
 // Selectable reports whether the model has an applicable source-backed
 // Resource Contract.
 func (model ModelSummary) Selectable() bool {
 	return model.selectable
+}
+
+// Contracts returns compatible Resource Contract IDs.
+func (model ModelSummary) Contracts() []string {
+	return append([]string(nil), model.contracts...)
+}
+
+// ResourceAliases returns compatible portable resource aliases.
+func (model ModelSummary) ResourceAliases() []string {
+	return append([]string(nil), model.resourceAliases...)
+}
+
+// EvidenceRefs returns profile-local evidence receipt IDs.
+func (model ModelSummary) EvidenceRefs() []string {
+	return append([]string(nil), model.evidenceRefs...)
+}
+
+// ID returns the exact Resource Contract identifier.
+func (contract ContractSummary) ID() string {
+	return contract.id
+}
+
+// Kind returns extended-resource or dra.
+func (contract ContractSummary) Kind() string {
+	return contract.kind
+}
+
+// ProviderScope returns the exact catalog provider scope.
+func (contract ContractSummary) ProviderScope() string {
+	return contract.providerScope
+}
+
+// FidelityModes returns supported product Fidelity Modes.
+func (contract ContractSummary) FidelityModes() []string {
+	return append([]string(nil), contract.fidelityModes...)
+}
+
+// Resources returns exact source-backed resources in canonical alias order.
+func (contract ContractSummary) Resources() []ResourceSummary {
+	return append([]ResourceSummary(nil), contract.resources...)
+}
+
+// IdentitySignals returns exact source-backed identity keys.
+func (contract ContractSummary) IdentitySignals() []IdentitySignalSummary {
+	return append([]IdentitySignalSummary(nil), contract.identitySignals...)
+}
+
+// Capabilities returns an immutable copy of evidence states by capability.
+func (contract ContractSummary) Capabilities() map[string]string {
+	return cloneStringMap(contract.capabilities)
+}
+
+// EvidenceRefs returns profile-local evidence receipt IDs.
+func (contract ContractSummary) EvidenceRefs() []string {
+	return append([]string(nil), contract.evidenceRefs...)
+}
+
+// Alias returns the portable Scenario resource alias.
+func (resource ResourceSummary) Alias() string {
+	return resource.alias
+}
+
+// Name returns the exact Kubernetes-facing resource or driver name.
+func (resource ResourceSummary) Name() string {
+	return resource.name
+}
+
+// Unit returns the catalog unit.
+func (resource ResourceSummary) Unit() string {
+	return resource.unit
+}
+
+// Kind returns node-label, annotation, or dra-attribute.
+func (signal IdentitySignalSummary) Kind() string {
+	return signal.kind
+}
+
+// Key returns the exact signal key.
+func (signal IdentitySignalSummary) Key() string {
+	return signal.key
 }
 
 // ProfileClass returns verified, provisional, or custom.
@@ -886,4 +1120,15 @@ func (signal ResolvedIdentitySignal) Key() string {
 // Evidence returns a copy of the evidence supporting the selection.
 func (selection ResolvedSelection) Evidence() []EvidenceReceipt {
 	return append([]EvidenceReceipt(nil), selection.evidence...)
+}
+
+func cloneStringMap(values map[string]string) map[string]string {
+	if values == nil {
+		return nil
+	}
+	cloned := make(map[string]string, len(values))
+	for key, value := range values {
+		cloned[key] = value
+	}
+	return cloned
 }

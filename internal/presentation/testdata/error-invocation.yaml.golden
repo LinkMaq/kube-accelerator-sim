@@ -1,0 +1,10 @@
+apiVersion: v1alpha1
+kind: Diagnostic
+command: test
+status: failure
+diagnostic:
+  code: InvocationInvalid
+  message: token=[REDACTED]
+  retryable: false
+  revisionAccepted: false
+  exitCategory: 2

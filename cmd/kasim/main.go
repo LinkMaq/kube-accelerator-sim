@@ -1,18 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
-	"github.com/LinkMaq/kube-accelerator-sim/internal/version"
+	"github.com/LinkMaq/kube-accelerator-sim/internal/cli"
 )
 
 func main() {
-	if len(os.Args) == 2 && os.Args[1] == "version" {
-		fmt.Print(version.Human("kasim"))
-		return
-	}
-
-	fmt.Fprintln(os.Stderr, "usage: kasim version")
-	os.Exit(2)
+	os.Exit(cli.Run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }

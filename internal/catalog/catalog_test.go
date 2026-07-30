@@ -189,6 +189,57 @@ func TestBundledCatalogContainsRequiredCommonModelSeeds(t *testing.T) {
 	}
 }
 
+func TestProfileViewExposesImmutableOfflineContractEvidence(t *testing.T) {
+	t.Parallel()
+
+	snapshot, err := catalog.LoadBundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile, err := snapshot.Show("nvidia")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile.ID() != "nvidia" ||
+		profile.DisplayName() != "NVIDIA" ||
+		profile.Class() != "verified" ||
+		profile.Revision() != "2026-07-30" ||
+		profile.Digest().String() == "" {
+		t.Fatalf("incomplete profile identity: %#v", profile)
+	}
+	if len(profile.Evidence()) != 2 {
+		t.Fatalf("evidence count = %d, want 2", len(profile.Evidence()))
+	}
+	contracts := profile.Contracts()
+	if len(contracts) != 2 ||
+		contracts[0].ID() != "device-plugin" ||
+		contracts[1].ID() != "dra" {
+		t.Fatalf("unexpected contracts: %#v", contracts)
+	}
+	if contracts[0].Kind() != "extended-resource" ||
+		contracts[0].ProviderScope() != "any-kubernetes" ||
+		contracts[0].Resources()[0].Name() != "nvidia.com/gpu" ||
+		contracts[0].IdentitySignals()[0].Key() != "nvidia.com/gpu.product" ||
+		contracts[0].Capabilities()["health"] != "verified" {
+		t.Fatalf("incomplete contract view: %#v", contracts[0])
+	}
+	models := profile.Models()
+	if models[0].DisplayName() == "" ||
+		len(models[0].Aliases()) == 0 ||
+		models[0].Lifecycle() == "" ||
+		len(models[0].Contracts()) == 0 ||
+		len(models[0].ResourceAliases()) == 0 ||
+		len(models[0].EvidenceRefs()) == 0 {
+		t.Fatalf("incomplete model view: %#v", models[0])
+	}
+
+	capabilities := contracts[0].Capabilities()
+	capabilities["health"] = "forged"
+	if contracts[0].Capabilities()["health"] != "verified" {
+		t.Fatal("contract capabilities escaped immutability")
+	}
+}
+
 func TestResolutionFailsClosedOnEvidenceClassAndModelResourceCompatibility(t *testing.T) {
 	t.Parallel()
 

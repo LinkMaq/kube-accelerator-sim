@@ -1,0 +1,13 @@
+apiVersion: v1alpha1
+kind: Version
+command: version
+status: success
+result:
+  binary: kasim
+  productVersion: dev
+  sourceRevision: unknown
+  buildDate: unknown
+  schemaVersion: v1alpha1
+  catalogVersion: "2026-07-30"
+  kubernetesFloor: "1.30"
+  kubernetesCeiling: "1.36"
