@@ -364,6 +364,7 @@ type NodeFragmentInput struct {
 // ProjectionFragment contains only declarative Node fields and fidelity
 // assertions. It contains no Kubernetes object, patch, Pod, or write method.
 type ProjectionFragment struct {
+	fidelity       domain.FidelityMode
 	nodes          []NodeFragment
 	deviceClasses  []DeviceClassFragment
 	resourceSlices []ResourceSliceFragment
@@ -421,6 +422,20 @@ func NewFragment(inputs []NodeFragmentInput) (ProjectionFragment, error) {
 		return strings.Compare(left.name, right.name)
 	})
 	return ProjectionFragment{nodes: nodes}, nil
+}
+
+// WithFidelity binds a rendered fragment to the explicit mode selected by the
+// controller composition adapter. Concrete projection adapters remain usable
+// independently in contract tests.
+func (fragment ProjectionFragment) WithFidelity(
+	fidelity domain.FidelityMode,
+) ProjectionFragment {
+	fragment.fidelity = fidelity
+	return fragment
+}
+
+func (fragment ProjectionFragment) Fidelity() domain.FidelityMode {
+	return fragment.fidelity
 }
 
 // DeviceAttributeKind is the portable stable DRA v1 attribute subset used by

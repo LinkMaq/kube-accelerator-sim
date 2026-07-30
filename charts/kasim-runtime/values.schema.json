@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "controller": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["replicas", "image", "maxConcurrentReconciles", "leaderElection", "resources"],
+      "properties": {
+        "replicas": {"type": "integer", "minimum": 1, "maximum": 3},
+        "image": {"$ref": "#/$defs/productImage"},
+        "maxConcurrentReconciles": {"type": "integer", "minimum": 1, "maximum": 16},
+        "leaderElection": {"type": "boolean"},
+        "resources": {"type": "object"}
+      }
+    },
+    "kwok": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image", "resources"],
+      "properties": {
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository", "digest", "pullPolicy"],
+          "properties": {
+            "repository": {"type": "string", "minLength": 1},
+            "digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+            "pullPolicy": {"enum": ["Always", "IfNotPresent", "Never"]}
+          }
+        },
+        "resources": {"type": "object"}
+      }
+    },
+    "dra": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {"enabled": {"type": "boolean"}}
+    },
+    "serviceAccounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["controller", "observer", "operator", "stageInstaller", "kwok"],
+      "properties": {
+        "controller": {"$ref": "#/$defs/serviceAccount"},
+        "observer": {"$ref": "#/$defs/serviceAccount"},
+        "operator": {"$ref": "#/$defs/serviceAccount"},
+        "stageInstaller": {"$ref": "#/$defs/serviceAccount"},
+        "kwok": {"$ref": "#/$defs/serviceAccount"}
+      }
+    },
+    "podLabels": {"type": "object", "additionalProperties": {"type": "string"}},
+    "podAnnotations": {"type": "object", "additionalProperties": {"type": "string"}},
+    "imagePullSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {"name": {"type": "string", "minLength": 1}}
+      }
+    },
+    "nodeSelector": {"type": "object", "additionalProperties": {"type": "string"}},
+    "tolerations": {"type": "array", "items": {"type": "object"}}
+  },
+  "required": ["controller", "kwok", "dra", "serviceAccounts"],
+  "$defs": {
+    "productImage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "tag", "digest", "pullPolicy"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "tag": {"type": "string"},
+        "digest": {
+          "oneOf": [
+            {"const": ""},
+            {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}
+          ]
+        },
+        "pullPolicy": {"enum": ["Always", "IfNotPresent", "Never"]}
+      }
+    },
+    "serviceAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["annotations"],
+      "properties": {
+        "annotations": {"type": "object", "additionalProperties": {"type": "string"}}
+      }
+    }
+  }
+}

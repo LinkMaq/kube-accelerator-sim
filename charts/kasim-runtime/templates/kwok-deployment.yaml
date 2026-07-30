@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kasim-runtime.fullname" . }}-kwok-controller
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kasim-runtime.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kwok-controller
+  annotations:
+    simulation.kasim.io/kwok-version: v0.8.0
+    simulation.kasim.io/kwok-source-commit: 156033d7df7ea0e09cea82b715fe566ea68aeeb4
+    simulation.kasim.io/kwok-stage-sha256: 2f28d95564ec43056c0873f7a25ac7d2a5bba4c8496c72f8b3ee73fd4f54ee24
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      {{- include "kasim-runtime.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: kwok-controller
+  template:
+    metadata:
+      labels:
+        {{- include "kasim-runtime.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: kwok-controller
+    spec:
+      serviceAccountName: {{ include "kasim-runtime.fullname" . }}-kwok
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        {{- include "kasim-runtime.realNodeAffinity" . | nindent 8 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: kwok-controller
+          image: {{ printf "%s@%s" .Values.kwok.image.repository .Values.kwok.image.digest }}
+          imagePullPolicy: {{ .Values.kwok.image.pullPolicy }}
+          args:
+            - --config=/etc/kwok/kwok.yaml
+            - --node-ip=$(POD_IP)
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          ports:
+            - name: health
+              containerPort: 10247
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 2
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: config
+              mountPath: /etc/kwok/kwok.yaml
+              subPath: kwok.yaml
+              readOnly: true
+          resources:
+            {{- toYaml .Values.kwok.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "kasim-runtime.fullname" . }}-kwok

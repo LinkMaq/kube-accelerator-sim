@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kasim-runtime.fullname" . }}-kwok
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kasim-runtime.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kwok-controller
+  annotations:
+    simulation.kasim.io/kwok-version: v0.8.0
+    simulation.kasim.io/kwok-manifest-sha256: a4c16e6431e382dcb5c1903139344b7a68652f16a6460337fe17a678a426f405
+data:
+  kwok.yaml: |
+    apiVersion: config.kwok.x-k8s.io/v1alpha1
+    kind: KwokConfiguration
+    options:
+      enableProfilingHandler: false
+      enableContentionProfiling: false
+      enablePodsOnNodeSyncListPager: false
+      enablePodsOnNodeSyncStreamWatch: true
+      nodeLeaseParallelism: 4
+      podPlayStageParallelism: 4
+      nodePlayStageParallelism: 4
+      nodePort: 10247
+      cidr: 10.0.0.0/24
+      manageAllNodes: false
+      manageNodesWithAnnotationSelector: 'kwok.x-k8s.io/node=fake'
+      manageNodesWithLabelSelector: ''
+      manageSingleNode: ''
+      nodeLeaseDurationSeconds: 40
+      enableCRDs:
+        - Stage

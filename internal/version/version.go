@@ -44,7 +44,11 @@ func Build(binary, catalogVersion string) Info {
 }
 
 func Human(binary string) string {
-	info := Build(binary, CatalogVersion)
+	return HumanWithCatalog(binary, CatalogVersion)
+}
+
+func HumanWithCatalog(binary, catalogVersion string) string {
+	info := Build(binary, catalogVersion)
 	return fmt.Sprintf(
 		"%s %s (commit=%s, built=%s)\nschema=%s catalog=%s kubernetes=%s-%s\n",
 		info.Binary,

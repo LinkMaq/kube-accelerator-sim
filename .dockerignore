@@ -1,0 +1,8 @@
+.git
+.github
+charts
+dist
+docs
+test
+*.test
+coverage.out

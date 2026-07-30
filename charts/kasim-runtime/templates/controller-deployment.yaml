@@ -1,0 +1,93 @@
+{{- if and (gt (int .Values.controller.replicas) 1) (not .Values.controller.leaderElection) -}}
+{{- fail "controller.leaderElection must be true when controller.replicas is greater than 1" -}}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kasim-runtime.fullname" . }}-controller
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kasim-runtime.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
+  annotations:
+    simulation.kasim.io/schema-version: v1alpha1
+    simulation.kasim.io/catalog-revision: "2026-07-30"
+    simulation.kasim.io/kubernetes-range: "1.30-1.36"
+spec:
+  replicas: {{ .Values.controller.replicas }}
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      {{- include "kasim-runtime.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: controller
+  template:
+    metadata:
+      labels:
+        {{- include "kasim-runtime.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: controller
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        simulation.kasim.io/product-version: {{ .Chart.AppVersion | quote }}
+        simulation.kasim.io/schema-version: v1alpha1
+        simulation.kasim.io/catalog-revision: "2026-07-30"
+        simulation.kasim.io/kubernetes-range: "1.30-1.36"
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "kasim-runtime.fullname" . }}-controller
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        {{- include "kasim-runtime.realNodeAffinity" . | nindent 8 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: controller
+          image: {{ include "kasim-runtime.controllerImage" . }}
+          imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
+          args:
+            - --metrics-bind-address=:8080
+            - --health-probe-bind-address=:8081
+            - --max-concurrent-reconciles={{ .Values.controller.maxConcurrentReconciles }}
+            - --leader-elect={{ .Values.controller.leaderElection }}
+          ports:
+            - name: metrics
+              containerPort: 8080
+            - name: health
+              containerPort: 8081
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            {{- toYaml .Values.controller.resources | nindent 12 }}

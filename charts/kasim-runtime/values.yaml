@@ -1,0 +1,50 @@
+controller:
+  replicas: 1
+  image:
+    repository: ghcr.io/linkmaq/kube-accelerator-sim-controller
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+  maxConcurrentReconciles: 8
+  leaderElection: false
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+kwok:
+  image:
+    repository: registry.k8s.io/kwok/kwok
+    digest: sha256:6d25aa8fbdfe78845423160bf125b5513f9522e2770981f0945c2a250c2b26f0
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+dra:
+  enabled: true
+
+serviceAccounts:
+  controller:
+    annotations: {}
+  observer:
+    annotations: {}
+  operator:
+    annotations: {}
+  stageInstaller:
+    annotations: {}
+  kwok:
+    annotations: {}
+
+podLabels: {}
+podAnnotations: {}
+imagePullSecrets: []
+nodeSelector: {}
+tolerations: []

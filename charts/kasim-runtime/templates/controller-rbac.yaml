@@ -1,0 +1,49 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "kasim-runtime.fullname" . }}-controller
+  labels:
+    {{- include "kasim-runtime.labels" . | nindent 4 }}
+    simulation.kasim.io/persona: controller
+rules:
+  - apiGroups: [simulation.kasim.io]
+    resources: [scenarioinstances]
+    verbs: [get, list, watch, update, patch]
+  - apiGroups: [simulation.kasim.io]
+    resources: [scenarioinstances/status]
+    verbs: [get, update, patch]
+  - apiGroups: [""]
+    resources: [nodes]
+    verbs: [get, list, watch, create, patch, delete]
+  - apiGroups: [""]
+    resources: [nodes/status]
+    verbs: [get, update, patch]
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, watch]
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    verbs: [get, list, watch, create, update, patch, delete]
+  {{- if .Values.dra.enabled }}
+  - apiGroups: [resource.k8s.io]
+    resources: [deviceclasses, resourceslices]
+    verbs: [get, list, watch, create, patch, delete]
+  - apiGroups: [resource.k8s.io]
+    resources: [resourceclaims]
+    verbs: [get, list, watch]
+  {{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "kasim-runtime.fullname" . }}-controller
+  labels:
+    {{- include "kasim-runtime.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "kasim-runtime.fullname" . }}-controller
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "kasim-runtime.fullname" . }}-controller
+    namespace: {{ .Release.Namespace }}

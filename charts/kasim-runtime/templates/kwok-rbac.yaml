@@ -1,0 +1,41 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "kasim-runtime.fullname" . }}-kwok-controller
+  labels:
+    {{- include "kasim-runtime.labels" . | nindent 4 }}
+    simulation.kasim.io/persona: kwok-controller
+rules:
+  - apiGroups: [""]
+    resources: [nodes]
+    verbs: [get, list, watch]
+  - apiGroups: [""]
+    resources: [nodes/status]
+    verbs: [patch, update]
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, watch, delete]
+  - apiGroups: [""]
+    resources: [pods/status]
+    verbs: [patch, update]
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    verbs: [get, list, watch, create, update, patch]
+  - apiGroups: [kwok.x-k8s.io]
+    resources: [stages]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "kasim-runtime.fullname" . }}-kwok-controller
+  labels:
+    {{- include "kasim-runtime.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "kasim-runtime.fullname" . }}-kwok-controller
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "kasim-runtime.fullname" . }}-kwok
+    namespace: {{ .Release.Namespace }}

@@ -1,0 +1,108 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "kasim-runtime.fullname" . }}-stage-apply
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kasim-runtime.labels" . | nindent 4 }}
+    app.kubernetes.io/component: stage-installer
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    simulation.kasim.io/kwok-stage-sha256: 2f28d95564ec43056c0873f7a25ac7d2a5bba4c8496c72f8b3ee73fd4f54ee24
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 120
+  template:
+    metadata:
+      labels:
+        {{- include "kasim-runtime.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: stage-installer
+    spec:
+      serviceAccountName: {{ include "kasim-runtime.fullname" . }}-stage-installer
+      automountServiceAccountToken: true
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        {{- include "kasim-runtime.realNodeAffinity" . | nindent 8 }}
+      containers:
+        - name: stage-installer
+          image: {{ include "kasim-runtime.controllerImage" . }}
+          imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
+          args:
+            - --kwok-stage-operation=apply
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "kasim-runtime.fullname" . }}-stage-delete
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kasim-runtime.labels" . | nindent 4 }}
+    app.kubernetes.io/component: stage-installer
+  annotations:
+    helm.sh/hook: pre-delete
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 120
+  template:
+    metadata:
+      labels:
+        {{- include "kasim-runtime.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: stage-installer
+    spec:
+      serviceAccountName: {{ include "kasim-runtime.fullname" . }}-stage-installer
+      automountServiceAccountToken: true
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        {{- include "kasim-runtime.realNodeAffinity" . | nindent 8 }}
+      containers:
+        - name: stage-installer
+          image: {{ include "kasim-runtime.controllerImage" . }}
+          imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
+          args:
+            - --kwok-stage-operation=delete
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi

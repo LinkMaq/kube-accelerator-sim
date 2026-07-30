@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "v1alpha1",
+  "productVersion": "0.1.0",
+  "goVersion": "1.26.0",
+  "kubernetesDependencies": "0.36.3",
+  "controllerRuntime": "0.24.1",
+  "controllerImage": {
+    "platforms": [
+      "linux/amd64",
+      "linux/arm64"
+    ],
+    "builder": "golang:1.26.0-alpine3.23@sha256:d4c4845f5d60c6a974c6000ce58ae079328d03ab7f721a0734277e69905473e5",
+    "runtime": "gcr.io/distroless/static-debian13:nonroot@sha256:f7f8f729987ad0fdf6b05eeeae94b26e6a0f613bdf46feea7fc40f7bd72953e6"
+  },
+  "catalog": {
+    "revision": "2026-07-30",
+    "sha256": "571e5b3d6a59e5aa641cbb61c6719914140c5e031b38ff08feacb0642a72c260"
+  },
+  "catalogSchema": {
+    "version": "v1alpha1",
+    "sha256": "c06cf488cd66fb6efff3c3aafc9a16584419d9bf9a5c2d974a634429066bcf01"
+  },
+  "productCRD": {
+    "version": "simulation.kasim.io/v1alpha1",
+    "sha256": "6edf364b62e22de7deb05e817a865601cfce0af9943a73f85c4a8bddb0d15be9"
+  },
+  "compatibility": {
+    "kubernetesFloor": "1.30",
+    "kubernetesCeiling": "1.36",
+    "stableDRAFloor": "1.34"
+  },
+  "kwok": {
+    "version": "v0.8.0",
+    "sourceCommit": "156033d7df7ea0e09cea82b715fe566ea68aeeb4",
+    "manifestSHA256": "a4c16e6431e382dcb5c1903139344b7a68652f16a6460337fe17a678a426f405",
+    "stageSHA256": "2f28d95564ec43056c0873f7a25ac7d2a5bba4c8496c72f8b3ee73fd4f54ee24",
+    "stageCRDSHA256": "7140ccc35f9e3733a013bd89ba34c9252e2444b6c2cc2275e632e4decd605bd6",
+    "image": "registry.k8s.io/kwok/kwok@sha256:6d25aa8fbdfe78845423160bf125b5513f9522e2770981f0945c2a250c2b26f0",
+    "platformManifests": {
+      "linux/amd64": "sha256:28ee38abba19bd0b89600b1b367c32480da45f1d954c80d14db5fc74feee83f2",
+      "linux/arm64": "sha256:b9de5357c7cb1312728b17bbb1bb703e463c6b5306a2b5af266c2cfee60f1c2c"
+    }
+  },
+  "dependencyLocks": [
+    "go.sum",
+    "charts/kasim-runtime/Chart.yaml",
+    "charts/kasim-runtime/values.schema.json"
+  ]
+}
