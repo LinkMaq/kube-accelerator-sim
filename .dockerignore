@@ -4,5 +4,11 @@ charts
 dist
 docs
 test
+!test
+test/*
+!test/oracle
+test/oracle/*
+!test/oracle/deviceplugin
+!test/oracle/deviceplugin/**
 *.test
 coverage.out

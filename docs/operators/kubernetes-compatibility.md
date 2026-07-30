@@ -56,4 +56,6 @@ resource accounting. It does not prove Pod execution, physical Accelerator
 access, Accelerator computation, device-plugin gRPC, CDI injection, or DRA
 node preparation. The stable DRA suite proves control-plane allocation only;
 the separate protocol oracle covers node-runtime protocol behavior without
-turning that evidence into a physical-hardware claim.
+turning that evidence into a physical-hardware claim. Its isolated workflow,
+evidence schema, and exclusions are documented in
+[`kubelet-protocol-oracle.md`](kubelet-protocol-oracle.md).
