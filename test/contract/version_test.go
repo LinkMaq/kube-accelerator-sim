@@ -20,7 +20,7 @@ func TestProductBinariesReportVersionMetadata(t *testing.T) {
 			want: []string{
 				"kasim dev",
 				"schema=v1alpha1",
-				"catalog=unavailable",
+				"catalog=2026-07-30",
 				"kubernetes=1.30-1.36",
 			},
 		},
