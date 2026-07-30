@@ -103,6 +103,7 @@ type InstanceRecord struct {
 	Name               domain.Name
 	InstanceUID        domain.InstanceUID
 	ResourceVersion    string
+	DeletionRequested  bool
 	CreationIdentity   string
 	Fidelity           domain.FidelityMode
 	DesiredGeneration  domain.Generation

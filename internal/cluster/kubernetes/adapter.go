@@ -13,11 +13,13 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/version"
 	coordinationapplyv1 "k8s.io/client-go/applyconfigurations/coordination/v1"
 	coreapplyv1 "k8s.io/client-go/applyconfigurations/core/v1"
+	metav1apply "k8s.io/client-go/applyconfigurations/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 
 	"github.com/LinkMaq/kube-accelerator-sim/internal/cluster"
@@ -256,6 +258,7 @@ func (adapter *Adapter) Observe(
 	}
 	selector := ownershipSelector(scope.InstanceUID().String())
 	objects := make([]cluster.ObservedObject, 0)
+	ownedNodeNames := make([]string, 0)
 	continueToken := ""
 	for {
 		result, err := adapter.client.CoreV1().Nodes().List(
@@ -280,12 +283,15 @@ func (adapter *Adapter) Observe(
 				result.Items[index].UID,
 				result.Items[index].ResourceVersion,
 				result.Items[index].Labels,
+				result.Items[index].OwnerReferences,
 				scope,
 			)
 			if err != nil {
 				return cluster.ObservedGraph{}, err
 			}
+			object.Node = observedNodeState(&result.Items[index])
 			objects = append(objects, object)
+			ownedNodeNames = append(ownedNodeNames, result.Items[index].Name)
 			if len(objects) > cluster.MaximumObservedObjects {
 				return cluster.ObservedGraph{}, cluster.NewError(
 					cluster.ErrorCapabilityUnavailable,
@@ -322,11 +328,13 @@ func (adapter *Adapter) Observe(
 				result.Items[index].UID,
 				result.Items[index].ResourceVersion,
 				result.Items[index].Labels,
+				result.Items[index].OwnerReferences,
 				scope,
 			)
 			if err != nil {
 				return cluster.ObservedGraph{}, err
 			}
+			object.Lease = observedLeaseState(&result.Items[index])
 			objects = append(objects, object)
 			if len(objects) > cluster.MaximumObservedObjects {
 				return cluster.ObservedGraph{}, cluster.NewError(
@@ -341,7 +349,58 @@ func (adapter *Adapter) Observe(
 			break
 		}
 	}
-	return cluster.ObservedGraph{Objects: objects}, nil
+	slices.Sort(ownedNodeNames)
+	pods := make([]cluster.ObservedPod, 0)
+	for _, nodeName := range ownedNodeNames {
+		continueToken = ""
+		for {
+			result, err := adapter.client.CoreV1().Pods(metav1.NamespaceAll).List(
+				ctx,
+				metav1.ListOptions{
+					FieldSelector: fields.OneTermEqualSelector(
+						"spec.nodeName",
+						nodeName,
+					).String(),
+					Limit:    discoveryPageSize,
+					Continue: continueToken,
+				},
+			)
+			if err != nil {
+				return cluster.ObservedGraph{}, classify(
+					"observe Pods bound to owned Nodes",
+					err,
+				)
+			}
+			for index := range result.Items {
+				pod := &result.Items[index]
+				// The field selector is the authoritative server-side bound,
+				// while this equality check also protects test clients and
+				// proxies that do not enforce field selectors.
+				if pod.Spec.NodeName != nodeName {
+					continue
+				}
+				pods = append(pods, observedPod(pod))
+				if len(pods) > cluster.MaximumObservedPods {
+					return cluster.ObservedGraph{}, cluster.NewError(
+						cluster.ErrorCapabilityUnavailable,
+						"owned-node Pod observation exceeded its bounded limit",
+						false,
+					)
+				}
+			}
+			continueToken = result.Continue
+			if continueToken == "" {
+				break
+			}
+		}
+	}
+	slices.SortFunc(pods, func(left, right cluster.ObservedPod) int {
+		if compared := strings.Compare(left.Namespace, right.Namespace); compared != 0 {
+			return compared
+		}
+		return strings.Compare(left.Name, right.Name)
+	})
+	return cluster.ObservedGraph{Objects: objects, Pods: pods}, nil
 }
 
 func (adapter *Adapter) Execute(
@@ -408,6 +467,9 @@ func (adapter *Adapter) applySyntheticNode(
 	dryRun bool,
 ) error {
 	objectLabels := change.Labels()
+	if objectLabels == nil {
+		objectLabels = make(map[string]string)
+	}
 	addOwnershipLabels(objectLabels, scope)
 	taints := make([]corev1.Taint, 0, len(change.Taints()))
 	applyTaints := make(
@@ -431,13 +493,15 @@ func (adapter *Adapter) applySyntheticNode(
 	options := applyOptions(dryRun)
 	preconditions := change.Preconditions()
 	if preconditions.UID == "" {
+		ownerReferences := ownerReferences(scope)
 		_, err := adapter.client.CoreV1().Nodes().Create(
 			ctx,
 			&corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        change.Key().Name(),
-					Labels:      objectLabels,
-					Annotations: change.Annotations(),
+					Name:            change.Key().Name(),
+					Labels:          objectLabels,
+					Annotations:     change.Annotations(),
+					OwnerReferences: ownerReferences,
 				},
 				Spec: corev1.NodeSpec{
 					Unschedulable: change.Unschedulable(),
@@ -471,6 +535,7 @@ func (adapter *Adapter) applySyntheticNode(
 		current.Labels,
 		current.UID,
 		current.ResourceVersion,
+		current.OwnerReferences,
 		scope,
 		preconditions,
 	); err != nil {
@@ -486,6 +551,9 @@ func (adapter *Adapter) applySyntheticNode(
 				WithUnschedulable(change.Unschedulable()).
 				WithTaints(applyTaints...),
 		)
+	if owner := ownerReferenceApply(scope); owner != nil {
+		configuration = configuration.WithOwnerReferences(owner)
+	}
 	_, err = adapter.client.CoreV1().Nodes().Apply(
 		ctx,
 		configuration,
@@ -513,6 +581,7 @@ func (adapter *Adapter) updateSyntheticNodeStatus(
 		current.Labels,
 		current.UID,
 		current.ResourceVersion,
+		current.OwnerReferences,
 		scope,
 		change.Preconditions(),
 	); err != nil {
@@ -526,28 +595,29 @@ func (adapter *Adapter) updateSyntheticNodeStatus(
 	if err != nil {
 		return err
 	}
-	readyStatus := corev1.ConditionFalse
-	if change.Ready() {
-		readyStatus = corev1.ConditionTrue
+	status := coreapplyv1.NodeStatus().
+		WithCapacity(capacity).
+		WithAllocatable(allocatable)
+	if change.ManagesReady() {
+		readyStatus := corev1.ConditionFalse
+		if change.Ready() {
+			readyStatus = corev1.ConditionTrue
+		}
+		observedAt := metav1.NewTime(change.ObservedAt())
+		status = status.WithConditions(
+			coreapplyv1.NodeCondition().
+				WithType(corev1.NodeReady).
+				WithStatus(readyStatus).
+				WithReason("KubeAcceleratorSimObserved").
+				WithMessage("Synthetic Node status is reconciled").
+				WithLastHeartbeatTime(observedAt).
+				WithLastTransitionTime(observedAt),
+		)
 	}
-	observedAt := metav1.NewTime(change.ObservedAt())
 	configuration := coreapplyv1.Node(change.Key().Name()).
 		WithUID(current.UID).
 		WithResourceVersion(current.ResourceVersion).
-		WithStatus(
-			coreapplyv1.NodeStatus().
-				WithCapacity(capacity).
-				WithAllocatable(allocatable).
-				WithConditions(
-					coreapplyv1.NodeCondition().
-						WithType(corev1.NodeReady).
-						WithStatus(readyStatus).
-						WithReason("KubeAcceleratorSimObserved").
-						WithMessage("Synthetic Node status is reconciled").
-						WithLastHeartbeatTime(observedAt).
-						WithLastTransitionTime(observedAt),
-				),
-		)
+		WithStatus(status)
 	_, err = adapter.client.CoreV1().Nodes().ApplyStatus(
 		ctx,
 		configuration,
@@ -570,13 +640,15 @@ func (adapter *Adapter) applyLease(
 	options := applyOptions(dryRun)
 	preconditions := change.Preconditions()
 	if preconditions.UID == "" {
+		ownerReferences := ownerReferences(scope)
 		_, err := adapter.client.CoordinationV1().
 			Leases(change.Key().Namespace()).
 			Create(ctx, &coordinationv1.Lease{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: change.Key().Namespace(),
-					Name:      change.Key().Name(),
-					Labels:    objectLabels,
+					Namespace:       change.Key().Namespace(),
+					Name:            change.Key().Name(),
+					Labels:          objectLabels,
+					OwnerReferences: ownerReferences,
 				},
 				Spec: coordinationv1.LeaseSpec{
 					HolderIdentity:       &holderIdentity,
@@ -607,6 +679,7 @@ func (adapter *Adapter) applyLease(
 		current.Labels,
 		current.UID,
 		current.ResourceVersion,
+		current.OwnerReferences,
 		scope,
 		preconditions,
 	); err != nil {
@@ -625,6 +698,9 @@ func (adapter *Adapter) applyLease(
 				WithLeaseDurationSeconds(duration).
 				WithRenewTime(renewTime),
 		)
+	if owner := ownerReferenceApply(scope); owner != nil {
+		configuration = configuration.WithOwnerReferences(owner)
+	}
 	_, err = adapter.client.CoordinationV1().
 		Leases(change.Key().Namespace()).
 		Apply(ctx, configuration, options)
@@ -642,6 +718,7 @@ func (adapter *Adapter) deleteOwned(
 	var labels map[string]string
 	var actualUID types.UID
 	var resourceVersion string
+	var objectOwnerReferences []metav1.OwnerReference
 	switch key.Kind() {
 	case cluster.ObjectKindNode:
 		object, err := adapter.client.CoreV1().Nodes().Get(
@@ -655,6 +732,7 @@ func (adapter *Adapter) deleteOwned(
 		labels = object.Labels
 		actualUID = object.UID
 		resourceVersion = object.ResourceVersion
+		objectOwnerReferences = object.OwnerReferences
 	case cluster.ObjectKindLease:
 		object, err := adapter.client.CoordinationV1().
 			Leases(key.Namespace()).
@@ -665,6 +743,7 @@ func (adapter *Adapter) deleteOwned(
 		labels = object.Labels
 		actualUID = object.UID
 		resourceVersion = object.ResourceVersion
+		objectOwnerReferences = object.OwnerReferences
 	default:
 		return cluster.NewError(
 			cluster.ErrorInvalidIntent,
@@ -677,6 +756,7 @@ func (adapter *Adapter) deleteOwned(
 		labels,
 		actualUID,
 		resourceVersion,
+		objectOwnerReferences,
 		scope,
 		preconditions,
 	); err != nil {
@@ -717,6 +797,7 @@ func validateOwnedMetadata(
 	objectLabels map[string]string,
 	actualUID types.UID,
 	resourceVersion string,
+	objectOwnerReferences []metav1.OwnerReference,
 	scope cluster.OwnershipScope,
 	preconditions cluster.ObjectPreconditions,
 ) error {
@@ -731,6 +812,9 @@ func validateOwnedMetadata(
 			),
 			false,
 		)
+	}
+	if err := validateOwnerReference(objectOwnerReferences, scope); err != nil {
+		return err
 	}
 	if string(actualUID) != preconditions.UID {
 		return cluster.NewError(
@@ -763,6 +847,37 @@ func addOwnershipLabels(
 		scope.DesiredGeneration().Value(),
 		10,
 	)
+}
+
+func ownerReferences(scope cluster.OwnershipScope) []metav1.OwnerReference {
+	if scope.InstanceName().String() == "" {
+		return nil
+	}
+	controller := true
+	blockOwnerDeletion := true
+	return []metav1.OwnerReference{{
+		APIVersion:         "simulation.kasim.io/v1alpha1",
+		Kind:               "ScenarioInstance",
+		Name:               scope.InstanceName().String(),
+		UID:                types.UID(scope.InstanceUID().String()),
+		Controller:         &controller,
+		BlockOwnerDeletion: &blockOwnerDeletion,
+	}}
+}
+
+func ownerReferenceApply(
+	scope cluster.OwnershipScope,
+) *metav1apply.OwnerReferenceApplyConfiguration {
+	if scope.InstanceName().String() == "" {
+		return nil
+	}
+	return metav1apply.OwnerReference().
+		WithAPIVersion("simulation.kasim.io/v1alpha1").
+		WithKind("ScenarioInstance").
+		WithName(scope.InstanceName().String()).
+		WithUID(types.UID(scope.InstanceUID().String())).
+		WithController(true).
+		WithBlockOwnerDeletion(true)
 }
 
 func applyOptions(dryRun bool) metav1.ApplyOptions {
@@ -807,6 +922,7 @@ func observedObject(
 	uid types.UID,
 	resourceVersion string,
 	objectLabels map[string]string,
+	objectOwnerReferences []metav1.OwnerReference,
 	scope cluster.OwnershipScope,
 ) (cluster.ObservedObject, error) {
 	if objectLabels[cluster.ManagedByLabel] != cluster.ManagedByValue ||
@@ -816,6 +932,9 @@ func observedObject(
 			"owned-object selector returned an object with conflicting identity",
 			false,
 		)
+	}
+	if err := validateOwnerReference(objectOwnerReferences, scope); err != nil {
+		return cluster.ObservedObject{}, err
 	}
 	value, err := strconv.ParseInt(
 		objectLabels[cluster.DesiredGenerationLabel],
@@ -846,6 +965,153 @@ func observedObject(
 		ResourceVersion:   resourceVersion,
 		DesiredGeneration: generation,
 	}, nil
+}
+
+func validateOwnerReference(
+	references []metav1.OwnerReference,
+	scope cluster.OwnershipScope,
+) error {
+	if scope.InstanceName().String() == "" {
+		return nil
+	}
+	for _, reference := range references {
+		if reference.APIVersion == "simulation.kasim.io/v1alpha1" &&
+			reference.Kind == "ScenarioInstance" &&
+			reference.Name == scope.InstanceName().String() &&
+			string(reference.UID) == scope.InstanceUID().String() &&
+			reference.Controller != nil &&
+			*reference.Controller &&
+			reference.BlockOwnerDeletion != nil &&
+			*reference.BlockOwnerDeletion {
+			return nil
+		}
+	}
+	return cluster.NewError(
+		cluster.ErrorOwnershipConflict,
+		"owned object has no exact Scenario Instance controller owner reference",
+		false,
+	)
+}
+
+func observedNodeState(node *corev1.Node) *cluster.ObservedNodeState {
+	taints := make([]cluster.NodeTaint, 0, len(node.Spec.Taints))
+	for _, taint := range node.Spec.Taints {
+		taints = append(taints, cluster.NodeTaint{
+			Key:    taint.Key,
+			Value:  taint.Value,
+			Effect: string(taint.Effect),
+		})
+	}
+	ready := false
+	for _, condition := range node.Status.Conditions {
+		if condition.Type == corev1.NodeReady {
+			ready = condition.Status == corev1.ConditionTrue
+			break
+		}
+	}
+	return &cluster.ObservedNodeState{
+		Labels:        cloneStringMap(node.Labels),
+		Annotations:   cloneStringMap(node.Annotations),
+		Taints:        taints,
+		Unschedulable: node.Spec.Unschedulable,
+		Capacity:      encodedResourceList(node.Status.Capacity),
+		Allocatable:   encodedResourceList(node.Status.Allocatable),
+		Ready:         ready,
+	}
+}
+
+func observedLeaseState(lease *coordinationv1.Lease) *cluster.ObservedLeaseState {
+	state := &cluster.ObservedLeaseState{}
+	if lease.Spec.HolderIdentity != nil {
+		state.HolderIdentity = *lease.Spec.HolderIdentity
+	}
+	if lease.Spec.LeaseDurationSeconds != nil {
+		state.LeaseDurationSeconds = *lease.Spec.LeaseDurationSeconds
+	}
+	if lease.Spec.RenewTime != nil {
+		state.RenewTime = lease.Spec.RenewTime.Time
+	}
+	return state
+}
+
+func observedPod(pod *corev1.Pod) cluster.ObservedPod {
+	return cluster.ObservedPod{
+		Namespace: pod.Namespace,
+		Name:      pod.Name,
+		UID:       string(pod.UID),
+		NodeName:  pod.Spec.NodeName,
+		Phase:     string(pod.Status.Phase),
+		Requested: encodedResourceList(effectivePodRequests(pod)),
+	}
+}
+
+func effectivePodRequests(pod *corev1.Pod) corev1.ResourceList {
+	regular := corev1.ResourceList{}
+	for _, container := range pod.Spec.Containers {
+		addResourceList(regular, container.Resources.Requests)
+	}
+
+	restartableInit := corev1.ResourceList{}
+	initMaximum := corev1.ResourceList{}
+	for _, container := range pod.Spec.InitContainers {
+		current := cloneResourceList(restartableInit)
+		if container.RestartPolicy != nil &&
+			*container.RestartPolicy == corev1.ContainerRestartPolicyAlways {
+			addResourceList(restartableInit, container.Resources.Requests)
+			current = cloneResourceList(restartableInit)
+		} else {
+			addResourceList(current, container.Resources.Requests)
+		}
+		maxResourceList(initMaximum, current)
+	}
+	addResourceList(regular, restartableInit)
+	maxResourceList(regular, initMaximum)
+	addResourceList(regular, pod.Spec.Overhead)
+	return regular
+}
+
+func addResourceList(target, values corev1.ResourceList) {
+	for name, value := range values {
+		current := target[name]
+		current.Add(value)
+		target[name] = current
+	}
+}
+
+func maxResourceList(target, values corev1.ResourceList) {
+	for name, value := range values {
+		current, found := target[name]
+		if !found || current.Cmp(value) < 0 {
+			target[name] = value.DeepCopy()
+		}
+	}
+}
+
+func cloneResourceList(input corev1.ResourceList) corev1.ResourceList {
+	result := make(corev1.ResourceList, len(input))
+	for name, value := range input {
+		result[name] = value.DeepCopy()
+	}
+	return result
+}
+
+func encodedResourceList(input corev1.ResourceList) map[string]string {
+	result := make(map[string]string, len(input))
+	for name, value := range input {
+		result[string(name)] = value.String()
+	}
+	return result
+}
+
+func cloneStringMap(input map[string]string) map[string]string {
+	if input == nil {
+		return nil
+	}
+	result := make(map[string]string, len(input))
+	for key, value := range input {
+		result[key] = value
+	}
+	return result
 }
 
 func ownershipSelector(instanceUID string) string {

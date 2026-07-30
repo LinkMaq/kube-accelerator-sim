@@ -20,6 +20,7 @@ const (
 	DesiredGenerationLabel = "simulation.kasim.io/desired-generation"
 	MaximumOwnedChanges    = 4096
 	MaximumObservedObjects = 16384
+	MaximumObservedPods    = 65536
 )
 
 // TargetSelection identifies exactly one context in exactly one kubeconfig.
@@ -85,6 +86,7 @@ func (requirement AccessRequirement) Validate() error {
 // OwnershipScope is the exact immutable root used for observation and every
 // owned mutation.
 type OwnershipScope struct {
+	instanceName      domain.Name
 	instanceUID       domain.InstanceUID
 	desiredGeneration domain.Generation
 }
@@ -107,6 +109,28 @@ func NewOwnershipScope(
 		instanceUID:       instanceUID,
 		desiredGeneration: desiredGeneration,
 	}, nil
+}
+
+// NewInstanceOwnershipScope adds the cluster-scoped Scenario Instance name
+// needed for the strongest legal Kubernetes owner reference.
+func NewInstanceOwnershipScope(
+	instanceName domain.Name,
+	instanceUID domain.InstanceUID,
+	desiredGeneration domain.Generation,
+) (OwnershipScope, error) {
+	if instanceName.String() == "" {
+		return OwnershipScope{}, fmt.Errorf("ownership scope requires an instance name")
+	}
+	scope, err := NewOwnershipScope(instanceUID, desiredGeneration)
+	if err != nil {
+		return OwnershipScope{}, err
+	}
+	scope.instanceName = instanceName
+	return scope, nil
+}
+
+func (scope OwnershipScope) InstanceName() domain.Name {
+	return scope.instanceName
 }
 
 func (scope OwnershipScope) InstanceUID() domain.InstanceUID {
@@ -213,11 +237,45 @@ type ObservedObject struct {
 	UID               string
 	ResourceVersion   string
 	DesiredGeneration domain.Generation
+	Node              *ObservedNodeState
+	Lease             *ObservedLeaseState
+}
+
+// ObservedNodeState is the bounded scheduler-visible state of an exactly
+// owned Synthetic Node.
+type ObservedNodeState struct {
+	Labels        map[string]string
+	Annotations   map[string]string
+	Taints        []NodeTaint
+	Unschedulable bool
+	Capacity      map[string]string
+	Allocatable   map[string]string
+	Ready         bool
+}
+
+// ObservedLeaseState is the bounded heartbeat state of one exact Node Lease.
+type ObservedLeaseState struct {
+	HolderIdentity       string
+	LeaseDurationSeconds int32
+	RenewTime            time.Time
+}
+
+// ObservedPod is read-only blocker and resource-accounting evidence for a Pod
+// bound to an owned Synthetic Node. Pods are intentionally not ObjectKinds
+// and can never enter an OwnedChangeSet.
+type ObservedPod struct {
+	Namespace string
+	Name      string
+	UID       string
+	NodeName  string
+	Phase     string
+	Requested map[string]string
 }
 
 // ObservedGraph is a bounded exact-UID observation.
 type ObservedGraph struct {
 	Objects []ObservedObject
+	Pods    []ObservedPod
 }
 
 // ChangeKind is a closed intention, not a Kubernetes verb or patch type.
@@ -388,6 +446,7 @@ func (ApplySyntheticNode) isOwnedChange() {}
 type SyntheticNodeStatusInput struct {
 	Capacity    map[string]string
 	Allocatable map[string]string
+	ManageReady bool
 	Ready       bool
 	ObservedAt  time.Time
 }
@@ -398,6 +457,7 @@ type UpdateSyntheticNodeStatus struct {
 	preconditions ObjectPreconditions
 	capacity      map[string]string
 	allocatable   map[string]string
+	manageReady   bool
 	ready         bool
 	observedAt    time.Time
 }
@@ -428,6 +488,7 @@ func NewUpdateSyntheticNodeStatus(
 		preconditions: preconditions,
 		capacity:      cloneStringMap(input.Capacity),
 		allocatable:   cloneStringMap(input.Allocatable),
+		manageReady:   input.ManageReady,
 		ready:         input.Ready,
 		observedAt:    input.ObservedAt.UTC(),
 	}, nil
@@ -455,6 +516,10 @@ func (change UpdateSyntheticNodeStatus) Allocatable() map[string]string {
 
 func (change UpdateSyntheticNodeStatus) Ready() bool {
 	return change.ready
+}
+
+func (change UpdateSyntheticNodeStatus) ManagesReady() bool {
+	return change.manageReady
 }
 
 func (change UpdateSyntheticNodeStatus) ObservedAt() time.Time {

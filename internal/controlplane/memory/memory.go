@@ -89,6 +89,44 @@ func (adapter *Adapter) Read(
 	return controlplane.CloneRecord(record), nil
 }
 
+// RequestDeletion marks one stored Scenario Instance as deleting. It is
+// concrete test/control-plane fixture plumbing rather than part of the public
+// Scenario Control Plane seam, whose deletion signal is read from the durable
+// record.
+func (adapter *Adapter) RequestDeletion(
+	_ context.Context,
+	key controlplane.InstanceKey,
+) error {
+	adapter.mutex.Lock()
+	defer adapter.mutex.Unlock()
+
+	storageKey := recordKey(key)
+	record, found := adapter.records[storageKey]
+	if !found {
+		return controlplane.NewError(
+			controlplane.ErrorNotFound,
+			fmt.Sprintf("Scenario Instance %q was not found", key.Name.String()),
+			"",
+		)
+	}
+	if record.Target.Fingerprint != key.TargetFingerprint {
+		return controlplane.NewError(
+			controlplane.ErrorTargetMismatch,
+			"Scenario Instance target fingerprint does not match the explicit target",
+			"",
+		)
+	}
+	if record.DeletionRequested {
+		return nil
+	}
+	adapter.nextVersion++
+	record.ResourceVersion = strconv.FormatUint(adapter.nextVersion, 10)
+	record.DeletionRequested = true
+	adapter.records[storageKey] = record
+	adapter.recordEvent(storageKey, record)
+	return nil
+}
+
 // Submit atomically enforces immutable identity and optimistic preconditions.
 func (adapter *Adapter) Submit(
 	_ context.Context,

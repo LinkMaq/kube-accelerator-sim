@@ -230,6 +230,127 @@ func TestAdapterObservesOnlyExactUIDOwnedNodesAndLeases(t *testing.T) {
 	}
 }
 
+func TestAdapterObservesSchedulerStateLeaseHeartbeatAndBoundPodRequests(t *testing.T) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 3)
+	ownedLabels := ownershipLabels(scope)
+	renewTime := metav1.NewMicroTime(time.Date(2026, 7, 30, 7, 0, 0, 0, time.UTC))
+	holder := "owned-node"
+	duration := int32(40)
+	kubernetesClient := kubernetesfake.NewSimpleClientset(
+		&corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "owned-node",
+				UID:             types.UID("node-uid"),
+				ResourceVersion: "11",
+				Labels:          ownedLabels,
+				Annotations:     map[string]string{"kwok.x-k8s.io/node": "fake"},
+			},
+			Spec: corev1.NodeSpec{
+				Unschedulable: true,
+				Taints: []corev1.Taint{{
+					Key: "accelerator", Value: "simulated", Effect: corev1.TaintEffectNoSchedule,
+				}},
+			},
+			Status: corev1.NodeStatus{
+				Capacity: corev1.ResourceList{
+					corev1.ResourceName("nvidia.com/gpu"): resource.MustParse("8"),
+				},
+				Allocatable: corev1.ResourceList{
+					corev1.ResourceName("nvidia.com/gpu"): resource.MustParse("6"),
+				},
+				Conditions: []corev1.NodeCondition{{
+					Type: corev1.NodeReady, Status: corev1.ConditionTrue,
+				}},
+			},
+		},
+		&coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:       "kube-node-lease",
+				Name:            "owned-node",
+				UID:             types.UID("lease-uid"),
+				ResourceVersion: "13",
+				Labels:          ownedLabels,
+			},
+			Spec: coordinationv1.LeaseSpec{
+				HolderIdentity:       &holder,
+				LeaseDurationSeconds: &duration,
+				RenewTime:            &renewTime,
+			},
+		},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "team-a", Name: "training", UID: types.UID("pod-uid"),
+			},
+			Spec: corev1.PodSpec{
+				NodeName: "owned-node",
+				Containers: []corev1.Container{
+					{Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{
+						corev1.ResourceName("nvidia.com/gpu"): resource.MustParse("2"),
+					}}},
+					{Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{
+						corev1.ResourceName("nvidia.com/gpu"): resource.MustParse("1"),
+					}}},
+				},
+				InitContainers: []corev1.Container{{
+					Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{
+						corev1.ResourceName("nvidia.com/gpu"): resource.MustParse("4"),
+					}},
+				}},
+				Overhead: corev1.ResourceList{
+					corev1.ResourceName("nvidia.com/gpu"): resource.MustParse("1"),
+				},
+			},
+			Status: corev1.PodStatus{Phase: corev1.PodRunning},
+		},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "team-b", Name: "real-workload", UID: types.UID("real-pod-uid"),
+			},
+			Spec: corev1.PodSpec{NodeName: "real-node"},
+		},
+	)
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+	graph, err := adapter.Observe(context.Background(), scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var node *cluster.ObservedNodeState
+	var lease *cluster.ObservedLeaseState
+	for _, object := range graph.Objects {
+		switch object.Key.Kind() {
+		case cluster.ObjectKindNode:
+			node = object.Node
+		case cluster.ObjectKindLease:
+			lease = object.Lease
+		}
+	}
+	if node == nil ||
+		!node.Unschedulable ||
+		!node.Ready ||
+		node.Annotations["kwok.x-k8s.io/node"] != "fake" ||
+		node.Capacity["nvidia.com/gpu"] != "8" ||
+		node.Allocatable["nvidia.com/gpu"] != "6" ||
+		len(node.Taints) != 1 {
+		t.Fatalf("unexpected observed Node state: %#v", node)
+	}
+	if lease == nil ||
+		lease.HolderIdentity != holder ||
+		lease.LeaseDurationSeconds != duration ||
+		!lease.RenewTime.Equal(renewTime.Time) {
+		t.Fatalf("unexpected observed Lease state: %#v", lease)
+	}
+	if len(graph.Pods) != 1 ||
+		graph.Pods[0].Namespace != "team-a" ||
+		graph.Pods[0].Name != "training" ||
+		graph.Pods[0].NodeName != "owned-node" ||
+		graph.Pods[0].Phase != "Running" ||
+		graph.Pods[0].Requested["nvidia.com/gpu"] != "5" {
+		t.Fatalf("unexpected observed Pod state: %#v", graph.Pods)
+	}
+}
+
 func TestAdapterPaginatesOwnedObservationUntilTheServerCursorCloses(t *testing.T) {
 	t.Parallel()
 
@@ -370,6 +491,109 @@ func TestAdapterRevalidatesOwnershipAndHonorsServerDryRunDelete(t *testing.T) {
 	}
 }
 
+func TestAdapterCreatesNodeAndLeaseWithScenarioInstanceOwnerReference(t *testing.T) {
+	t.Parallel()
+
+	scope := namedOwnershipScope(t, 2)
+	kubernetesClient := kubernetesfake.NewSimpleClientset()
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+	nodeKey, err := cluster.NewObjectKey(
+		cluster.ObjectKindNode,
+		"",
+		"owned-node",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodeChange, err := cluster.NewApplySyntheticNode(
+		nodeKey,
+		cluster.ObjectPreconditions{},
+		cluster.SyntheticNodeInput{Unschedulable: true},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executeSingle(t, adapter, scope, cluster.ExecutionPersistent, nodeChange)
+
+	leaseKey, err := cluster.NewObjectKey(
+		cluster.ObjectKindLease,
+		"kube-node-lease",
+		"owned-node",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	leaseChange, err := cluster.NewApplyLease(
+		leaseKey,
+		cluster.ObjectPreconditions{},
+		cluster.LeaseInput{
+			HolderIdentity:       "owned-node",
+			LeaseDurationSeconds: 40,
+			RenewTime:            time.Date(2026, 7, 30, 7, 0, 0, 0, time.UTC),
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executeSingle(t, adapter, scope, cluster.ExecutionPersistent, leaseChange)
+
+	node, err := kubernetesClient.CoreV1().Nodes().Get(
+		context.Background(),
+		"owned-node",
+		metav1.GetOptions{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lease, err := kubernetesClient.CoordinationV1().
+		Leases("kube-node-lease").
+		Get(context.Background(), "owned-node", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, references := range [][]metav1.OwnerReference{
+		node.OwnerReferences,
+		lease.OwnerReferences,
+	} {
+		if len(references) != 1 ||
+			references[0].APIVersion != "simulation.kasim.io/v1alpha1" ||
+			references[0].Kind != "ScenarioInstance" ||
+			references[0].Name != "training-lab" ||
+			string(references[0].UID) != scope.InstanceUID().String() ||
+			references[0].Controller == nil ||
+			!*references[0].Controller ||
+			references[0].BlockOwnerDeletion == nil ||
+			!*references[0].BlockOwnerDeletion {
+			t.Fatalf("strongest legal owner reference missing: %#v", references)
+		}
+	}
+}
+
+func TestAdapterNamedScopeRejectsOwnedLabelsWithoutExactOwnerReference(t *testing.T) {
+	t.Parallel()
+
+	scope := namedOwnershipScope(t, 2)
+	kubernetesClient := kubernetesfake.NewSimpleClientset(&corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "forged-owned-node",
+			UID:             types.UID("node-uid"),
+			ResourceVersion: "11",
+			Labels: map[string]string{
+				cluster.ManagedByLabel:         cluster.ManagedByValue,
+				cluster.InstanceUIDLabel:       scope.InstanceUID().String(),
+				cluster.DesiredGenerationLabel: "2",
+			},
+		},
+	})
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+	if _, err := adapter.Observe(
+		context.Background(),
+		scope,
+	); cluster.ErrorCodeOf(err) != cluster.ErrorOwnershipConflict {
+		t.Fatalf("missing exact owner reference error = %v", err)
+	}
+}
+
 func TestEnvtestServerDryRunApplyStatusAndDeleteHaveExactPersistence(t *testing.T) {
 	assets := os.Getenv("KUBEBUILDER_ASSETS")
 	if assets == "" {
@@ -414,7 +638,7 @@ func TestEnvtestServerDryRunApplyStatusAndDeleteHaveExactPersistence(t *testing.
 	if capabilities.KubernetesMinor != 36 {
 		t.Fatalf("envtest Kubernetes minor = %d", capabilities.KubernetesMinor)
 	}
-	scope := ownershipScope(t, 2)
+	scope := namedOwnershipScope(t, 2)
 	nodeKey, err := cluster.NewObjectKey(
 		cluster.ObjectKindNode,
 		"",
@@ -511,8 +735,9 @@ func TestEnvtestServerDryRunApplyStatusAndDeleteHaveExactPersistence(t *testing.
 				"memory":         "8Gi",
 				"nvidia.com/gpu": "6",
 			},
-			Ready:      true,
-			ObservedAt: time.Date(2026, 7, 30, 6, 0, 0, 0, time.UTC),
+			ManageReady: true,
+			Ready:       true,
+			ObservedAt:  time.Date(2026, 7, 30, 6, 0, 0, 0, time.UTC),
 		},
 	)
 	if err != nil {
@@ -539,6 +764,7 @@ func TestEnvtestServerDryRunApplyStatusAndDeleteHaveExactPersistence(t *testing.
 		cluster.SyntheticNodeStatusInput{
 			Capacity:    map[string]string{"nvidia.com/gpu": "8"},
 			Allocatable: map[string]string{"nvidia.com/gpu": "6"},
+			ManageReady: true,
 			Ready:       true,
 			ObservedAt:  time.Date(2026, 7, 30, 6, 0, 0, 0, time.UTC),
 		},
@@ -558,6 +784,69 @@ func TestEnvtestServerDryRunApplyStatusAndDeleteHaveExactPersistence(t *testing.
 	if node.Status.Capacity.Name("nvidia.com/gpu", resource.DecimalSI).String() != "8" ||
 		node.Status.Allocatable.Name("nvidia.com/gpu", resource.DecimalSI).String() != "6" {
 		t.Fatalf("status apply did not persist exact resources: %#v", node.Status)
+	}
+	statusChange, err = cluster.NewUpdateSyntheticNodeStatus(
+		statusKey,
+		cluster.ObjectPreconditions{
+			UID:             string(node.UID),
+			ResourceVersion: node.ResourceVersion,
+		},
+		cluster.SyntheticNodeStatusInput{
+			Capacity: map[string]string{
+				"nvidia.com/gpu": "8",
+				"amd.com/gpu":    "4",
+			},
+			Allocatable: map[string]string{
+				"nvidia.com/gpu": "6",
+				"amd.com/gpu":    "4",
+			},
+			ObservedAt: time.Date(2026, 7, 30, 6, 1, 0, 0, time.UTC),
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executeSingle(t, adapter, scope, cluster.ExecutionPersistent, statusChange)
+	node, err = kubernetesClient.CoreV1().Nodes().Get(
+		context.Background(),
+		nodeKey.Name(),
+		metav1.GetOptions{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	statusChange, err = cluster.NewUpdateSyntheticNodeStatus(
+		statusKey,
+		cluster.ObjectPreconditions{
+			UID:             string(node.UID),
+			ResourceVersion: node.ResourceVersion,
+		},
+		cluster.SyntheticNodeStatusInput{
+			Capacity:    map[string]string{"nvidia.com/gpu": "8"},
+			Allocatable: map[string]string{"nvidia.com/gpu": "6"},
+			ObservedAt:  time.Date(2026, 7, 30, 6, 2, 0, 0, time.UTC),
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executeSingle(t, adapter, scope, cluster.ExecutionPersistent, statusChange)
+	node, err = kubernetesClient.CoreV1().Nodes().Get(
+		context.Background(),
+		nodeKey.Name(),
+		metav1.GetOptions{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, found := node.Status.Capacity["amd.com/gpu"]; found {
+		t.Fatalf("status apply retained stale capacity: %#v", node.Status.Capacity)
+	}
+	if _, found := node.Status.Allocatable["amd.com/gpu"]; found {
+		t.Fatalf(
+			"status apply retained stale allocatable: %#v",
+			node.Status.Allocatable,
+		)
 	}
 
 	leaseKey, err := cluster.NewObjectKey(
@@ -669,6 +958,27 @@ func ownershipScope(t *testing.T, value int64) cluster.OwnershipScope {
 		t.Fatal(err)
 	}
 	scope, err := cluster.NewOwnershipScope(uid, generation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return scope
+}
+
+func namedOwnershipScope(t *testing.T, value int64) cluster.OwnershipScope {
+	t.Helper()
+	uid, err := domain.ParseInstanceUID("6cb2dd6f-c608-4e79-aaf6-e3fa1287f73c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	generation, err := domain.NewGeneration(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	name, err := domain.ParseName("training-lab")
+	if err != nil {
+		t.Fatal(err)
+	}
+	scope, err := cluster.NewInstanceOwnershipScope(name, uid, generation)
 	if err != nil {
 		t.Fatal(err)
 	}

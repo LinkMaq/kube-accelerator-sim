@@ -463,6 +463,7 @@ func toRecord(
 		Name:               name,
 		InstanceUID:        uid,
 		ResourceVersion:    instance.ResourceVersion,
+		DeletionRequested:  instance.DeletionTimestamp != nil,
 		CreationIdentity:   instance.Spec.CreationIdentity,
 		Fidelity:           fidelity,
 		DesiredGeneration:  desired,

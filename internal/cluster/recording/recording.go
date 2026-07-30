@@ -34,6 +34,7 @@ type Adapter struct {
 	mutex      sync.Mutex
 	options    Options
 	calls      []Call
+	attempted  []cluster.OwnedChangeSet
 	persistent []cluster.OwnedChangeSet
 }
 
@@ -43,6 +44,12 @@ func New(options Options) *Adapter {
 		[]cluster.ObservedObject(nil),
 		options.Observed.Objects...,
 	)
+	for index := range options.Observed.Objects {
+		options.Observed.Objects[index] = cloneObservedObject(
+			options.Observed.Objects[index],
+		)
+	}
+	options.Observed.Pods = cloneObservedPods(options.Observed.Pods)
 	options.Denied = append([]cluster.AccessRequirement(nil), options.Denied...)
 	errorsByCall := make(map[Call]error, len(options.Errors))
 	for call, err := range options.Errors {
@@ -110,10 +117,8 @@ func (adapter *Adapter) Observe(
 		)
 	}
 	return cluster.ObservedGraph{
-		Objects: append(
-			[]cluster.ObservedObject(nil),
-			adapter.options.Observed.Objects...,
-		),
+		Objects: cloneObservedObjects(adapter.options.Observed.Objects),
+		Pods:    cloneObservedPods(adapter.options.Observed.Pods),
 	}, nil
 }
 
@@ -129,6 +134,7 @@ func (adapter *Adapter) Execute(
 		call = CallExecuteDryRun
 	}
 	adapter.calls = append(adapter.calls, call)
+	adapter.attempted = append(adapter.attempted, changeSet)
 	if err := adapter.options.Errors[call]; err != nil {
 		return cluster.MutationReceipt{}, err
 	}
@@ -154,6 +160,20 @@ func (adapter *Adapter) PersistentChangeSets() []cluster.OwnedChangeSet {
 	adapter.mutex.Lock()
 	defer adapter.mutex.Unlock()
 	return append([]cluster.OwnedChangeSet(nil), adapter.persistent...)
+}
+
+func (adapter *Adapter) AttemptedChangeSets() []cluster.OwnedChangeSet {
+	adapter.mutex.Lock()
+	defer adapter.mutex.Unlock()
+	return append([]cluster.OwnedChangeSet(nil), adapter.attempted...)
+}
+
+// ClearError releases one deterministic failure point so the same adapter can
+// exercise a later retry without replacing its recorded history.
+func (adapter *Adapter) ClearError(call Call) {
+	adapter.mutex.Lock()
+	defer adapter.mutex.Unlock()
+	delete(adapter.options.Errors, call)
 }
 
 func containsRequirement(
@@ -182,6 +202,56 @@ func cloneCapabilities(
 			[]string(nil),
 			capability.Verbs...,
 		)
+	}
+	return result
+}
+
+func cloneObservedObjects(
+	input []cluster.ObservedObject,
+) []cluster.ObservedObject {
+	result := make([]cluster.ObservedObject, len(input))
+	for index, object := range input {
+		result[index] = cloneObservedObject(object)
+	}
+	return result
+}
+
+func cloneObservedObject(
+	input cluster.ObservedObject,
+) cluster.ObservedObject {
+	result := input
+	if input.Node != nil {
+		node := *input.Node
+		node.Labels = cloneStringMap(input.Node.Labels)
+		node.Annotations = cloneStringMap(input.Node.Annotations)
+		node.Taints = append([]cluster.NodeTaint(nil), input.Node.Taints...)
+		node.Capacity = cloneStringMap(input.Node.Capacity)
+		node.Allocatable = cloneStringMap(input.Node.Allocatable)
+		result.Node = &node
+	}
+	if input.Lease != nil {
+		lease := *input.Lease
+		result.Lease = &lease
+	}
+	return result
+}
+
+func cloneObservedPods(input []cluster.ObservedPod) []cluster.ObservedPod {
+	result := make([]cluster.ObservedPod, len(input))
+	for index, pod := range input {
+		result[index] = pod
+		result[index].Requested = cloneStringMap(pod.Requested)
+	}
+	return result
+}
+
+func cloneStringMap(input map[string]string) map[string]string {
+	if input == nil {
+		return nil
+	}
+	result := make(map[string]string, len(input))
+	for key, value := range input {
+		result[key] = value
 	}
 	return result
 }
