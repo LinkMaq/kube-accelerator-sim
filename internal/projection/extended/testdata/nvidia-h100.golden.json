@@ -1,0 +1,19 @@
+{
+  "objectKinds": [
+    "Node"
+  ],
+  "nodes": [
+    {
+      "name": "kasim-node-dd261ef38fe9d85f08e42d49",
+      "identityLabels": {},
+      "capacity": {
+        "nvidia.com/gpu": 8
+      },
+      "allocatable": {
+        "nvidia.com/gpu": 6
+      },
+      "requiresReady": true,
+      "requiresLease": true
+    }
+  ]
+}

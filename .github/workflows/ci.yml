@@ -44,3 +44,46 @@ jobs:
 
       - name: Build binaries
         run: make build
+
+  kwok-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install pinned kind and kubectl
+        shell: bash
+        run: |
+          tool_dir="${RUNNER_TEMP}/kasim-e2e-tools"
+          mkdir -p "${tool_dir}"
+          curl --fail --location --silent --show-error \
+            https://github.com/kubernetes-sigs/kind/releases/download/v0.32.0/kind-linux-amd64 \
+            --output "${tool_dir}/kind"
+          printf '%s  %s\n' \
+            50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54 \
+            "${tool_dir}/kind" | sha256sum --check -
+          curl --fail --location --silent --show-error \
+            https://dl.k8s.io/release/v1.36.2/bin/linux/amd64/kubectl \
+            --output "${tool_dir}/kubectl"
+          printf '%s  %s\n' \
+            1e9045ec32bea85da43de85f0065358529ea7c7a152eca78154fba5b58c27d82 \
+            "${tool_dir}/kubectl" | sha256sum --check -
+          chmod 0755 "${tool_dir}/kind" "${tool_dir}/kubectl"
+          printf 'KIND_BIN=%s\n' "${tool_dir}/kind" >> "${GITHUB_ENV}"
+          printf 'KUBECTL_BIN=%s\n' "${tool_dir}/kubectl" >> "${GITHUB_ENV}"
+
+      - name: Exercise pinned KWOK scheduling lifecycle
+        env:
+          KASIM_E2E_KWOK: "1"
+        run: >-
+          go test -v ./test/e2e
+          -run TestPinnedKWOKSchedulesAndStartsPod
+          -count=1
+          -timeout=12m

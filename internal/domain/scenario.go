@@ -201,6 +201,18 @@ func NewTaint(key, value, effect string) (Taint, error) {
 	return Taint{key: key, value: value, effect: effect}, nil
 }
 
+func (taint Taint) Key() string {
+	return taint.key
+}
+
+func (taint Taint) Value() string {
+	return taint.value
+}
+
+func (taint Taint) Effect() string {
+	return taint.effect
+}
+
 // NodeTemplateInput is the portable base capacity and placement intent shared
 // by every replica of a Node Group.
 type NodeTemplateInput struct {

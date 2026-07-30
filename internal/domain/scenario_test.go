@@ -123,6 +123,11 @@ func TestScenarioRepresentsOneHomogeneousNodeGroupAndPool(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if taint.Key() != "accelerator" ||
+		taint.Value() != "simulated" ||
+		taint.Effect() != "NoSchedule" {
+		t.Fatalf("Taint accessors lost portable intent: %#v", taint)
+	}
 	capacity := map[string]string{"cpu": "64", "memory": "256Gi", "pods": "110"}
 	labels := map[string]string{"workload.example.com/class": "training"}
 	node, err := domain.NewNodeTemplate(domain.NodeTemplateInput{
