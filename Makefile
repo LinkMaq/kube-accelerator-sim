@@ -7,6 +7,8 @@ BUILD_DATE ?= unknown
 CONTROLLER_IMAGE ?= ghcr.io/linkmaq/kube-accelerator-sim-controller
 IMAGE_PLATFORMS ?= linux/amd64,linux/arm64
 CHART_OCI_REGISTRY ?=
+RELEASE_EVIDENCE_DIR ?=
+RELEASE_OUTPUT ?= dist/release
 
 VERSION_PACKAGE := github.com/LinkMaq/kube-accelerator-sim/internal/version
 LDFLAGS := -X '$(VERSION_PACKAGE).productVersion=$(VERSION)' \
@@ -15,7 +17,7 @@ LDFLAGS := -X '$(VERSION_PACKAGE).productVersion=$(VERSION)' \
 
 .PHONY: architecture build chart-package chart-push chart-verify container-image \
 	container-image-local format format-check generate-check module-check \
-	test test-race verify vet
+	release-artifacts test test-race verify vet
 
 architecture:
 	$(GO) run ./internal/tools/archcheck --root .
@@ -82,6 +84,16 @@ generate-check:
 module-check:
 	$(GO) mod tidy
 	git diff --exit-code -- go.mod go.sum
+
+release-artifacts:
+	@test -n "$(RELEASE_EVIDENCE_DIR)" || \
+		(printf 'RELEASE_EVIDENCE_DIR is required\n' >&2; exit 2)
+	$(GO) run ./internal/tools/releasebuild \
+		--version "$(VERSION)" \
+		--revision "$(SOURCE_REVISION)" \
+		--build-date "$(BUILD_DATE)" \
+		--evidence-dir "$(RELEASE_EVIDENCE_DIR)" \
+		--output "$(RELEASE_OUTPUT)"
 
 test:
 	$(GO) test ./...

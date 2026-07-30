@@ -58,3 +58,5 @@ SBOM and provenance generation is in `release/inputs.json`.
 
 The exact Kubernetes patch/image validation lock and the CI evidence cadence
 are documented in [Kubernetes compatibility](kubernetes-compatibility.md).
+Checksums, attestations, signatures, OCI publication, and consumer verification
+are documented in [Release verification](release-verification.md).

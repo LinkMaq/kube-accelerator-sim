@@ -1,0 +1,462 @@
+name: Evidence-gated release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Semantic version without the v prefix
+        required: true
+        type: string
+      compatibility_run_id:
+        description: Successful full Kubernetes compatibility workflow run ID
+        required: true
+        type: string
+      protocol_run_id:
+        description: Successful kubelet protocol oracle workflow run ID
+        required: true
+        type: string
+      scale_run_id:
+        description: Successful two-trial scale workflow run ID
+        required: true
+        type: string
+      publish:
+        description: Publish the tag release, controller image, and OCI chart
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  evidence:
+    name: Validate exact release evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      build_date: ${{ steps.metadata.outputs.build_date }}
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Validate Semantic Versioning and tag authority
+        id: metadata
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_PUBLISH: ${{ inputs.publish }}
+        run: |
+          if ! [[ "${RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            printf 'version is not Semantic Versioning: %s\n' "${RELEASE_VERSION}" >&2
+            exit 2
+          fi
+          expected_ref="refs/tags/v${RELEASE_VERSION}"
+          if [[ "${RELEASE_PUBLISH}" == "true" && "${GITHUB_REF}" != "${expected_ref}" ]]; then
+            printf 'publishing requires %s, got %s\n' "${expected_ref}" "${GITHUB_REF}" >&2
+            exit 2
+          fi
+          source_epoch="$(git show -s --format=%ct "${GITHUB_SHA}")"
+          build_date="$(date --utc --date="@${source_epoch}" '+%Y-%m-%dT%H:%M:%SZ')"
+          printf 'build_date=%s\n' "${build_date}" >> "${GITHUB_OUTPUT}"
+
+      - name: Download full compatibility receipts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.compatibility_run_id }}
+          pattern: compatibility-receipt-*
+          path: incoming/compatibility
+          merge-multiple: true
+
+      - name: Download protocol oracle receipts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.protocol_run_id }}
+          pattern: protocol-oracle-receipt-*
+          path: incoming/protocol
+          merge-multiple: true
+
+      - name: Download two scale receipts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.scale_run_id }}
+          name: scale-receipts
+          path: incoming/scale
+
+      - name: Verify receipt schemas, revisions, matrices, and outcomes
+        shell: bash
+        run: >-
+          go run ./internal/tools/releaseevidence
+          --revision "${GITHUB_SHA}"
+          --compatibility-dir incoming/compatibility
+          --protocol-dir incoming/protocol
+          --scale-dir incoming/scale
+          --output release-evidence
+
+      - name: Retain normalized release-evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-evidence
+          path: release-evidence
+          if-no-files-found: error
+          retention-days: 90
+
+  package:
+    name: Build deterministic release artifacts
+    needs: evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Download normalized evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-evidence
+          path: release-evidence
+
+      - name: Install checksummed Helm
+        shell: bash
+        run: |
+          helm_archive="${RUNNER_TEMP}/helm-v4.2.3-linux-amd64.tar.gz"
+          curl --fail --location --silent --show-error \
+            https://get.helm.sh/helm-v4.2.3-linux-amd64.tar.gz \
+            --output "${helm_archive}"
+          printf '%s  %s\n' \
+            e9b88b4ee95b18c706839c28d3a0220e5bc470e9cd9262410c90793c45ff8b7c \
+            "${helm_archive}" | sha256sum --check -
+          tar --extract --gzip --file "${helm_archive}" \
+            --strip-components=1 --directory "${RUNNER_TEMP}" linux-amd64/helm
+          chmod 0755 "${RUNNER_TEMP}/helm"
+          printf 'HELM_BIN=%s\n' "${RUNNER_TEMP}/helm" >> "${GITHUB_ENV}"
+
+      - name: Build five CLI archives, chart, locks, and release receipt
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_BUILD_DATE: ${{ needs.evidence.outputs.build_date }}
+        run: >-
+          go run ./internal/tools/releasebuild
+          --version "${RELEASE_VERSION}"
+          --revision "${GITHUB_SHA}"
+          --build-date "${RELEASE_BUILD_DATE}"
+          --evidence-dir release-evidence
+          --output release-staging
+
+      - name: Verify packaged Helm chart
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          chart="release-staging/kasim-runtime-${RELEASE_VERSION}.tgz"
+          "${HELM_BIN}" show chart "${chart}"
+          "${HELM_BIN}" template release-smoke "${chart}" \
+            --namespace kasim-system \
+            --kube-version 1.36.3 >/dev/null
+
+      - name: Install checksummed Syft v1.50.0
+        shell: bash
+        run: |
+          archive="${RUNNER_TEMP}/syft_1.50.0_linux_amd64.tar.gz"
+          curl --fail --location --silent --show-error \
+            https://github.com/anchore/syft/releases/download/v1.50.0/syft_1.50.0_linux_amd64.tar.gz \
+            --output "${archive}"
+          printf '%s  %s\n' \
+            bf7b29ff57f06da30918266a0e1c2885a8f99784798d1bdb1628886aa015d788 \
+            "${archive}" | sha256sum --check -
+          tar --extract --gzip --file "${archive}" \
+            --directory "${RUNNER_TEMP}" syft
+          chmod 0755 "${RUNNER_TEMP}/syft"
+          printf 'SYFT_BIN=%s\n' "${RUNNER_TEMP}/syft" >> "${GITHUB_ENV}"
+
+      - name: Generate release SBOMs and checksum manifests
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          "${SYFT_BIN}" dir:. \
+            --exclude .git \
+            --exclude release-staging \
+            --output "spdx-json=${RUNNER_TEMP}/kasim-${RELEASE_VERSION}-source.spdx.json"
+          mv "${RUNNER_TEMP}/kasim-${RELEASE_VERSION}-source.spdx.json" release-staging/
+          (
+            cd release-staging
+            sha256sum kasim_"${RELEASE_VERSION}"_* > cli-checksums.txt
+            find . -maxdepth 1 -type f ! -name checksums.txt \
+              -printf '%f\n' | LC_ALL=C sort | xargs sha256sum > checksums.txt
+            sha256sum --check checksums.txt
+          )
+
+      - name: Upload release-artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-artifacts
+          path: release-staging
+          if-no-files-found: error
+          retention-days: 90
+
+  smoke:
+    name: CLI smoke ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            goos: linux
+            goarch: amd64
+          - runner: ubuntu-24.04-arm
+            goos: linux
+            goarch: arm64
+          - runner: macos-15-intel
+            goos: darwin
+            goarch: amd64
+          - runner: macos-15
+            goos: darwin
+            goarch: arm64
+          - runner: windows-2025
+            goos: windows
+            goarch: amd64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - name: Check out smoke harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Download release-artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-artifacts
+          path: release-artifacts
+
+      - name: Verify checksum, extract, and execute native CLI
+        env:
+          KASIM_RELEASE_ARTIFACT_DIR: ${{ github.workspace }}/release-artifacts
+          KASIM_RELEASE_VERSION: ${{ inputs.version }}
+          KASIM_RELEASE_REVISION: ${{ github.sha }}
+        run: go test ./test/release -run '^TestReleaseCLIArchive$' -count=1
+
+  image:
+    name: Build Linux amd64/arm64 controller image
+    needs: evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Authenticate to GHCR
+        if: inputs.publish
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build immutable multi-platform image
+        id: image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ inputs.publish }}
+          tags: ghcr.io/linkmaq/kube-accelerator-sim-controller:${{ inputs.version }}
+          build-args: |
+            VERSION=${{ inputs.version }}
+            SOURCE_REVISION=${{ github.sha }}
+            BUILD_DATE=${{ needs.evidence.outputs.build_date }}
+          sbom: true
+          provenance: mode=max
+
+      - name: Install Cosign
+        if: inputs.publish
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.2
+
+      - name: Sign and attest the pushed image digest
+        if: inputs.publish
+        env:
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        run: >-
+          cosign sign --yes
+          "ghcr.io/linkmaq/kube-accelerator-sim-controller@${IMAGE_DIGEST}"
+
+      - name: Record GitHub image provenance
+        if: inputs.publish
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        with:
+          subject-name: ghcr.io/linkmaq/kube-accelerator-sim-controller
+          subject-digest: ${{ steps.image.outputs.digest }}
+          push-to-registry: true
+
+  attest:
+    name: Attest release checksums and SBOM
+    needs:
+      - package
+      - smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Download release-artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-artifacts
+          path: release-artifacts
+
+      - name: Attest checksummed release provenance
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        with:
+          subject-checksums: release-artifacts/checksums.txt
+
+      - name: Attest CLI archives with the SPDX SBOM
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        with:
+          subject-checksums: release-artifacts/cli-checksums.txt
+          sbom-path: release-artifacts/kasim-${{ inputs.version }}-source.spdx.json
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.2
+
+      - name: Sign the checksum manifest with keyless OIDC
+        run: >-
+          cosign sign-blob --yes
+          --bundle release-artifacts/checksums.txt.sigstore.json
+          release-artifacts/checksums.txt
+
+      - name: Retain checksum signature
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-signature
+          path: release-artifacts/checksums.txt.sigstore.json
+          if-no-files-found: error
+          retention-days: 90
+
+  publish:
+    name: Publish tag assets and OCI chart
+    if: inputs.publish
+    needs:
+      - evidence
+      - package
+      - smoke
+      - image
+      - attest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+    steps:
+      - name: Check out exact tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download release-artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-artifacts
+          path: release-artifacts
+
+      - name: Download checksum signature
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-signature
+          path: release-artifacts
+
+      - name: Install checksummed Helm
+        shell: bash
+        run: |
+          helm_archive="${RUNNER_TEMP}/helm-v4.2.3-linux-amd64.tar.gz"
+          curl --fail --location --silent --show-error \
+            https://get.helm.sh/helm-v4.2.3-linux-amd64.tar.gz \
+            --output "${helm_archive}"
+          printf '%s  %s\n' \
+            e9b88b4ee95b18c706839c28d3a0220e5bc470e9cd9262410c90793c45ff8b7c \
+            "${helm_archive}" | sha256sum --check -
+          tar --extract --gzip --file "${helm_archive}" \
+            --strip-components=1 --directory "${RUNNER_TEMP}" linux-amd64/helm
+          chmod 0755 "${RUNNER_TEMP}/helm"
+          printf 'HELM_BIN=%s\n' "${RUNNER_TEMP}/helm" >> "${GITHUB_ENV}"
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.2
+
+      - name: Authenticate Helm to GHCR
+        run: >-
+          printf '%s' "${{ secrets.GITHUB_TOKEN }}" |
+          "${HELM_BIN}" registry login ghcr.io
+          --username "${{ github.actor }}"
+          --password-stdin
+
+      - name: Push and sign the OCI Helm chart
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          "${HELM_BIN}" push \
+            "release-artifacts/kasim-runtime-${RELEASE_VERSION}.tgz" \
+            oci://ghcr.io/linkmaq/charts
+          cosign sign --yes \
+            "ghcr.io/linkmaq/charts/kasim-runtime:${RELEASE_VERSION}"
+
+      - name: Publish immutable GitHub release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: >-
+          gh release create "v${RELEASE_VERSION}"
+          release-artifacts/*
+          --verify-tag
+          --generate-notes
+          --title "kube-accelerator-sim v${RELEASE_VERSION}"
