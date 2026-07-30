@@ -145,8 +145,17 @@ type ResolvedSelection struct {
 	profileDigest domain.Digest
 	modelID       string
 	contractID    string
+	resourceAlias string
 	resourceName  string
+	identity      []ResolvedIdentitySignal
 	evidence      []EvidenceReceipt
+}
+
+// ResolvedIdentitySignal is one exact source-backed vendor identity key used
+// by the selected Resource Contract. Values remain model/backend data.
+type ResolvedIdentitySignal struct {
+	kind string
+	key  string
 }
 
 // LoadBundled validates the exact embedded catalog and computes stable profile
@@ -613,57 +622,119 @@ func (snapshot Snapshot) Resolve(request ResolveRequest) (ResolvedSelection, err
 	}
 
 	var contract *contractRecord
-	for index := range profile.record.Contracts {
-		candidate := &profile.record.Contracts[index]
-		if candidate.ID == request.ContractID {
-			contract = candidate
-			break
+	if request.ContractID != "" {
+		for index := range profile.record.Contracts {
+			candidate := &profile.record.Contracts[index]
+			if candidate.ID == request.ContractID {
+				contract = candidate
+				break
+			}
 		}
-	}
-	if contract == nil || !slices.Contains(model.Contracts, contract.ID) {
-		return ResolvedSelection{}, fmt.Errorf(
-			"contract %q is not supported by model %q",
-			request.ContractID,
-			model.ID,
-		)
-	}
-	if !slices.Contains(contract.FidelityModes, request.Fidelity.String()) {
-		return ResolvedSelection{}, fmt.Errorf(
-			"contract %q does not support Fidelity Mode %q",
-			contract.ID,
-			request.Fidelity,
-		)
+		if contract == nil || !slices.Contains(model.Contracts, contract.ID) {
+			return ResolvedSelection{}, fmt.Errorf(
+				"contract %q is not supported by model %q",
+				request.ContractID,
+				model.ID,
+			)
+		}
+		if !slices.Contains(contract.FidelityModes, request.Fidelity.String()) {
+			return ResolvedSelection{}, fmt.Errorf(
+				"contract %q does not support Fidelity Mode %q",
+				contract.ID,
+				request.Fidelity,
+			)
+		}
+	} else {
+		compatibleContracts := make([]*contractRecord, 0, len(profile.record.Contracts))
+		for index := range profile.record.Contracts {
+			candidate := &profile.record.Contracts[index]
+			if slices.Contains(model.Contracts, candidate.ID) &&
+				slices.Contains(candidate.FidelityModes, request.Fidelity.String()) {
+				compatibleContracts = append(compatibleContracts, candidate)
+			}
+		}
+		if len(compatibleContracts) == 0 {
+			return ResolvedSelection{}, fmt.Errorf(
+				"no Resource Contract supports model %q and Fidelity Mode %q",
+				model.ID,
+				request.Fidelity.String(),
+			)
+		}
+		if len(compatibleContracts) > 1 {
+			return ResolvedSelection{}, fmt.Errorf(
+				"contract is ambiguous for model %q and Fidelity Mode %q",
+				model.ID,
+				request.Fidelity.String(),
+			)
+		}
+		contract = compatibleContracts[0]
 	}
 
-	var resourceName string
-	for _, resource := range contract.Resources {
-		if resource.Alias == request.ResourceAlias {
-			resourceName = resource.Name
-			break
+	var resource resourceRecord
+	if request.ResourceAlias != "" {
+		found := false
+		for _, candidate := range contract.Resources {
+			if candidate.Alias == request.ResourceAlias {
+				resource = candidate
+				found = true
+				break
+			}
 		}
-	}
-	if resourceName == "" {
-		return ResolvedSelection{}, fmt.Errorf(
-			"resource alias %q is not defined by contract %q",
-			request.ResourceAlias,
-			contract.ID,
-		)
-	}
-	if len(model.ResourceAliases) != 0 &&
-		!slices.Contains(model.ResourceAliases, request.ResourceAlias) {
-		return ResolvedSelection{}, fmt.Errorf(
-			"resource alias %q is not compatible with model %q",
-			request.ResourceAlias,
-			model.ID,
-		)
+		if !found {
+			return ResolvedSelection{}, fmt.Errorf(
+				"resource alias %q is not defined by contract %q",
+				request.ResourceAlias,
+				contract.ID,
+			)
+		}
+		if len(model.ResourceAliases) != 0 &&
+			!slices.Contains(model.ResourceAliases, request.ResourceAlias) {
+			return ResolvedSelection{}, fmt.Errorf(
+				"resource alias %q is not compatible with model %q",
+				request.ResourceAlias,
+				model.ID,
+			)
+		}
+	} else {
+		compatibleResources := make([]resourceRecord, 0, len(contract.Resources))
+		for _, candidate := range contract.Resources {
+			if len(model.ResourceAliases) == 0 ||
+				slices.Contains(model.ResourceAliases, candidate.Alias) {
+				compatibleResources = append(compatibleResources, candidate)
+			}
+		}
+		if len(compatibleResources) == 0 {
+			return ResolvedSelection{}, fmt.Errorf(
+				"no resource alias is compatible with model %q and contract %q",
+				model.ID,
+				contract.ID,
+			)
+		}
+		if len(compatibleResources) > 1 {
+			return ResolvedSelection{}, fmt.Errorf(
+				"resource alias is ambiguous for model %q and contract %q",
+				model.ID,
+				contract.ID,
+			)
+		}
+		resource = compatibleResources[0]
 	}
 	evidence := append([]EvidenceReceipt(nil), profile.record.Evidence...)
+	identity := make([]ResolvedIdentitySignal, 0, len(contract.IdentitySignals))
+	for _, signal := range contract.IdentitySignals {
+		identity = append(identity, ResolvedIdentitySignal{
+			kind: signal.Kind,
+			key:  signal.Key,
+		})
+	}
 	return ResolvedSelection{
 		profileClass:  profile.record.Class,
 		profileDigest: profile.digest,
 		modelID:       model.ID,
 		contractID:    contract.ID,
-		resourceName:  resourceName,
+		resourceAlias: resource.Alias,
+		resourceName:  resource.Name,
+		identity:      identity,
 		evidence:      evidence,
 	}, nil
 }
@@ -786,9 +857,30 @@ func (selection ResolvedSelection) ContractID() string {
 	return selection.contractID
 }
 
+// ResourceAlias returns the exact portable alias selected within the contract.
+func (selection ResolvedSelection) ResourceAlias() string {
+	return selection.resourceAlias
+}
+
 // ResourceName returns the exact evidence-backed Kubernetes resource name.
 func (selection ResolvedSelection) ResourceName() string {
 	return selection.resourceName
+}
+
+// IdentitySignals returns a copy of the selected contract's exact identity
+// signal keys.
+func (selection ResolvedSelection) IdentitySignals() []ResolvedIdentitySignal {
+	return append([]ResolvedIdentitySignal(nil), selection.identity...)
+}
+
+// Kind returns node-label, annotation, or dra-attribute.
+func (signal ResolvedIdentitySignal) Kind() string {
+	return signal.kind
+}
+
+// Key returns the exact source-backed signal key.
+func (signal ResolvedIdentitySignal) Key() string {
+	return signal.key
 }
 
 // Evidence returns a copy of the evidence supporting the selection.
