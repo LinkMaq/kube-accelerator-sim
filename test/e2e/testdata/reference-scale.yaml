@@ -1,0 +1,55 @@
+metadata:
+  name: reference-scale
+spec:
+  fidelity: scheduling
+  acceptance:
+    provisionalProfiles: false
+  nodeGroups:
+    - name: baseline
+      replicas: 900
+      node:
+        capacity:
+          cpu: "16"
+          memory: 64Gi
+          pods: "110"
+        placement:
+          zone: scale-a
+        labels:
+          simulation.kasim.io/reference-role: baseline
+        taints: []
+      acceleratorPools:
+        - name: accelerator
+          profile:
+            id: nvidia
+            revision: 2026-07-30
+            digest: sha256:dfd6878266ba81287632d5a0cc9d5fe8856d2839ac735a460929ba5d7f519705
+          model: nvidia-h100
+          contract: device-plugin
+          resource: gpu
+          variant: {}
+          count: 8
+          healthy: 8
+    - name: health-sample
+      replicas: 100
+      node:
+        capacity:
+          cpu: "16"
+          memory: 64Gi
+          pods: "110"
+        placement:
+          zone: scale-a
+        labels:
+          simulation.kasim.io/reference-role: health-sample
+        taints: []
+      acceleratorPools:
+        - name: accelerator
+          profile:
+            id: nvidia
+            revision: 2026-07-30
+            digest: sha256:dfd6878266ba81287632d5a0cc9d5fe8856d2839ac735a460929ba5d7f519705
+          model: nvidia-h100
+          contract: device-plugin
+          resource: gpu
+          variant: {}
+          count: 8
+          healthy: 8

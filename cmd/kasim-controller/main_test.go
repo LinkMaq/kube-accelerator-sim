@@ -2,6 +2,8 @@ package main
 
 import (
 	"testing"
+
+	"k8s.io/client-go/rest"
 )
 
 func TestParseOptionsUsesSafeRuntimeDefaults(t *testing.T) {
@@ -64,5 +66,38 @@ func TestParseOptionsRestrictsInternalStageOperation(t *testing.T) {
 		"--kwok-stage-operation=replace-all",
 	}); err == nil {
 		t.Fatal("controller accepted an unbounded Stage operation")
+	}
+}
+
+func TestClusterClientConfigUsesBoundedScaleThroughput(t *testing.T) {
+	t.Parallel()
+
+	base := &rest.Config{
+		Host:      "https://cluster.example.test",
+		QPS:       5,
+		Burst:     10,
+		UserAgent: "manager-client",
+	}
+
+	config := clusterClientConfig(base)
+
+	if config == base {
+		t.Fatal("cluster client configuration aliases the manager configuration")
+	}
+	if config.QPS != 100 {
+		t.Errorf("cluster client QPS = %v, want 100", config.QPS)
+	}
+	if config.Burst != 200 {
+		t.Errorf("cluster client burst = %d, want 200", config.Burst)
+	}
+	if config.Host != base.Host {
+		t.Errorf("cluster client host = %q, want %q", config.Host, base.Host)
+	}
+	if base.QPS != 5 || base.Burst != 10 {
+		t.Errorf(
+			"manager configuration mutated to QPS=%v burst=%d",
+			base.QPS,
+			base.Burst,
+		)
 	}
 }

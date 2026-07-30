@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -883,6 +884,7 @@ func installCompatibilityRuntime(
 	contextName,
 	chartPath,
 	controllerImage string,
+	extraHelmArguments ...string,
 ) {
 	t.Helper()
 	pullImage(t, ctx, dockerBinary, chartKWOKImage)
@@ -903,12 +905,7 @@ func installCompatibilityRuntime(
 		chartKWOKTestRepo+"@"+chartKWOKAMD64Digest,
 	)
 	runKube(t, ctx, kubectlBinary, kubeconfig, "create", "namespace", "kasim-system")
-	helmRuntime(
-		t,
-		ctx,
-		helmBinary,
-		kubeconfig,
-		contextName,
+	helmArguments := []string{
 		"upgrade",
 		"--install",
 		compatibilityReleaseName,
@@ -922,12 +919,24 @@ func installCompatibilityRuntime(
 		"--set",
 		"controller.image.pullPolicy=Never",
 		"--set",
-		"kwok.image.repository="+chartKWOKTestRepo,
+		"kwok.image.repository=" + chartKWOKTestRepo,
 		"--set",
-		"kwok.image.digest="+chartKWOKAMD64Digest,
+		"kwok.image.digest=" + chartKWOKAMD64Digest,
+	}
+	helmArguments = append(helmArguments, extraHelmArguments...)
+	helmArguments = append(
+		helmArguments,
 		"--wait",
 		"--timeout",
 		"240s",
+	)
+	helmRuntime(
+		t,
+		ctx,
+		helmBinary,
+		kubeconfig,
+		contextName,
+		helmArguments...,
 	)
 	for _, deployment := range []string{
 		"compat-kasim-runtime-controller",
@@ -1278,15 +1287,119 @@ func realNodeSafetySnapshot(
 	name string,
 ) string {
 	t.Helper()
-	return kubeOutput(
+	document := kubeOutput(
 		t,
 		ctx,
 		kubectlBinary,
 		kubeconfig,
 		"get",
 		"node/"+name,
-		"-o=jsonpath={.metadata.uid}|{.metadata.labels.app\\.kubernetes\\.io/managed-by}|{.metadata.labels.simulation\\.kasim\\.io/instance-uid}|{.spec.unschedulable}|{.spec.taints}|{.status.capacity.nvidia\\.com/gpu}|{.status.allocatable.nvidia\\.com/gpu}",
+		"-o=json",
 	)
+	var node struct {
+		Metadata struct {
+			UID    string            `json:"uid"`
+			Labels map[string]string `json:"labels"`
+		} `json:"metadata"`
+		Spec struct {
+			Unschedulable bool            `json:"unschedulable"`
+			Taints        []realNodeTaint `json:"taints"`
+		} `json:"spec"`
+		Status struct {
+			Capacity    map[string]string `json:"capacity"`
+			Allocatable map[string]string `json:"allocatable"`
+		} `json:"status"`
+	}
+	if err := json.Unmarshal([]byte(document), &node); err != nil {
+		t.Fatalf("decode real Node safety snapshot: %v", err)
+	}
+	snapshot := struct {
+		UID                    string          `json:"uid"`
+		ManagedBy              string          `json:"managedBy"`
+		InstanceUID            string          `json:"instanceUID"`
+		Unschedulable          bool            `json:"unschedulable"`
+		Taints                 []realNodeTaint `json:"taints"`
+		AcceleratorCapacity    string          `json:"acceleratorCapacity"`
+		AcceleratorAllocatable string          `json:"acceleratorAllocatable"`
+	}{
+		UID:                    node.Metadata.UID,
+		ManagedBy:              node.Metadata.Labels["app.kubernetes.io/managed-by"],
+		InstanceUID:            node.Metadata.Labels["simulation.kasim.io/instance-uid"],
+		Unschedulable:          node.Spec.Unschedulable,
+		Taints:                 stableRealNodeTaints(node.Spec.Taints),
+		AcceleratorCapacity:    node.Status.Capacity["nvidia.com/gpu"],
+		AcceleratorAllocatable: node.Status.Allocatable["nvidia.com/gpu"],
+	}
+	encoded, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatalf("encode real Node safety snapshot: %v", err)
+	}
+	return string(encoded)
+}
+
+type realNodeTaint struct {
+	Key       string `json:"key"`
+	Value     string `json:"value,omitempty"`
+	Effect    string `json:"effect"`
+	TimeAdded string `json:"timeAdded,omitempty"`
+}
+
+func stableRealNodeTaints(taints []realNodeTaint) []realNodeTaint {
+	kubernetesLifecycleTaints := map[string]struct{}{
+		"node.kubernetes.io/not-ready":           {},
+		"node.kubernetes.io/unreachable":         {},
+		"node.kubernetes.io/memory-pressure":     {},
+		"node.kubernetes.io/disk-pressure":       {},
+		"node.kubernetes.io/pid-pressure":        {},
+		"node.kubernetes.io/network-unavailable": {},
+		"node.kubernetes.io/unschedulable":       {},
+	}
+	stable := make([]realNodeTaint, 0, len(taints))
+	for _, taint := range taints {
+		if _, dynamic := kubernetesLifecycleTaints[taint.Key]; dynamic {
+			continue
+		}
+		stable = append(stable, taint)
+	}
+	sort.Slice(stable, func(left, right int) bool {
+		if stable[left].Key != stable[right].Key {
+			return stable[left].Key < stable[right].Key
+		}
+		if stable[left].Effect != stable[right].Effect {
+			return stable[left].Effect < stable[right].Effect
+		}
+		return stable[left].Value < stable[right].Value
+	})
+	return stable
+}
+
+func TestStableRealNodeTaintsExcludeNodeLifecycleNoise(t *testing.T) {
+	t.Parallel()
+
+	taints := stableRealNodeTaints([]realNodeTaint{
+		{
+			Key:    "node.kubernetes.io/not-ready",
+			Effect: "NoExecute",
+		},
+		{
+			Key:    "node.kubernetes.io/unreachable",
+			Effect: "NoExecute",
+		},
+		{
+			Key:    "dedicated",
+			Value:  "control-plane",
+			Effect: "NoSchedule",
+		},
+	})
+
+	if len(taints) != 1 {
+		t.Fatalf("stable taints = %#v, want one user-managed taint", taints)
+	}
+	if taints[0].Key != "dedicated" ||
+		taints[0].Value != "control-plane" ||
+		taints[0].Effect != "NoSchedule" {
+		t.Fatalf("stable taint = %#v, want dedicated control-plane", taints[0])
+	}
 }
 
 func realLeaseSafetySnapshot(

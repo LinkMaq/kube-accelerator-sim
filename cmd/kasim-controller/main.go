@@ -32,7 +32,12 @@ import (
 	"github.com/LinkMaq/kube-accelerator-sim/internal/version"
 )
 
-const leaderElectionID = "kasim-controller.simulation.kasim.io"
+const (
+	leaderElectionID = "kasim-controller.simulation.kasim.io"
+
+	clusterClientQPS   = 100
+	clusterClientBurst = 200
+)
 
 type options struct {
 	metricsAddress          string
@@ -205,7 +210,7 @@ func start(options options, snapshot catalog.Snapshot) error {
 	if err != nil {
 		return fmt.Errorf("construct direct watch client: %w", err)
 	}
-	kubernetesClient, err := clientset.NewForConfig(config)
+	kubernetesClient, err := clientset.NewForConfig(clusterClientConfig(config))
 	if err != nil {
 		return fmt.Errorf("construct typed Kubernetes client: %w", err)
 	}
@@ -246,6 +251,13 @@ func start(options options, snapshot catalog.Snapshot) error {
 		return fmt.Errorf("run controller manager: %w", err)
 	}
 	return nil
+}
+
+func clusterClientConfig(base *rest.Config) *rest.Config {
+	config := rest.CopyConfig(base)
+	config.QPS = clusterClientQPS
+	config.Burst = clusterClientBurst
+	return config
 }
 
 type watchingClient struct {
