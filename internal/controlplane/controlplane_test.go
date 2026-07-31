@@ -208,6 +208,69 @@ func TestKubernetesWatchResumesAfterOpaqueResourceVersionAndCloses(t *testing.T)
 	}
 }
 
+func TestKubernetesWatchReportsExactObjectDeletion(t *testing.T) {
+	t.Parallel()
+
+	adapter, kubernetesClient := newKubernetesAdapter(t)
+	fixture := newFixture(t)
+	if _, err := adapter.Submit(
+		context.Background(),
+		fixture.createCommand(),
+	); err != nil {
+		t.Fatal(err)
+	}
+	instance := &simulationv1alpha1.ScenarioInstance{}
+	key := client.ObjectKey{Name: fixture.name.String()}
+	if err := kubernetesClient.Get(
+		context.Background(),
+		key,
+		instance,
+	); err != nil {
+		t.Fatal(err)
+	}
+	instance.Finalizers = nil
+	if err := kubernetesClient.Update(
+		context.Background(),
+		instance,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := kubernetesClient.Get(
+		context.Background(),
+		key,
+		instance,
+	); err != nil {
+		t.Fatal(err)
+	}
+	stream, err := adapter.Watch(
+		context.Background(),
+		controlplane.WatchCursor{
+			Key:                  fixture.key,
+			AfterResourceVersion: instance.ResourceVersion,
+			Limit:                1,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := kubernetesClient.Delete(
+		context.Background(),
+		instance,
+	); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if _, err := stream.Next(
+		ctx,
+	); controlplane.ErrorCodeOf(err) != controlplane.ErrorNotFound {
+		t.Fatalf("deleted object watch error = %v, want NotFound", err)
+	}
+	if err := stream.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestKubernetesWatchExpiryReturnsCurrentResumeCursor(t *testing.T) {
 	t.Parallel()
 

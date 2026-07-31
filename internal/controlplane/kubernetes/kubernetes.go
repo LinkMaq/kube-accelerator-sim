@@ -832,6 +832,16 @@ func (stream *eventStream) Next(ctx context.Context) (controlplane.InstanceEvent
 			}
 			stream.cursor = instance.ResourceVersion
 			stream.count++
+			if event.Type == watch.Deleted {
+				return controlplane.InstanceEvent{}, controlplane.NewError(
+					controlplane.ErrorNotFound,
+					fmt.Sprintf(
+						"Scenario Instance %q was deleted",
+						stream.key.Name.String(),
+					),
+					"",
+				)
+			}
 			return controlplane.InstanceEvent{
 				Cursor: stream.cursor,
 				Record: record,
