@@ -17,7 +17,7 @@ LDFLAGS := -X '$(VERSION_PACKAGE).productVersion=$(VERSION)' \
 
 .PHONY: architecture build chart-package chart-push chart-verify container-image \
 	container-image-local format format-check generate-check module-check \
-	release-artifacts test test-race verify vet
+	release-artifacts test test-race traceability-check verify vet
 
 architecture:
 	$(GO) run ./internal/tools/archcheck --root .
@@ -101,7 +101,10 @@ test:
 test-race:
 	$(GO) test -race ./...
 
+traceability-check:
+	$(GO) run ./internal/tools/traceability --check
+
 vet:
 	$(GO) vet ./...
 
-verify: format-check vet test test-race architecture chart-verify
+verify: format-check vet test test-race architecture traceability-check chart-verify

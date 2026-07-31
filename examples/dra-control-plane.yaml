@@ -1,0 +1,30 @@
+metadata:
+  name: dra-control-plane
+spec:
+  fidelity: dra-control-plane
+  acceptance:
+    provisionalProfiles: false
+  nodeGroups:
+    - name: workers
+      replicas: 2
+      node:
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: lab-a
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: accelerator
+          profile:
+            id: nvidia
+            revision: 2026-07-30
+            digest: sha256:dfd6878266ba81287632d5a0cc9d5fe8856d2839ac735a460929ba5d7f519705
+          model: nvidia-h100
+          contract: dra
+          resource: device
+          variant: {}
+          count: 8
+          healthy: 8

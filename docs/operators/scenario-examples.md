@@ -1,0 +1,91 @@
+# Scenario examples
+
+Every example is a canonical, versioned Scenario document. Validate it
+offline before any cluster write:
+
+```sh
+./dist/kasim apply -f ./examples/heterogeneous.yaml \
+  --dry-run=client \
+  -o json
+```
+
+Connected apply always names the existing target explicitly:
+
+```sh
+./dist/kasim apply -f ./examples/heterogeneous.yaml \
+  --kubeconfig ./target.kubeconfig \
+  --context target \
+  -o json
+```
+
+| Scenario | File | Intended control-plane shape |
+| --- | --- | --- |
+| Single Node, single accelerator | [single-node-single-accelerator.yaml](../../examples/single-node-single-accelerator.yaml) | One Synthetic Node with one `nvidia.com/gpu` unit |
+| Single Node, multiple accelerators | [single-node-multi-accelerator.yaml](../../examples/single-node-multi-accelerator.yaml) | One Synthetic Node with eight units |
+| Multiple Nodes, multiple accelerators | [multi-node-multi-accelerator.yaml](../../examples/multi-node-multi-accelerator.yaml) | Four homogeneous Nodes with eight units each |
+| Heterogeneous cluster | [heterogeneous.yaml](../../examples/heterogeneous.yaml) | Separate NVIDIA H100 and Huawei Atlas A2 Node Groups |
+| Stable DRA control plane | [dra-control-plane.yaml](../../examples/dra-control-plane.yaml) | Deterministic `resource.k8s.io/v1` inventory on Kubernetes 1.34–1.36 |
+| Reference scale | [reference-scale.yaml](../../test/e2e/testdata/reference-scale.yaml) | Release gate with 1,000 Nodes and 8,000 units |
+
+The file stores exact profile revisions and digests. If catalog evidence is
+revised, select the new profile intentionally and review the resulting
+canonical digest. Do not mechanically edit a digest to bypass compilation.
+
+## Homogeneous demo shortcut
+
+For a quick homogeneous scheduling projection, the shortcut uses the same
+compiler and lifecycle path:
+
+```sh
+./dist/kasim apply demo \
+  --profile nvidia \
+  --model nvidia-h100 \
+  --contract device-plugin \
+  --resource gpu \
+  --nodes 2 \
+  --accelerators-per-node 8 \
+  --healthy-per-node 8 \
+  --dry-run=client \
+  -o json
+```
+
+Remove `--dry-run=client` and add both explicit target flags to submit:
+
+```sh
+./dist/kasim apply demo \
+  --profile nvidia \
+  --model nvidia-h100 \
+  --contract device-plugin \
+  --resource gpu \
+  --nodes 2 \
+  --accelerators-per-node 8 \
+  --healthy-per-node 8 \
+  --kubeconfig ./target.kubeconfig \
+  --context target \
+  -o json
+```
+
+Heterogeneous and multi-pool configurations use a Scenario document, not the
+shortcut.
+
+## Health, capacity, and scale
+
+The example files set `count` (capacity) and `healthy` (allocatable) per Node.
+A smaller `healthy` value represents partial health while remaining a valid
+Ready Scenario. The CLI `health` command revises only that typed field.
+
+The CLI `scale` command changes one Node Group replica count. Scale-down uses
+the highest stable replica indices first. A capacity reduction can report
+`Overcommitted`; existing bound Pods remain untouched.
+
+## DRA gating
+
+`dra-control-plane` requires stable `resource.k8s.io/v1`, so preflight rejects
+it below Kubernetes 1.34 and outside the supported 1.34–1.36 DRA range. It
+simulates DRA inventory, claims, allocation, scheduler reservation, and
+cleanup. It does not perform node preparation or container device injection.
+
+All examples model Kubernetes-visible surfaces. The project does not provide
+device access, does not execute accelerator compute, does not install vendor
+drivers, does not provide vendor telemetry, does not simulate NUMA topology,
+and does not inject CDI devices.

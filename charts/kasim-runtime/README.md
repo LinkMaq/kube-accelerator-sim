@@ -6,6 +6,8 @@ the cluster lifecycle. Create the namespace separately, then install:
 
 ```sh
 helm upgrade --install kasim-runtime ./charts/kasim-runtime \
+  --kubeconfig ./target.kubeconfig \
+  --kube-context target \
   --namespace kasim-system
 ```
 

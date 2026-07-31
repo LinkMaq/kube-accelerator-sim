@@ -1,0 +1,53 @@
+metadata:
+  name: heterogeneous-lab
+spec:
+  fidelity: scheduling
+  acceptance:
+    provisionalProfiles: false
+  nodeGroups:
+    - name: nvidia-workers
+      replicas: 2
+      node:
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: lab-a
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: h100
+          profile:
+            id: nvidia
+            revision: 2026-07-30
+            digest: sha256:dfd6878266ba81287632d5a0cc9d5fe8856d2839ac735a460929ba5d7f519705
+          model: nvidia-h100
+          contract: device-plugin
+          resource: gpu
+          variant: {}
+          count: 8
+          healthy: 8
+    - name: ascend-workers
+      replicas: 2
+      node:
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: lab-b
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: atlas-a2
+          profile:
+            id: huawei-ascend
+            revision: 2026-07-30
+            digest: sha256:e94ee314cf9b9076350e79666a7f660283b0d83c9b40de1c33c6707012737519
+          model: huawei-atlas-a2
+          contract: device-plugin
+          resource: ascend910
+          variant: {}
+          count: 8
+          healthy: 8
