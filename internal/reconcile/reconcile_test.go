@@ -23,7 +23,7 @@ import (
 
 var fixedTime = time.Date(2026, 7, 30, 8, 0, 0, 0, time.UTC)
 
-func TestReconcileCreatesClosedSyntheticNodeBeforeOwnedLease(t *testing.T) {
+func TestReconcileCreatesOwnedLeaseBeforeActiveClosedSyntheticNode(t *testing.T) {
 	t.Parallel()
 
 	fixture := newFixture(t, recording.Options{
@@ -45,18 +45,18 @@ func TestReconcileCreatesClosedSyntheticNodeBeforeOwnedLease(t *testing.T) {
 	}
 	changes := changeSets[0].Changes()
 	if len(changes) != 1 {
-		t.Fatalf("first change set = %d changes, want one closed Node", len(changes))
+		t.Fatalf("first change set = %d changes, want one owned Lease", len(changes))
 	}
-	node, ok := changes[0].(cluster.ApplySyntheticNode)
+	lease, ok := changes[0].(cluster.ApplyLease)
 	if !ok {
-		t.Fatalf("first change = %T, want ApplySyntheticNode", changes[0])
+		t.Fatalf("first change = %T, want ApplyLease", changes[0])
 	}
-	if !node.Unschedulable() ||
-		node.Annotations()["kwok.x-k8s.io/node"] != "disabled" ||
-		node.Labels()["simulation.kasim.io/node-group"] != "nodes" {
-		t.Fatalf("unexpected closed unactivated Synthetic Node intent: %#v", node)
+	if lease.Key().Namespace() != "kube-node-lease" ||
+		lease.HolderIdentity() != lease.Key().Name() ||
+		lease.LeaseDurationSeconds() != 40 {
+		t.Fatalf("unexpected owned Lease prerequisite: %#v", lease)
 	}
-	if changes[0].Key().Kind() != cluster.ObjectKindNode {
+	if changes[0].Key().Kind() != cluster.ObjectKindLease {
 		t.Fatalf("unexpected object mutation %s", changes[0].Key().Kind())
 	}
 	if len(fixture.commits) != 1 ||
@@ -64,6 +64,165 @@ func TestReconcileCreatesClosedSyntheticNodeBeforeOwnedLease(t *testing.T) {
 		fixture.commits[0].Status.Phase != "Reconciling" ||
 		fixture.commits[0].Finalization != reconcile.FinalizationEnsure {
 		t.Fatalf("unexpected committed status intent: %#v", fixture.commits)
+	}
+}
+
+func TestReconcileCreatesActiveClosedNodeOnlyAfterOwnedLeaseWasObserved(t *testing.T) {
+	t.Parallel()
+
+	observed := completeObservedGraph(t, true, nil)
+	observed.Objects = observed.Objects[:1]
+	fixture := newFixture(t, recording.Options{
+		Capabilities: schedulingCapabilities(),
+		Observed:     observed,
+	})
+	result, err := fixture.reconciler.Reconcile(context.Background(), fixture.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Requeue() || result.Phase() != "Reconciling" {
+		t.Fatalf("Node create stage result = %#v", result)
+	}
+	changes := fixture.cluster.PersistentChangeSets()[0].Changes()
+	if len(changes) != 1 {
+		t.Fatalf("Node create stage changes = %d, want 1", len(changes))
+	}
+	node, ok := changes[0].(cluster.ApplySyntheticNode)
+	if !ok ||
+		!node.Unschedulable() ||
+		node.Annotations()["kwok.x-k8s.io/node"] != "fake" ||
+		node.Key().Name() != syntheticNodeName(t) {
+		t.Fatalf("active closed Node did not follow owned Lease: %#v", changes)
+	}
+}
+
+func TestReconcileWaitsForEveryOwnedLeaseBeforeCreatingAnyNode(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixtureScenario(t, recording.Options{
+		Capabilities: schedulingCapabilities(),
+		Observed: cluster.ObservedGraph{Objects: []cluster.ObservedObject{
+			observedLeaseAt(t, 0),
+		}},
+	}, 8, 8, 2)
+	result, err := fixture.reconciler.Reconcile(context.Background(), fixture.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Requeue() || result.Phase() != "Reconciling" {
+		t.Fatalf("Lease barrier result = %#v", result)
+	}
+	changes := fixture.cluster.PersistentChangeSets()[0].Changes()
+	if len(changes) != 1 {
+		t.Fatalf("partial Lease stage changes = %d, want 1", len(changes))
+	}
+	lease, ok := changes[0].(cluster.ApplyLease)
+	if !ok ||
+		lease.Key().Name() != syntheticNodeNameAt(t, 1) {
+		t.Fatalf("partial Lease observation bypassed global barrier: %#v", changes)
+	}
+}
+
+func TestReconcileCreatesEveryNodeInStableOrderAfterAllLeasesWereObserved(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	fixture := newFixtureScenario(t, recording.Options{
+		Capabilities: schedulingCapabilities(),
+		Observed: cluster.ObservedGraph{Objects: []cluster.ObservedObject{
+			observedLeaseAt(t, 0),
+			observedLeaseAt(t, 1),
+		}},
+	}, 8, 8, 2)
+	result, err := fixture.reconciler.Reconcile(context.Background(), fixture.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Requeue() || result.Phase() != "Reconciling" {
+		t.Fatalf("Node create barrier result = %#v", result)
+	}
+	changes := fixture.cluster.PersistentChangeSets()[0].Changes()
+	if len(changes) != 2 {
+		t.Fatalf("Node create stage changes = %d, want 2", len(changes))
+	}
+	expectedNames := []string{
+		syntheticNodeNameAt(t, 0),
+		syntheticNodeNameAt(t, 1),
+	}
+	slices.Sort(expectedNames)
+	for index, change := range changes {
+		node, ok := change.(cluster.ApplySyntheticNode)
+		if !ok ||
+			node.Key().Name() != expectedNames[index] ||
+			!node.Unschedulable() ||
+			node.Annotations()["kwok.x-k8s.io/node"] != "fake" {
+			t.Fatalf("Node create change %d bypassed stable active-closed stage: %#v", index, change)
+		}
+	}
+}
+
+func TestReconcilePrioritizesNodeRepairAcrossMixedIdentityStages(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixtureScenario(t, recording.Options{
+		Capabilities: schedulingCapabilities(),
+		Observed: cluster.ObservedGraph{Objects: []cluster.ObservedObject{
+			observedNodeAt(t, 0, false, "fake"),
+			observedLeaseAt(t, 2),
+		}},
+	}, 8, 8, 3)
+	result, err := fixture.reconciler.Reconcile(context.Background(), fixture.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Requeue() || result.Phase() != "Reconciling" {
+		t.Fatalf("mixed repair barrier result = %#v", result)
+	}
+	changes := fixture.cluster.PersistentChangeSets()[0].Changes()
+	if len(changes) != 1 {
+		t.Fatalf("mixed repair stage changes = %d, want 1", len(changes))
+	}
+	node, ok := changes[0].(cluster.ApplySyntheticNode)
+	if !ok ||
+		node.Key().Name() != syntheticNodeNameAt(t, 0) ||
+		!node.Unschedulable() ||
+		node.Annotations()["kwok.x-k8s.io/node"] != "disabled" {
+		t.Fatalf("mixed identity stages bypassed repair barrier: %#v", changes)
+	}
+}
+
+func TestReconcilePrioritizesEveryLeaseAcrossMixedIdentityStages(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixtureScenario(t, recording.Options{
+		Capabilities: schedulingCapabilities(),
+		Observed: cluster.ObservedGraph{Objects: []cluster.ObservedObject{
+			observedNodeAt(t, 0, true, "disabled"),
+			observedLeaseAt(t, 2),
+		}},
+	}, 8, 8, 3)
+	result, err := fixture.reconciler.Reconcile(context.Background(), fixture.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Requeue() || result.Phase() != "Reconciling" {
+		t.Fatalf("mixed Lease barrier result = %#v", result)
+	}
+	changes := fixture.cluster.PersistentChangeSets()[0].Changes()
+	if len(changes) != 2 {
+		t.Fatalf("mixed Lease stage changes = %d, want 2", len(changes))
+	}
+	expectedNames := []string{
+		syntheticNodeNameAt(t, 0),
+		syntheticNodeNameAt(t, 1),
+	}
+	slices.Sort(expectedNames)
+	for index, change := range changes {
+		lease, ok := change.(cluster.ApplyLease)
+		if !ok || lease.Key().Name() != expectedNames[index] {
+			t.Fatalf("Lease change %d was not stable or bypassed: %#v", index, change)
+		}
 	}
 }
 
@@ -1655,6 +1814,77 @@ func staleObservedObjects(
 				RenewTime:            fixedTime,
 			},
 		}
+}
+
+func observedLeaseAt(t *testing.T, index uint64) cluster.ObservedObject {
+	t.Helper()
+	name := syntheticNodeNameAt(t, index)
+	generation, err := domain.NewGeneration(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, err := cluster.NewObjectKey(
+		cluster.ObjectKindLease,
+		"kube-node-lease",
+		name,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cluster.ObservedObject{
+		Key:               key,
+		UID:               "lease-uid-" + strconv.FormatUint(index, 10),
+		ResourceVersion:   strconv.FormatUint(100+index, 10),
+		DesiredGeneration: generation,
+		Lease: &cluster.ObservedLeaseState{
+			HolderIdentity:       name,
+			LeaseDurationSeconds: 40,
+			RenewTime:            fixedTime,
+		},
+	}
+}
+
+func observedNodeAt(
+	t *testing.T,
+	index uint64,
+	unschedulable bool,
+	runtimeAnnotation string,
+) cluster.ObservedObject {
+	t.Helper()
+	name := syntheticNodeNameAt(t, index)
+	generation, err := domain.NewGeneration(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, err := cluster.NewObjectKey(cluster.ObjectKindNode, "", name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replicaIndex := strconv.FormatUint(index, 10)
+	return cluster.ObservedObject{
+		Key:               key,
+		UID:               "node-uid-" + replicaIndex,
+		ResourceVersion:   strconv.FormatUint(200+index, 10),
+		DesiredGeneration: generation,
+		Node: &cluster.ObservedNodeState{
+			Labels: map[string]string{
+				"kubernetes.io/hostname":            name,
+				"simulation.kasim.io/scenario":      "training-lab",
+				"simulation.kasim.io/node-group":    "nodes",
+				"simulation.kasim.io/replica-index": replicaIndex,
+				cluster.ManagedByLabel:              cluster.ManagedByValue,
+				cluster.InstanceUIDLabel:            "memory-1",
+				cluster.DesiredGenerationLabel:      "1",
+			},
+			Annotations: map[string]string{
+				"kwok.x-k8s.io/node": runtimeAnnotation,
+			},
+			Unschedulable: unschedulable,
+			Capacity:      map[string]string{"nvidia.com/gpu": "8"},
+			Allocatable:   map[string]string{"nvidia.com/gpu": "8"},
+			Ready:         true,
+		},
+	}
 }
 
 func completeObservedGraph(

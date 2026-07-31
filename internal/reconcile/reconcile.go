@@ -1055,7 +1055,8 @@ func (reconciler *InstanceReconciler) missingIdentityChanges(
 	}
 	contribution := reconciler.runtime.NodeContribution()
 	inactiveAnnotations := contribution.InactiveAnnotations()
-	nodeChanges := make([]cluster.OwnedChange, 0, len(graph.Nodes()))
+	repairNodeChanges := make([]cluster.OwnedChange, 0, len(graph.Nodes()))
+	createNodeChanges := make([]cluster.OwnedChange, 0, len(graph.Nodes()))
 	leaseChanges := make([]cluster.OwnedChange, 0, len(graph.Nodes()))
 	now := reconciler.now().UTC()
 	for _, node := range graph.Nodes() {
@@ -1092,6 +1093,7 @@ func (reconciler *InstanceReconciler) missingIdentityChanges(
 			return nil, err
 		}
 		actualNode, nodeFound := observedKeys[objectIdentity(nodeKey)]
+		nodeAnnotations := contribution.Annotations()
 		if nodeFound {
 			if actualNode.Node == nil {
 				return nil, fmt.Errorf(
@@ -1107,6 +1109,9 @@ func (reconciler *InstanceReconciler) missingIdentityChanges(
 					)) {
 				continue
 			}
+			nodeAnnotations = inactiveAnnotations
+		} else if !leaseFound {
+			continue
 		}
 		labels := node.Labels()
 		for key, value := range fragments[node.Name()].IdentityLabels() {
@@ -1125,7 +1130,7 @@ func (reconciler *InstanceReconciler) missingIdentityChanges(
 			preconditions(actualNode),
 			cluster.SyntheticNodeInput{
 				Labels:        labels,
-				Annotations:   inactiveAnnotations,
+				Annotations:   nodeAnnotations,
 				Taints:        taints,
 				Unschedulable: true,
 			},
@@ -1133,14 +1138,24 @@ func (reconciler *InstanceReconciler) missingIdentityChanges(
 		if err != nil {
 			return nil, err
 		}
-		nodeChanges = append(nodeChanges, change)
+		if nodeFound {
+			repairNodeChanges = append(repairNodeChanges, change)
+		} else {
+			createNodeChanges = append(createNodeChanges, change)
+		}
 	}
-	if len(nodeChanges) != 0 {
-		// A later Reconcile must observe every closed, runtime-inactive Node
-		// before its Lease can enter the cluster.
-		return nodeChanges, nil
+	if len(repairNodeChanges) != 0 {
+		// A later Reconcile must observe every repaired Node as closed and
+		// runtime-inactive before recreating a missing Lease.
+		return repairNodeChanges, nil
 	}
-	return leaseChanges, nil
+	if len(leaseChanges) != 0 {
+		// KWOK independently renews Node Leases. Establish exact ownership
+		// before creating an active Synthetic Node so the runtime can never
+		// win an unowned create race.
+		return leaseChanges, nil
+	}
+	return createNodeChanges, nil
 }
 
 func (reconciler *InstanceReconciler) metadataChanges(
