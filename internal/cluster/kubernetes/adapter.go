@@ -2,10 +2,12 @@ package kubernetes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
@@ -32,10 +34,11 @@ import (
 )
 
 const (
-	discoveryPageSize        = int64(200)
-	minimumMinor             = 30
-	maximumMinor             = 36
-	ownedMutationConcurrency = 32
+	discoveryPageSize           = int64(200)
+	minimumMinor                = 30
+	maximumMinor                = 36
+	ownedMutationConcurrency    = 32
+	ownedObservationConcurrency = 32
 )
 
 var ownedMutationConflictBackoff = wait.Backoff{
@@ -522,6 +525,10 @@ func (adapter *Adapter) Observe(
 		}
 	}
 	slices.Sort(ownedNodeNames)
+	ownedNodeNameSet := make(map[string]struct{}, len(ownedNodeNames))
+	for _, name := range ownedNodeNames {
+		ownedNodeNameSet[name] = struct{}{}
+	}
 	pods := make([]cluster.ObservedPod, 0)
 	observedPodKeys := make(map[string]struct{})
 	appendPod := func(pod *corev1.Pod) error {
@@ -540,15 +547,15 @@ func (adapter *Adapter) Observe(
 		}
 		return nil
 	}
-	if len(resourceClaims) != 0 {
-		claimNamesByNamespace := make(map[string]map[string]struct{})
-		for _, claim := range resourceClaims {
-			if claimNamesByNamespace[claim.Namespace] == nil {
-				claimNamesByNamespace[claim.Namespace] =
-					make(map[string]struct{})
-			}
-			claimNamesByNamespace[claim.Namespace][claim.Name] = struct{}{}
+	claimNamesByNamespace := make(map[string]map[string]struct{})
+	for _, claim := range resourceClaims {
+		if claimNamesByNamespace[claim.Namespace] == nil {
+			claimNamesByNamespace[claim.Namespace] =
+				make(map[string]struct{})
 		}
+		claimNamesByNamespace[claim.Namespace][claim.Name] = struct{}{}
+	}
+	if len(claimNamesByNamespace) != 0 {
 		continueToken = ""
 		for {
 			result, err := adapter.client.CoreV1().Pods(metav1.NamespaceAll).List(
@@ -560,16 +567,18 @@ func (adapter *Adapter) Observe(
 			)
 			if err != nil {
 				return cluster.ObservedGraph{}, classify(
-					"observe Pods referencing selected DRA ResourceClaims",
+					"observe Pods bound to owned Nodes or referencing selected DRA ResourceClaims",
 					err,
 				)
 			}
 			for index := range result.Items {
 				pod := &result.Items[index]
-				if !podReferencesResourceClaim(
+				_, boundToOwnedNode := ownedNodeNameSet[pod.Spec.NodeName]
+				referencesOwnedClaim := podReferencesResourceClaim(
 					pod,
 					claimNamesByNamespace[pod.Namespace],
-				) {
+				)
+				if !boundToOwnedNode && !referencesOwnedClaim {
 					continue
 				}
 				if err := appendPod(pod); err != nil {
@@ -581,42 +590,18 @@ func (adapter *Adapter) Observe(
 				break
 			}
 		}
-	}
-	for _, nodeName := range ownedNodeNames {
-		continueToken = ""
-		for {
-			result, err := adapter.client.CoreV1().Pods(metav1.NamespaceAll).List(
-				ctx,
-				metav1.ListOptions{
-					FieldSelector: fields.OneTermEqualSelector(
-						"spec.nodeName",
-						nodeName,
-					).String(),
-					Limit:    discoveryPageSize,
-					Continue: continueToken,
-				},
-			)
-			if err != nil {
-				return cluster.ObservedGraph{}, classify(
-					"observe Pods bound to owned Nodes",
-					err,
-				)
-			}
-			for index := range result.Items {
-				pod := &result.Items[index]
-				// The field selector is the authoritative server-side bound,
-				// while this equality check also protects test clients and
-				// proxies that do not enforce field selectors.
-				if pod.Spec.NodeName != nodeName {
-					continue
-				}
-				if err := appendPod(pod); err != nil {
-					return cluster.ObservedGraph{}, err
-				}
-			}
-			continueToken = result.Continue
-			if continueToken == "" {
-				break
+	} else if len(ownedNodeNames) != 0 {
+		boundPods, err := adapter.observePodsBoundToNodes(
+			ctx,
+			ownedNodeNames,
+			cluster.MaximumObservedPods,
+		)
+		if err != nil {
+			return cluster.ObservedGraph{}, err
+		}
+		for index := range boundPods {
+			if err := appendPod(&boundPods[index]); err != nil {
+				return cluster.ObservedGraph{}, err
 			}
 		}
 	}
@@ -640,6 +625,140 @@ func (adapter *Adapter) Observe(
 		Pods:           pods,
 		ResourceClaims: resourceClaims,
 	}, nil
+}
+
+func (adapter *Adapter) observePodsBoundToNodes(
+	ctx context.Context,
+	nodeNames []string,
+	maxPods int64,
+) ([]corev1.Pod, error) {
+	type indexedResult struct {
+		index int
+		pods  []corev1.Pod
+		err   error
+	}
+	if maxPods <= 0 {
+		return nil, cluster.NewError(
+			cluster.ErrorCapabilityUnavailable,
+			"owned-node Pod observation has no positive budget",
+			false,
+		)
+	}
+	var observedPods atomic.Int64
+	pods := make([]corev1.Pod, 0)
+	for waveStart := 0; waveStart < len(nodeNames); waveStart +=
+		ownedObservationConcurrency {
+		if err := ctx.Err(); err != nil {
+			return nil, classify("observe Pods bound to owned Nodes", err)
+		}
+		waveEnd := min(
+			waveStart+ownedObservationConcurrency,
+			len(nodeNames),
+		)
+		waveCtx, cancelWave := context.WithCancel(ctx)
+		results := make(chan indexedResult, waveEnd-waveStart)
+		for index := waveStart; index < waveEnd; index++ {
+			go func(index int) {
+				observed, err := adapter.observePodsBoundToNode(
+					waveCtx,
+					nodeNames[index],
+					&observedPods,
+					maxPods,
+				)
+				results <- indexedResult{
+					index: index,
+					pods:  observed,
+					err:   err,
+				}
+			}(index)
+		}
+		podsByIndex := make([][]corev1.Pod, waveEnd-waveStart)
+		errorsByIndex := make([]error, waveEnd-waveStart)
+		for range waveEnd - waveStart {
+			result := <-results
+			resultIndex := result.index - waveStart
+			podsByIndex[resultIndex] = result.pods
+			errorsByIndex[resultIndex] = result.err
+			if result.err != nil {
+				cancelWave()
+			}
+		}
+		cancelWave()
+		selectedError := -1
+		for index, err := range errorsByIndex {
+			if err == nil {
+				continue
+			}
+			if selectedError == -1 ||
+				(errors.Is(errorsByIndex[selectedError], context.Canceled) &&
+					!errors.Is(err, context.Canceled)) {
+				selectedError = index
+			}
+		}
+		if selectedError != -1 {
+			return nil, classify(
+				fmt.Sprintf(
+					"observe Pods bound to owned Node %q",
+					nodeNames[waveStart+selectedError],
+				),
+				errorsByIndex[selectedError],
+			)
+		}
+		for index := range podsByIndex {
+			pods = append(pods, podsByIndex[index]...)
+			if int64(len(pods)) > maxPods {
+				return nil, cluster.NewError(
+					cluster.ErrorCapabilityUnavailable,
+					"owned-node Pod observation exceeded its bounded limit",
+					false,
+				)
+			}
+		}
+	}
+	return pods, nil
+}
+
+func (adapter *Adapter) observePodsBoundToNode(
+	ctx context.Context,
+	nodeName string,
+	observedPods *atomic.Int64,
+	maxPods int64,
+) ([]corev1.Pod, error) {
+	pods := make([]corev1.Pod, 0)
+	continueToken := ""
+	for {
+		result, err := adapter.client.CoreV1().Pods(metav1.NamespaceAll).List(
+			ctx,
+			metav1.ListOptions{
+				FieldSelector: fields.OneTermEqualSelector(
+					"spec.nodeName",
+					nodeName,
+				).String(),
+				Limit:    discoveryPageSize,
+				Continue: continueToken,
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
+		for index := range result.Items {
+			if result.Items[index].Spec.NodeName != nodeName {
+				continue
+			}
+			if observedPods.Add(1) > maxPods {
+				return nil, cluster.NewError(
+					cluster.ErrorCapabilityUnavailable,
+					"owned-node Pod observation exceeded its shared limit",
+					false,
+				)
+			}
+			pods = append(pods, result.Items[index])
+		}
+		continueToken = result.Continue
+		if continueToken == "" {
+			return pods, nil
+		}
+	}
 }
 
 func (adapter *Adapter) Execute(

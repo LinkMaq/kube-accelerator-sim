@@ -348,6 +348,239 @@ func TestAdapterObservesOnlyExactUIDOwnedNodesAndLeases(t *testing.T) {
 	}
 }
 
+func TestAdapterObservesBoundPodsWithBoundedConcurrency(t *testing.T) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 3)
+	ownedLabels := ownershipLabels(scope)
+	nodes := make([]corev1.Node, 0, 64)
+	for index := 0; index < 64; index++ {
+		nodes = append(nodes, corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            fmt.Sprintf("owned-node-%02d", index),
+				UID:             types.UID(fmt.Sprintf("node-uid-%02d", index)),
+				ResourceVersion: strconv.Itoa(index + 1),
+				Labels:          ownedLabels,
+			},
+		})
+	}
+	var active atomic.Int32
+	var peak atomic.Int32
+	started := make(chan struct{}, 64)
+	release := make(chan struct{})
+	kubernetesClient, err := kubernetes.NewForConfig(&rest.Config{
+		Host: "https://cluster.example.test",
+		ContentConfig: rest.ContentConfig{
+			AcceptContentTypes: runtime.ContentTypeJSON,
+			ContentType:        runtime.ContentTypeJSON,
+		},
+		Transport: roundTripFunc(func(
+			request *http.Request,
+		) (*http.Response, error) {
+			var responseObject any
+			switch request.URL.Path {
+			case "/api/v1/nodes":
+				responseObject = &corev1.NodeList{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "v1",
+						Kind:       "NodeList",
+					},
+					Items: nodes,
+				}
+			case "/apis/coordination.k8s.io/v1/namespaces/kube-node-lease/leases":
+				responseObject = &coordinationv1.LeaseList{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "coordination.k8s.io/v1",
+						Kind:       "LeaseList",
+					},
+				}
+			case "/api/v1/pods":
+				fieldSelector := request.URL.Query().Get("fieldSelector")
+				const prefix = "spec.nodeName="
+				if !strings.HasPrefix(fieldSelector, prefix) {
+					return nil, fmt.Errorf(
+						"unexpected Pod field selector %q",
+						fieldSelector,
+					)
+				}
+				nodeName := strings.TrimPrefix(fieldSelector, prefix)
+				items := []corev1.Pod{}
+				if nodeName == "owned-node-63" {
+					items = append(items, corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: "team-a",
+							Name:      "owned-workload",
+							UID:       types.UID("owned-pod-uid"),
+						},
+						Spec: corev1.PodSpec{NodeName: nodeName},
+					})
+				}
+				responseObject = &corev1.PodList{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "v1",
+						Kind:       "PodList",
+					},
+					Items: items,
+				}
+				current := active.Add(1)
+				for {
+					observed := peak.Load()
+					if current <= observed || peak.CompareAndSwap(observed, current) {
+						break
+					}
+				}
+				started <- struct{}{}
+				<-release
+				active.Add(-1)
+			default:
+				return nil, fmt.Errorf(
+					"unexpected observation request %s",
+					request.URL.String(),
+				)
+			}
+			payload, marshalErr := json.Marshal(responseObject)
+			if marshalErr != nil {
+				return nil, marshalErr
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header: http.Header{
+					"Content-Type": []string{runtime.ContentTypeJSON},
+				},
+				Body:    io.NopCloser(bytes.NewReader(payload)),
+				Request: request,
+			}, nil
+		}),
+		QPS:   1000,
+		Burst: 1000,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+	type observationResult struct {
+		graph cluster.ObservedGraph
+		err   error
+	}
+	completed := make(chan observationResult, 1)
+	go func() {
+		graph, observeErr := adapter.Observe(context.Background(), scope)
+		completed <- observationResult{graph: graph, err: observeErr}
+	}()
+	for observed := 0; observed < 4; observed++ {
+		select {
+		case <-started:
+		case result := <-completed:
+			close(release)
+			t.Fatalf(
+				"Pod observation completed before concurrent progress: graph %#v, error %v",
+				result.graph,
+				result.err,
+			)
+		case <-time.After(time.Second):
+			close(release)
+			t.Fatalf(
+				"Pod observation did not make bounded concurrent progress: peak %d",
+				peak.Load(),
+			)
+		}
+	}
+	close(release)
+	result := <-completed
+	if result.err != nil {
+		t.Fatal(result.err)
+	}
+	graph := result.graph
+	if len(graph.Pods) != 1 ||
+		graph.Pods[0].Namespace != "team-a" ||
+		graph.Pods[0].Name != "owned-workload" ||
+		graph.Pods[0].NodeName != "owned-node-63" {
+		t.Fatalf("unexpected exact-owned Pod observation: %#v", graph.Pods)
+	}
+	if peak.Load() < 4 || peak.Load() > 32 {
+		t.Fatalf("bounded Pod observation peak = %d, want 4..32", peak.Load())
+	}
+}
+
+func TestAdapterPaginatesBoundPodObservationUntilTheServerCursorCloses(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 3)
+	kubernetesClient := kubernetesfake.NewSimpleClientset(
+		&corev1.Node{ObjectMeta: metav1.ObjectMeta{
+			Name:            "owned-node",
+			UID:             types.UID("node-uid"),
+			ResourceVersion: "11",
+			Labels:          ownershipLabels(scope),
+		}},
+	)
+	podListCalls := 0
+	kubernetesClient.Fake.PrependReactor(
+		"list",
+		"pods",
+		func(action clienttesting.Action) (bool, runtime.Object, error) {
+			options := action.(interface {
+				GetListOptions() metav1.ListOptions
+			}).GetListOptions()
+			podListCalls++
+			if options.FieldSelector != "spec.nodeName=owned-node" ||
+				options.Limit != 200 {
+				t.Fatalf("Pod page options = %#v", options)
+			}
+			switch podListCalls {
+			case 1:
+				if options.Continue != "" {
+					t.Fatalf("first Pod page options = %#v", options)
+				}
+				return true, &corev1.PodList{
+					ListMeta: metav1.ListMeta{Continue: "next-page"},
+					Items: []corev1.Pod{{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: "team-b",
+							Name:      "unrelated",
+						},
+						Spec: corev1.PodSpec{NodeName: "real-node"},
+					}},
+				}, nil
+			case 2:
+				if options.Continue != "next-page" {
+					t.Fatalf("second Pod page options = %#v", options)
+				}
+				return true, &corev1.PodList{Items: []corev1.Pod{{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "team-a",
+						Name:      "owned-workload",
+						UID:       types.UID("owned-pod-uid"),
+					},
+					Spec: corev1.PodSpec{NodeName: "owned-node"},
+				}}}, nil
+			default:
+				t.Fatalf("unexpected Pod list call %d", podListCalls)
+				return true, nil, nil
+			}
+		},
+	)
+
+	graph, err := clusterkubernetes.NewAdapter(kubernetesClient).
+		Observe(context.Background(), scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if podListCalls != 2 ||
+		len(graph.Pods) != 1 ||
+		graph.Pods[0].Namespace != "team-a" ||
+		graph.Pods[0].Name != "owned-workload" {
+		t.Fatalf(
+			"Pod pagination calls=%d graph=%#v",
+			podListCalls,
+			graph,
+		)
+	}
+}
+
 func TestAdapterObservesSchedulerStateLeaseHeartbeatAndBoundPodRequests(t *testing.T) {
 	t.Parallel()
 
