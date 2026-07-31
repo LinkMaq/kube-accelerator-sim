@@ -1,0 +1,30 @@
+metadata:
+  name: google-tpu-v6e-fleet
+spec:
+  fidelity: scheduling
+  acceptance:
+    provisionalProfiles: false
+  nodeGroups:
+    - name: tpu-workers
+      replicas: 2
+      node:
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: accelerator-a
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: tpu-v6e
+          profile:
+            id: google-tpu
+            revision: 2026-07-31
+            digest: sha256:145994176db738324df8a4bcf573ff109dc72df60e586f30676dc1cca89ac83d
+          model: google-tpu-v6e
+          contract: gke
+          resource: tpu
+          variant: {}
+          count: 4
+          healthy: 4

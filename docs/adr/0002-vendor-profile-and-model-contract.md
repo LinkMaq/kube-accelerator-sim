@@ -77,9 +77,9 @@ models:
 
 ## Initial coverage
 
-The first verified catalog covers source-backed contracts for NVIDIA, AMD Instinct, Intel Data Center GPU, Intel Gaudi, Huawei Ascend, Cambricon, Biren, Iluvatar CoreX, Enflame, Moore Threads, FuriosaAI, Graphcore, AWS Neuron, and Google Cloud TPU, including the mainstream model seed established by the vendor evidence research.
+The first verified catalog covers source-backed contracts for NVIDIA, AMD Instinct, Intel Data Center GPU, Intel Gaudi, Huawei Ascend, Cambricon, Biren, Iluvatar CoreX, Enflame, Moore Threads, FuriosaAI, Graphcore, AWS Neuron, Google Cloud TPU, MetaX, and Hygon DCU, including the mainstream model seed established by the vendor evidence research.
 
-The first provisional catalog includes exact, integration-named contracts for MetaX, Hygon DCU, Kunlunxin through HAMi, and Vastai through HAMi. Qualcomm Cloud AI 100 and product-only ecosystems remain catalog-only until a complete fully qualified resource or DRA contract is public. This limitation is evidence-driven; the project does not invent missing vendor names to create superficial coverage.
+The first provisional catalog includes exact, integration-named contracts for Kunlunxin through HAMi and Vastai through HAMi. MetaX and Hygon DCU moved to verified after first-party Kubernetes documentation established their exact resource contracts on 2026-07-31. Qualcomm Cloud AI 100 and product-only ecosystems remain catalog-only until a complete fully qualified resource or DRA contract is public. This limitation is evidence-driven; the project does not invent missing vendor names to create superficial coverage.
 
 ## Consequences
 

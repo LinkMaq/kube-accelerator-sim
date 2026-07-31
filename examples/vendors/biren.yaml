@@ -1,29 +1,28 @@
 metadata:
-  name: training-lab
+  name: biren-br100-fleet
 spec:
   fidelity: scheduling
   acceptance:
     provisionalProfiles: false
   nodeGroups:
-    - name: workers
-      replicas: 1
+    - name: biren-workers
+      replicas: 2
       node:
         capacity:
           cpu: "64"
           memory: 256Gi
           pods: "110"
         placement:
-          zone: lab-a
-        labels:
-          workload.example.com/class: training
+          zone: accelerator-a
+        labels: {}
         taints: []
       acceleratorPools:
-        - name: training
+        - name: br100
           profile:
-            id: nvidia
+            id: biren
             revision: 2026-07-31
-            digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
-          model: nvidia-h100
+            digest: sha256:2a069bb0b61a92b47cce38d9213c091c0c76e92136cc097ee2e14aff0520fe4a
+          model: biren-br100
           contract: device-plugin
           resource: gpu
           variant: {}

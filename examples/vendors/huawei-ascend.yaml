@@ -1,31 +1,30 @@
 metadata:
-  name: training-lab
+  name: huawei-atlas-a2-fleet
 spec:
   fidelity: scheduling
   acceptance:
     provisionalProfiles: false
   nodeGroups:
-    - name: workers
-      replicas: 1
+    - name: ascend-workers
+      replicas: 2
       node:
         capacity:
           cpu: "64"
           memory: 256Gi
           pods: "110"
         placement:
-          zone: lab-a
-        labels:
-          workload.example.com/class: training
+          zone: accelerator-a
+        labels: {}
         taints: []
       acceleratorPools:
-        - name: training
+        - name: atlas-a2
           profile:
-            id: nvidia
+            id: huawei-ascend
             revision: 2026-07-31
-            digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
-          model: nvidia-h100
+            digest: sha256:d4fbba0cf3ddb9b57f98d3cb584010d601baecaa9b0500a108df32e94642629d
+          model: huawei-atlas-a2
           contract: device-plugin
-          resource: gpu
+          resource: ascend910
           variant: {}
           count: 8
           healthy: 8

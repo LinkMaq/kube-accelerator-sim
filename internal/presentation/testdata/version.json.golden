@@ -9,7 +9,7 @@
     "sourceRevision": "unknown",
     "buildDate": "unknown",
     "schemaVersion": "v1alpha1",
-    "catalogVersion": "2026-07-30",
+    "catalogVersion": "2026-07-31",
     "kubernetesFloor": "1.30",
     "kubernetesCeiling": "1.36"
   }

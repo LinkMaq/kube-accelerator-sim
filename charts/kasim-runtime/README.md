@@ -11,6 +11,23 @@ helm upgrade --install kasim-runtime ./charts/kasim-runtime \
   --namespace kasim-system
 ```
 
+For the published `v0.1.0` package, install the same immutable chart directly
+from GitHub Container Registry:
+
+```sh
+helm upgrade --install kasim-runtime \
+  oci://ghcr.io/linkmaq/charts/kasim-runtime \
+  --version 0.1.0 \
+  --kubeconfig ./target.kubeconfig \
+  --kube-context target \
+  --namespace kasim-system
+```
+
+The chart selects
+`ghcr.io/linkmaq/kube-accelerator-sim-controller:0.1.0` by its matching
+`appVersion`. A different controller tag is rejected; use the chart and image
+from the same release.
+
 The default controller and KWOK Pods are non-root, use a read-only root
 filesystem, drop all Linux capabilities, and have hard node affinity excluding
 simulator-owned Synthetic Nodes.

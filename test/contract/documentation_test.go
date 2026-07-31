@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,6 +22,7 @@ import (
 	"github.com/LinkMaq/kube-accelerator-sim/internal/controlplane"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/controlplane/memory"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/domain"
+	"github.com/LinkMaq/kube-accelerator-sim/internal/scenario"
 )
 
 type traceabilityDocument struct {
@@ -164,21 +167,19 @@ func TestDocumentedScenariosCompileThroughTheProductCLI(t *testing.T) {
 	t.Parallel()
 
 	root := repositoryRoot(t)
-	for _, path := range []string{
-		"examples/single-node-single-accelerator.yaml",
-		"examples/single-node-multi-accelerator.yaml",
-		"examples/multi-node-multi-accelerator.yaml",
-		"examples/heterogeneous.yaml",
-		"examples/dra-control-plane.yaml",
-	} {
+	for _, path := range documentedScenarioPaths(t, root) {
 		path := path
-		t.Run(filepath.Base(path), func(t *testing.T) {
+		relative, err := filepath.Rel(filepath.Join(root, "examples"), path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Run(relative, func(t *testing.T) {
 			t.Parallel()
 			var stdout, stderr bytes.Buffer
 			exit := cli.Run(
 				[]string{
 					"apply",
-					"-f", filepath.Join(root, path),
+					"-f", path,
 					"--dry-run=client",
 					"-o", "json",
 				},
@@ -194,6 +195,106 @@ func TestDocumentedScenariosCompileThroughTheProductCLI(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestExamplesCoverEverySelectableVendorResourceSignal(t *testing.T) {
+	t.Parallel()
+
+	root := repositoryRoot(t)
+	snapshot, err := catalog.LoadBundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	covered := make(map[string]struct{})
+	for _, path := range documentedScenarioPaths(t, root) {
+		encoded, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		input, err := scenario.Document(encoded)
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		_, receipt, err := scenario.Compile(input, snapshot)
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		for _, resolution := range receipt.Resolutions() {
+			covered[exampleSignalKey(
+				resolution.ProfileDigest().String(),
+				resolution.ContractID(),
+				resolution.ResourceAlias(),
+			)] = struct{}{}
+		}
+	}
+
+	for _, summary := range snapshot.List() {
+		profile, err := snapshot.Show(summary.ID())
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, contract := range profile.Contracts() {
+			for _, resource := range contract.Resources() {
+				compatible := false
+				for _, model := range profile.Models() {
+					if model.Selectable() &&
+						slices.Contains(model.Contracts(), contract.ID()) &&
+						slices.Contains(model.ResourceAliases(), resource.Alias()) {
+						compatible = true
+						break
+					}
+				}
+				if !compatible {
+					continue
+				}
+				key := exampleSignalKey(
+					profile.Digest().String(),
+					contract.ID(),
+					resource.Alias(),
+				)
+				if _, found := covered[key]; !found {
+					t.Errorf(
+						"examples do not cover selectable signal %s %s/%s (%s)",
+						profile.ID(),
+						contract.ID(),
+						resource.Alias(),
+						resource.Name(),
+					)
+				}
+			}
+		}
+	}
+}
+
+func documentedScenarioPaths(t *testing.T, root string) []string {
+	t.Helper()
+
+	var paths []string
+	examplesRoot := filepath.Join(root, "examples")
+	err := filepath.WalkDir(
+		examplesRoot,
+		func(path string, entry fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if !entry.IsDir() && filepath.Ext(path) == ".yaml" {
+				paths = append(paths, path)
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("list documented Scenarios: %v", err)
+	}
+	sort.Strings(paths)
+	if len(paths) < 20 {
+		t.Fatalf("expected broad documented Scenario coverage, got %d files", len(paths))
+	}
+	return paths
+}
+
+func exampleSignalKey(profileDigest, contractID, resourceAlias string) string {
+	return strings.Join([]string{profileDigest, contractID, resourceAlias}, "\x00")
 }
 
 func TestDocumentedConnectedLifecycleCommandsExecute(t *testing.T) {

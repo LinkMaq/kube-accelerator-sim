@@ -1,0 +1,30 @@
+metadata:
+  name: kunlunxin-p800-fleet
+spec:
+  fidelity: scheduling
+  acceptance:
+    provisionalProfiles: true
+  nodeGroups:
+    - name: kunlunxin-workers
+      replicas: 2
+      node:
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: accelerator-a
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: p800
+          profile:
+            id: kunlunxin-hami
+            revision: 2026-07-31
+            digest: sha256:5c5b606b7b3b84e37a816201869fbb24e558f15b28ff1a9b291772153cfe5e10
+          model: kunlunxin-p800
+          contract: hami-device
+          resource: xpu
+          variant: {}
+          count: 8
+          healthy: 8

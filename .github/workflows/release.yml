@@ -454,9 +454,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_VERSION: ${{ inputs.version }}
-        run: >-
-          gh release create "v${RELEASE_VERSION}"
-          release-artifacts/*
-          --verify-tag
-          --generate-notes
-          --title "kube-accelerator-sim v${RELEASE_VERSION}"
+        run: |
+          notes_file="release/notes/v${RELEASE_VERSION}.md"
+          test -s "${notes_file}"
+          gh release create "v${RELEASE_VERSION}" \
+            release-artifacts/* \
+            --verify-tag \
+            --notes-file "${notes_file}" \
+            --title "kube-accelerator-sim v${RELEASE_VERSION}"

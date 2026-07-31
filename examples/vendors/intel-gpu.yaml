@@ -1,31 +1,30 @@
 metadata:
-  name: training-lab
+  name: intel-max-fleet
 spec:
   fidelity: scheduling
   acceptance:
     provisionalProfiles: false
   nodeGroups:
-    - name: workers
-      replicas: 1
+    - name: intel-gpu-workers
+      replicas: 2
       node:
         capacity:
           cpu: "64"
           memory: 256Gi
           pods: "110"
         placement:
-          zone: lab-a
-        labels:
-          workload.example.com/class: training
+          zone: accelerator-a
+        labels: {}
         taints: []
       acceleratorPools:
-        - name: training
+        - name: max-1550
           profile:
-            id: nvidia
+            id: intel-gpu
             revision: 2026-07-31
-            digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
-          model: nvidia-h100
+            digest: sha256:b7f8a6a57cbf8b21451fb6a34694da00cf9203d3ed2ff4ab3e29cb19cc08c64c
+          model: intel-max-1550
           contract: device-plugin
-          resource: gpu
+          resource: xe
           variant: {}
           count: 8
           healthy: 8

@@ -1,0 +1,494 @@
+metadata:
+  name: extended-resource-variants
+spec:
+  fidelity: scheduling
+  acceptance:
+    provisionalProfiles: true
+  nodeGroups:
+    - name: nvidia-mig
+      replicas: 1
+      node:
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: signal-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: mig-1g-10gb
+          profile:
+            id: nvidia
+            revision: 2026-07-31
+            digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
+          model: nvidia-a100-80gb
+          contract: device-plugin
+          resource: mig-1g-10gb
+          variant: {}
+          count: 8
+          healthy: 8
+        - name: mig-2g-20gb
+          profile:
+            id: nvidia
+            revision: 2026-07-31
+            digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
+          model: nvidia-a100-80gb
+          contract: device-plugin
+          resource: mig-2g-20gb
+          variant: {}
+          count: 4
+          healthy: 4
+        - name: mig-7g-80gb
+          profile:
+            id: nvidia
+            revision: 2026-07-31
+            digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
+          model: nvidia-a100-80gb
+          contract: device-plugin
+          resource: mig-7g-80gb
+          variant: {}
+          count: 1
+          healthy: 1
+    - name: nvidia-shared
+      replicas: 1
+      node:
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: signal-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: l40s-shared
+          profile:
+            id: nvidia
+            revision: 2026-07-31
+            digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
+          model: nvidia-l40s
+          contract: device-plugin
+          resource: gpu-shared
+          variant: {}
+          count: 32
+          healthy: 32
+    - name: amd-partitions
+      replicas: 1
+      node:
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: signal-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: cpx-nps4
+          profile:
+            id: amd
+            revision: 2026-07-31
+            digest: sha256:c165c4b0616a2f4064e6a1805e14d97ed76b66d632a9c050fda89cd8b15d2bea
+          model: amd-mi300x
+          contract: device-plugin
+          resource: cpx-nps4
+          variant: {}
+          count: 8
+          healthy: 8
+        - name: spx-nps1
+          profile:
+            id: amd
+            revision: 2026-07-31
+            digest: sha256:c165c4b0616a2f4064e6a1805e14d97ed76b66d632a9c050fda89cd8b15d2bea
+          model: amd-mi300x
+          contract: device-plugin
+          resource: spx-nps1
+          variant: {}
+          count: 8
+          healthy: 8
+        - name: cpx-nps1
+          profile:
+            id: amd
+            revision: 2026-07-31
+            digest: sha256:c165c4b0616a2f4064e6a1805e14d97ed76b66d632a9c050fda89cd8b15d2bea
+          model: amd-mi300x
+          contract: device-plugin
+          resource: cpx-nps1
+          variant: {}
+          count: 8
+          healthy: 8
+    - name: intel-i915
+      replicas: 1
+      node:
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: signal-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: flex-170
+          profile:
+            id: intel-gpu
+            revision: 2026-07-31
+            digest: sha256:b7f8a6a57cbf8b21451fb6a34694da00cf9203d3ed2ff4ab3e29cb19cc08c64c
+          model: intel-flex-170
+          contract: device-plugin
+          resource: i915
+          variant: {}
+          count: 8
+          healthy: 8
+    - name: ascend-generations
+      replicas: 1
+      node:
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: signal-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: ascend310
+          profile:
+            id: huawei-ascend
+            revision: 2026-07-31
+            digest: sha256:d4fbba0cf3ddb9b57f98d3cb584010d601baecaa9b0500a108df32e94642629d
+          model: huawei-ascend-310
+          contract: device-plugin
+          resource: ascend310
+          variant: {}
+          count: 8
+          healthy: 8
+        - name: ascend310p
+          profile:
+            id: huawei-ascend
+            revision: 2026-07-31
+            digest: sha256:d4fbba0cf3ddb9b57f98d3cb584010d601baecaa9b0500a108df32e94642629d
+          model: huawei-ascend-310p
+          contract: device-plugin
+          resource: ascend310p
+          variant: {}
+          count: 8
+          healthy: 8
+        - name: ascend310p-vnpu
+          profile:
+            id: huawei-ascend
+            revision: 2026-07-31
+            digest: sha256:d4fbba0cf3ddb9b57f98d3cb584010d601baecaa9b0500a108df32e94642629d
+          model: huawei-ascend-310p
+          contract: device-plugin
+          resource: npu-core
+          variant: {}
+          count: 32
+          healthy: 32
+    - name: cambricon-mim
+      replicas: 1
+      node:
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: signal-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: mlu370
+          profile:
+            id: cambricon
+            revision: 2026-07-31
+            digest: sha256:3c68ef76743e2cee037d4072f6be5d67b361138e6e00cd658d9e024507c93edf
+          model: cambricon-mlu370
+          contract: device-plugin
+          resource: mlu370
+          variant: {}
+          count: 8
+          healthy: 8
+        - name: mlu370-mim
+          profile:
+            id: cambricon
+            revision: 2026-07-31
+            digest: sha256:3c68ef76743e2cee037d4072f6be5d67b361138e6e00cd658d9e024507c93edf
+          model: cambricon-mlu370
+          contract: device-plugin
+          resource: mlu370-mim-2m-8gb
+          variant: {}
+          count: 16
+          healthy: 16
+        - name: mlu370-share
+          profile:
+            id: cambricon
+            revision: 2026-07-31
+            digest: sha256:3c68ef76743e2cee037d4072f6be5d67b361138e6e00cd658d9e024507c93edf
+          model: cambricon-mlu370
+          contract: device-plugin
+          resource: mlu370-share
+          variant: {}
+          count: 32
+          healthy: 32
+    - name: biren-partitions
+      replicas: 1
+      node:
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: signal-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: quarter-gpu
+          profile:
+            id: biren
+            revision: 2026-07-31
+            digest: sha256:2a069bb0b61a92b47cce38d9213c091c0c76e92136cc097ee2e14aff0520fe4a
+          model: biren-br100
+          contract: device-plugin
+          resource: quarter-gpu
+          variant: {}
+          count: 32
+          healthy: 32
+        - name: half-gpu
+          profile:
+            id: biren
+            revision: 2026-07-31
+            digest: sha256:2a069bb0b61a92b47cce38d9213c091c0c76e92136cc097ee2e14aff0520fe4a
+          model: biren-br100
+          contract: device-plugin
+          resource: half-gpu
+          variant: {}
+          count: 16
+          healthy: 16
+    - name: iluvatar-legacy
+      replicas: 1
+      node:
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: signal-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: legacy-gpu
+          profile:
+            id: iluvatar
+            revision: 2026-07-31
+            digest: sha256:f19beef220644dc7bc093f75b91a387867cdaa727e99b5c577d515e9252dbaeb
+          model: iluvatar-bi-v150
+          contract: device-plugin
+          resource: legacy-gpu
+          variant: {}
+          count: 8
+          healthy: 8
+    - name: enflame-sharing
+      replicas: 1
+      node:
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: signal-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: shared-gcu
+          profile:
+            id: enflame
+            revision: 2026-07-31
+            digest: sha256:12d285901e12e6b3494454cbb4adcfcd58df1eea3f4dd6546cdaf27712459d82
+          model: enflame-s60
+          contract: device-plugin
+          resource: shared-gcu
+          variant: {}
+          count: 32
+          healthy: 32
+        - name: drs-gcu
+          profile:
+            id: enflame
+            revision: 2026-07-31
+            digest: sha256:12d285901e12e6b3494454cbb4adcfcd58df1eea3f4dd6546cdaf27712459d82
+          model: enflame-s60
+          contract: device-plugin
+          resource: drs-gcu
+          variant: {}
+          count: 32
+          healthy: 32
+    - name: moore-threads-sgpu
+      replicas: 1
+      node:
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: signal-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: sgpu-core
+          profile:
+            id: moore-threads
+            revision: 2026-07-31
+            digest: sha256:fa8bb573c8e6c7eeb89d8ae8503d97b2b389598674d31e69ec79117519f08a30
+          model: moore-threads-mtt-s3000
+          contract: device-plugin
+          resource: sgpu-core
+          variant: {}
+          count: 100
+          healthy: 100
+        - name: sgpu-memory
+          profile:
+            id: moore-threads
+            revision: 2026-07-31
+            digest: sha256:fa8bb573c8e6c7eeb89d8ae8503d97b2b389598674d31e69ec79117519f08a30
+          model: moore-threads-mtt-s3000
+          contract: device-plugin
+          resource: sgpu-memory
+          variant: {}
+          count: 96
+          healthy: 96
+    - name: aws-neuron-cores
+      replicas: 1
+      node:
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: signal-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: neuroncore
+          profile:
+            id: aws-neuron
+            revision: 2026-07-31
+            digest: sha256:91d50953e6d1dc76ddd602b08a215938062cdad7fa2b4414e8b2766447575756
+          model: aws-inferentia2
+          contract: device-plugin
+          resource: neuroncore
+          variant: {}
+          count: 32
+          healthy: 32
+    - name: metax-modes
+      replicas: 1
+      node:
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: signal-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: vfio-gpu
+          profile:
+            id: metax
+            revision: 2026-07-31
+            digest: sha256:c39da7311ee12247f621832c3a4f24bcbfa8b6563bd2eaf1014615d25a959ebd
+          model: metax-c500
+          contract: device-plugin
+          resource: vfio-gpu
+          variant: {}
+          count: 8
+          healthy: 8
+        - name: sgpu
+          profile:
+            id: metax
+            revision: 2026-07-31
+            digest: sha256:c39da7311ee12247f621832c3a4f24bcbfa8b6563bd2eaf1014615d25a959ebd
+          model: metax-c500
+          contract: device-plugin
+          resource: sgpu
+          variant: {}
+          count: 16
+          healthy: 16
+    - name: hygon-vdcu
+      replicas: 1
+      node:
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: signal-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: dcu-share-30c-16g
+          profile:
+            id: hygon
+            revision: 2026-07-31
+            digest: sha256:f9c9a7fc5f06b32dd18759cd6634b53df7ec83e6d0231ede35f39be61cebe242
+          model: hygon-k100-ai
+          contract: device-plugin
+          resource: dcu-share-30c-16g
+          variant: {}
+          count: 8
+          healthy: 8
+        - name: dcu-share-36c-16g
+          profile:
+            id: hygon
+            revision: 2026-07-31
+            digest: sha256:f9c9a7fc5f06b32dd18759cd6634b53df7ec83e6d0231ede35f39be61cebe242
+          model: hygon-k100-ai
+          contract: device-plugin
+          resource: dcu-share-36c-16g
+          variant: {}
+          count: 8
+          healthy: 8
+        - name: dcu-share-36c-5g
+          profile:
+            id: hygon
+            revision: 2026-07-31
+            digest: sha256:f9c9a7fc5f06b32dd18759cd6634b53df7ec83e6d0231ede35f39be61cebe242
+          model: hygon-k100-ai
+          contract: device-plugin
+          resource: dcu-share-36c-5g
+          variant: {}
+          count: 16
+          healthy: 16
+    - name: kunlunxin-vxpu
+      replicas: 1
+      node:
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: signal-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: vxpu
+          profile:
+            id: kunlunxin-hami
+            revision: 2026-07-31
+            digest: sha256:5c5b606b7b3b84e37a816201869fbb24e558f15b28ff1a9b291772153cfe5e10
+          model: kunlunxin-p800
+          contract: hami-vxpu
+          resource: vxpu
+          variant: {}
+          count: 16
+          healthy: 16
+        - name: vxpu-memory
+          profile:
+            id: kunlunxin-hami
+            revision: 2026-07-31
+            digest: sha256:5c5b606b7b3b84e37a816201869fbb24e558f15b28ff1a9b291772153cfe5e10
+          model: kunlunxin-p800
+          contract: hami-vxpu
+          resource: vxpu-memory
+          variant: {}
+          count: 128
+          healthy: 128

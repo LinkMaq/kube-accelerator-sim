@@ -11,8 +11,8 @@ sources:
 annotations:
   simulation.kasim.io/schema-version: v1alpha1
   simulation.kasim.io/product-crd-sha256: 6edf364b62e22de7deb05e817a865601cfce0af9943a73f85c4a8bddb0d15be9
-  simulation.kasim.io/catalog-revision: "2026-07-30"
-  simulation.kasim.io/catalog-sha256: 571e5b3d6a59e5aa641cbb61c6719914140c5e031b38ff08feacb0642a72c260
+  simulation.kasim.io/catalog-revision: "2026-07-31"
+  simulation.kasim.io/catalog-sha256: c37d2624485a9e1ab6c775dcb22e6955187752c31058e8a59ea0dc2b7bb476aa
   simulation.kasim.io/kubernetes-range: "1.30-1.36"
   simulation.kasim.io/kwok-version: v0.8.0
   simulation.kasim.io/kwok-source-commit: 156033d7df7ea0e09cea82b715fe566ea68aeeb4

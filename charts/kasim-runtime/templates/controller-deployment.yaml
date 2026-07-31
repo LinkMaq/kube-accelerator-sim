@@ -11,7 +11,7 @@ metadata:
     app.kubernetes.io/component: controller
   annotations:
     simulation.kasim.io/schema-version: v1alpha1
-    simulation.kasim.io/catalog-revision: "2026-07-30"
+    simulation.kasim.io/catalog-revision: "2026-07-31"
     simulation.kasim.io/kubernetes-range: "1.30-1.36"
 spec:
   replicas: {{ .Values.controller.replicas }}
@@ -31,7 +31,7 @@ spec:
       annotations:
         simulation.kasim.io/product-version: {{ .Chart.AppVersion | quote }}
         simulation.kasim.io/schema-version: v1alpha1
-        simulation.kasim.io/catalog-revision: "2026-07-30"
+        simulation.kasim.io/catalog-revision: "2026-07-31"
         simulation.kasim.io/kubernetes-range: "1.30-1.36"
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}

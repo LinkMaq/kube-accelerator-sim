@@ -34,8 +34,8 @@ spec:
         - name: training
           profile:
             id: nvidia
-            revision: 2026-07-30
-            digest: sha256:dfd6878266ba81287632d5a0cc9d5fe8856d2839ac735a460929ba5d7f519705
+            revision: 2026-07-31
+            digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
           model: nvidia-h100
           contract: device-plugin
           resource: gpu
@@ -176,7 +176,7 @@ func TestCompileRejectsNonCanonicalOrStructurallyAmbiguousDocuments(t *testing.T
 		"unpinned profile": {
 			document: strings.Replace(
 				validScenarioDocument,
-				"sha256:dfd6878266ba81287632d5a0cc9d5fe8856d2839ac735a460929ba5d7f519705",
+				"sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de",
 				"sha256:afd6878266ba81287632d5a0cc9d5fe8856d2839ac735a460929ba5d7f519705",
 				1,
 			),
@@ -250,8 +250,8 @@ func TestCompileRejectsScalarResourceCollisionOnOneNode(t *testing.T) {
         - name: inference
           profile:
             id: nvidia
-            revision: 2026-07-30
-            digest: sha256:dfd6878266ba81287632d5a0cc9d5fe8856d2839ac735a460929ba5d7f519705
+            revision: 2026-07-31
+            digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
           model: nvidia-h200
           contract: device-plugin
           resource: gpu
@@ -324,8 +324,8 @@ func TestCompileRejectsConflictingDRAIdentitySignalsOnOneNode(t *testing.T) {
         - name: inference
           profile:
             id: nvidia
-            revision: 2026-07-30
-            digest: sha256:dfd6878266ba81287632d5a0cc9d5fe8856d2839ac735a460929ba5d7f519705
+            revision: 2026-07-31
+            digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
           model: nvidia-h200
           contract: dra
           resource: device
@@ -389,8 +389,8 @@ spec:
         - name: accelerators
           profile:
             id: nvidia
-            revision: 2026-07-30
-            digest: sha256:dfd6878266ba81287632d5a0cc9d5fe8856d2839ac735a460929ba5d7f519705
+            revision: 2026-07-31
+            digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
           model: nvidia-h100
           contract: device-plugin
           resource: gpu

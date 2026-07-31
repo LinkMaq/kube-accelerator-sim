@@ -1,24 +1,23 @@
 metadata:
-  name: training-lab
+  name: nvidia-h100-fleet
 spec:
   fidelity: scheduling
   acceptance:
     provisionalProfiles: false
   nodeGroups:
-    - name: workers
-      replicas: 1
+    - name: nvidia-workers
+      replicas: 2
       node:
         capacity:
           cpu: "64"
           memory: 256Gi
           pods: "110"
         placement:
-          zone: lab-a
-        labels:
-          workload.example.com/class: training
+          zone: accelerator-a
+        labels: {}
         taints: []
       acceleratorPools:
-        - name: training
+        - name: h100
           profile:
             id: nvidia
             revision: 2026-07-31

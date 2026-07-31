@@ -23,7 +23,7 @@ func TestVersionGoldenInEveryOutputFormat(t *testing.T) {
 			SourceRevision:    "unknown",
 			BuildDate:         "unknown",
 			SchemaVersion:     "v1alpha1",
-			CatalogVersion:    "2026-07-30",
+			CatalogVersion:    "2026-07-31",
 			KubernetesFloor:   "1.30",
 			KubernetesCeiling: "1.36",
 		},

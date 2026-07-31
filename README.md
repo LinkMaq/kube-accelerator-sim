@@ -74,6 +74,7 @@ fidelity claim.
 
 ## Documentation
 
+- [Accelerator vendor and resource-signal examples](examples/README.md)
 - [Scenario examples](docs/operators/scenario-examples.md)
 - [Vendor profile evidence and support classes](docs/operators/profile-evidence.md)
 - [Runtime installation and permissions](docs/operators/runtime-installation.md)
@@ -84,6 +85,34 @@ fidelity claim.
 - [Final v1 audit](docs/operators/final-audit.md)
 - [Normative requirement traceability](docs/operators/requirement-traceability.md)
 - [v1 product specification](docs/spec/v1.md)
+
+## Published packages
+
+The evidence-gated `v0.1.0` release publishes native CLI archives as GitHub
+Release assets and publishes both runtime artifacts through GitHub Packages:
+
+```sh
+docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.1.0
+helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.1.0
+```
+
+Use the chart directly from its OCI package:
+
+```sh
+helm upgrade --install kasim-runtime \
+  oci://ghcr.io/linkmaq/charts/kasim-runtime \
+  --version 0.1.0 \
+  --kubeconfig ./target.kubeconfig \
+  --kube-context target \
+  --namespace kasim-system \
+  --create-namespace=false \
+  --wait
+```
+
+Download and verify the appropriate CLI archive and checksums from the
+[`v0.1.0` release](https://github.com/LinkMaq/kube-accelerator-sim/releases/tag/v0.1.0).
+The verification steps are documented in
+[Release verification](docs/operators/release-verification.md).
 
 ## Development verification
 

@@ -24,8 +24,29 @@ Connected apply always names the existing target explicitly:
 | Single Synthetic Node, multiple Accelerators | [single-node-multi-accelerator.yaml](../../examples/single-node-multi-accelerator.yaml) | One Synthetic Node with eight units |
 | Multiple Synthetic Nodes, multiple Accelerators | [multi-node-multi-accelerator.yaml](../../examples/multi-node-multi-accelerator.yaml) | Four homogeneous Synthetic Nodes with eight units each |
 | Heterogeneous Node Groups | [heterogeneous.yaml](../../examples/heterogeneous.yaml) | Separate NVIDIA H100 and Huawei Atlas A2 Node Groups |
-| Stable DRA control plane | [dra-control-plane.yaml](../../examples/dra-control-plane.yaml) | Deterministic `resource.k8s.io/v1` inventory on Kubernetes 1.34–1.36 |
+| Per-vendor presets | [examples/vendors](../../examples/vendors) | One directly applicable Scenario for each of 17 selectable vendor ecosystems |
+| Extended-resource variants | [extended-resource-variants.yaml](../../examples/signals/extended-resource-variants.yaml) | Alternate, partitioned, shared, virtual, memory, and core resource signals |
+| Stable DRA control plane | [dra-control-plane.yaml](../../examples/dra-control-plane.yaml) | NVIDIA, AMD, and AWS Neuron `resource.k8s.io/v1` inventory on Kubernetes 1.34–1.36 |
 | Reference scale | [reference-scale.yaml](../../test/e2e/testdata/reference-scale.yaml) | Release gate with 1,000 Synthetic Nodes and 8,000 units |
+
+The complete vendor/resource matrix, including exact resource names and
+evidence-driven omissions, is documented in the
+[examples index](../../examples/README.md). For example:
+
+```sh
+./dist/kasim apply -f ./examples/vendors/hygon.yaml \
+  --dry-run=client \
+  -o json
+
+./dist/kasim apply -f ./examples/signals/extended-resource-variants.yaml \
+  --dry-run=client \
+  -o json
+```
+
+The Kunlunxin example opts in to the provisional, integration-specific
+`kunlunxin-hami` profile explicitly. The CLI receipt reports that class,
+HAMi provider scope, and its evidence; it is not silently promoted to a
+verified vendor default.
 
 The file stores exact profile revisions and digests. If catalog evidence is
 revised, select the new profile intentionally and review the resulting

@@ -1,29 +1,28 @@
 metadata:
-  name: training-lab
+  name: amd-mi300x-fleet
 spec:
   fidelity: scheduling
   acceptance:
     provisionalProfiles: false
   nodeGroups:
-    - name: workers
-      replicas: 1
+    - name: amd-workers
+      replicas: 2
       node:
         capacity:
           cpu: "64"
           memory: 256Gi
           pods: "110"
         placement:
-          zone: lab-a
-        labels:
-          workload.example.com/class: training
+          zone: accelerator-a
+        labels: {}
         taints: []
       acceleratorPools:
-        - name: training
+        - name: mi300x
           profile:
-            id: nvidia
+            id: amd
             revision: 2026-07-31
-            digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
-          model: nvidia-h100
+            digest: sha256:c165c4b0616a2f4064e6a1805e14d97ed76b66d632a9c050fda89cd8b15d2bea
+          model: amd-mi300x
           contract: device-plugin
           resource: gpu
           variant: {}

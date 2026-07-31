@@ -19,7 +19,7 @@ or vendor preference. Model lifecycle such as `current-product`,
 
 ## Bundled ecosystem coverage
 
-The catalog revision is `2026-07-30`. Use `kasim profile show <id> -o json` for
+The catalog revision is `2026-07-31`. Use `kasim profile show <id> -o json` for
 the exact source URLs, immutable revisions, checked dates, contract spellings,
 models, limitations, and digest.
 
@@ -34,20 +34,23 @@ models, limitations, and digest.
 | Biren | `biren` | verified | BR100 family |
 | Iluvatar CoreX | `iluvatar` | verified | BI-V150, BI-V150S |
 | Enflame | `enflame` | verified | S60, S60G |
-| Moore Threads | `moore-threads` | verified | MTT S3000, S80, S2000 |
+| Moore Threads | `moore-threads` | verified | MTT S3000, S80, S2000, S4000 |
 | FuriosaAI | `furiosa` | verified | RNGD |
 | Graphcore | `graphcore` | verified | GC200/C600 and retention models |
 | AWS Neuron | `aws-neuron` | verified | Inferentia and Trainium families |
 | Google Cloud TPU | `google-tpu` | verified | TPU v4, v5e, v5p, v6e, TPU7x |
-| MetaX | `metax` | provisional | C500/C500-P/C500X, C280/C290/C550, N260 |
-| Hygon DCU | `hygon` | provisional | K100_AI, BW200 |
-| Kunlunxin | `kunlunxin` | provisional | P800, R480 |
-| Vastai | `vastai` | provisional/catalog-only | No built-in selectable model seed |
+| MetaX | `metax` | verified | C500/C500-P/C500X, C280/C290/C550/C600, N260 |
+| Hygon DCU | `hygon` | verified | K100_AI, BW200, BW1000, Z100L, BW1100 |
+| Kunlunxin through HAMi | `kunlunxin-hami` | provisional | P800, R480 |
+| Vastai through HAMi | `vastai-hami` | provisional/catalog-only | No built-in selectable model seed |
 | Qualcomm Cloud AI 100 | `qualcomm-cloud-ai-100` | provisional/catalog-only | Recorded model family; no selectable fully-qualified schedulable contract |
 
-The full evidence review is in
-[Vendor and model evidence catalog](../research/vendor-model-evidence-catalog.md).
-Its source links are research inputs; the bundled
+The current evidence review is in
+[Accelerator vendor signals and model seeds](../research/accelerator-vendor-signals-and-models.md).
+The earlier
+[Vendor and model evidence catalog](../research/vendor-model-evidence-catalog.md)
+is retained as the pre-2026-07-31 snapshot. Their source links are research
+inputs; the bundled
 [`profiles/catalog.json`](../../profiles/catalog.json) is the exact validated
 release input.
 
@@ -59,7 +62,7 @@ The following commands are offline:
 ./dist/kasim profile list -o json
 ./dist/kasim profile show nvidia -o json
 ./dist/kasim profile show huawei-ascend -o json
-./dist/kasim profile show kunlunxin -o json
+./dist/kasim profile show kunlunxin-hami -o json
 ```
 
 For provisional profiles, review the evidence limitation before opting in.

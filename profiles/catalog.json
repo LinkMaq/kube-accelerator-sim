@@ -1,6 +1,6 @@
 {
   "schemaVersion": "v1alpha1",
-  "revision": "2026-07-30",
+  "revision": "2026-07-31",
   "profiles": [
     {
       "id": "nvidia",
@@ -35,6 +35,26 @@
               "alias": "gpu",
               "name": "nvidia.com/gpu",
               "unit": "device"
+            },
+            {
+              "alias": "gpu-shared",
+              "name": "nvidia.com/gpu.shared",
+              "unit": "shared-device"
+            },
+            {
+              "alias": "mig-1g-10gb",
+              "name": "nvidia.com/mig-1g.10gb",
+              "unit": "partition"
+            },
+            {
+              "alias": "mig-2g-20gb",
+              "name": "nvidia.com/mig-2g.20gb",
+              "unit": "partition"
+            },
+            {
+              "alias": "mig-7g-80gb",
+              "name": "nvidia.com/mig-7g.80gb",
+              "unit": "partition"
             }
           ],
           "identitySignals": [
@@ -64,10 +84,10 @@
       ],
       "models": [
         {"id":"nvidia-a100-40gb","displayName":"NVIDIA A100 40GB","aliases":["A100-40GB"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
-        {"id":"nvidia-a100-80gb","displayName":"NVIDIA A100 80GB","aliases":["A100-80GB"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"nvidia-a100-80gb","displayName":"NVIDIA A100 80GB","aliases":["A100-80GB"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","mig-1g-10gb","mig-2g-20gb","mig-7g-80gb","device"],"evidenceRefs":["contract","dra"]},
         {"id":"nvidia-h100","displayName":"NVIDIA H100","aliases":["H100"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
         {"id":"nvidia-h200","displayName":"NVIDIA H200","aliases":["H200"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
-        {"id":"nvidia-l40s","displayName":"NVIDIA L40S","aliases":["L40S"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"nvidia-l40s","displayName":"NVIDIA L40S","aliases":["L40S"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","gpu-shared","device"],"evidenceRefs":["contract","dra"]},
         {"id":"nvidia-b200","displayName":"NVIDIA B200","aliases":["B200"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
         {"id":"nvidia-b300","displayName":"NVIDIA B300","aliases":["B300"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
         {"id":"nvidia-a800","displayName":"NVIDIA A800","aliases":["A800"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
@@ -83,7 +103,7 @@
       "contracts":[
         {
           "id":"device-plugin","kind":"extended-resource","providerScope":"any-kubernetes","fidelityModes":["scheduling"],
-          "resources":[{"alias":"gpu","name":"amd.com/gpu","unit":"device"},{"alias":"cpx-nps4","name":"amd.com/cpx_nps4","unit":"partition"},{"alias":"spx-nps1","name":"amd.com/spx_nps1","unit":"partition"}],
+          "resources":[{"alias":"gpu","name":"amd.com/gpu","unit":"device"},{"alias":"cpx-nps4","name":"amd.com/cpx_nps4","unit":"partition"},{"alias":"spx-nps1","name":"amd.com/spx_nps1","unit":"partition"},{"alias":"cpx-nps1","name":"amd.com/cpx_nps1","unit":"partition"}],
           "identitySignals":[{"kind":"node-label","key":"amd.com/gpu.product-name"},{"kind":"node-label","key":"amd.com/gpu.vram"}],
           "capabilities":{"health":"verified","topology":"verified","sharing":"not-public","partitioning":"verified"},
           "evidenceRefs":["contract"]
@@ -97,13 +117,13 @@
         }
       ],
       "models":[
-        {"id":"amd-mi210","displayName":"AMD Instinct MI210","aliases":["MI210"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","device"],"evidenceRefs":["contract","dra"]},
-        {"id":"amd-mi250x","displayName":"AMD Instinct MI250X","aliases":["MI250X"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","device"],"evidenceRefs":["contract","dra"]},
-        {"id":"amd-mi300a","displayName":"AMD Instinct MI300A","aliases":["MI300A"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","device"],"evidenceRefs":["contract","dra"]},
-        {"id":"amd-mi300x","displayName":"AMD Instinct MI300X","aliases":["MI300X"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","device"],"evidenceRefs":["contract","dra"]},
-        {"id":"amd-mi325x","displayName":"AMD Instinct MI325X","aliases":["MI325X"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","device"],"evidenceRefs":["contract","dra"]},
-        {"id":"amd-mi350x","displayName":"AMD Instinct MI350X","aliases":["MI350X"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","device"],"evidenceRefs":["contract","dra"]},
-        {"id":"amd-mi355x","displayName":"AMD Instinct MI355X","aliases":["MI355X"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","device"],"evidenceRefs":["contract","dra"]}
+        {"id":"amd-mi210","displayName":"AMD Instinct MI210","aliases":["MI210"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","cpx-nps1","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"amd-mi250x","displayName":"AMD Instinct MI250X","aliases":["MI250X"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","cpx-nps1","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"amd-mi300a","displayName":"AMD Instinct MI300A","aliases":["MI300A"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","cpx-nps1","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"amd-mi300x","displayName":"AMD Instinct MI300X","aliases":["MI300X"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","cpx-nps1","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"amd-mi325x","displayName":"AMD Instinct MI325X","aliases":["MI325X"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","cpx-nps1","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"amd-mi350x","displayName":"AMD Instinct MI350X","aliases":["MI350X"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","cpx-nps1","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"amd-mi355x","displayName":"AMD Instinct MI355X","aliases":["MI355X"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","cpx-nps1","device"],"evidenceRefs":["contract","dra"]}
       ]
     },
     {
@@ -157,7 +177,7 @@
       }],
       "models":[
         {"id":"huawei-ascend-310","displayName":"Huawei Ascend 310","aliases":["Ascend 310"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend310"],"evidenceRefs":["contract"]},
-        {"id":"huawei-ascend-310p","displayName":"Huawei Ascend 310P","aliases":["Ascend 310P"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend310p"],"evidenceRefs":["contract"]},
+        {"id":"huawei-ascend-310p","displayName":"Huawei Ascend 310P","aliases":["Ascend 310P"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend310p","npu-core"],"evidenceRefs":["contract"]},
         {"id":"huawei-ascend-910","displayName":"Huawei Ascend 910","aliases":["Ascend 910"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend910"],"evidenceRefs":["contract"]},
         {"id":"huawei-atlas-a2","displayName":"Huawei Atlas A2","aliases":["Atlas A2"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend910"],"evidenceRefs":["contract"]},
         {"id":"huawei-atlas-a3","displayName":"Huawei Atlas A3","aliases":["Atlas A3"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend910"],"evidenceRefs":["contract"]}
@@ -170,13 +190,13 @@
       "evidence":[{"id":"contract","grade":"A","source":"https://github.com/Cambricon/cambricon-k8s-device-plugin/commit/cc0f7735f208810df14c4178a888d2ad50613a8d","revision":"cc0f7735f208810df14c4178a888d2ad50613a8d","checkedAt":"2026-07-30"}],
       "contracts":[{
         "id":"device-plugin","kind":"extended-resource","providerScope":"any-kubernetes","fidelityModes":["scheduling"],
-        "resources":[{"alias":"mlu","name":"cambricon.com/mlu","unit":"device"},{"alias":"mlu370","name":"cambricon.com/mlu370","unit":"device"},{"alias":"mlu370-mim-2m-8gb","name":"cambricon.com/mlu370.mim-2m.8gb","unit":"partition"}],
+        "resources":[{"alias":"mlu","name":"cambricon.com/mlu","unit":"device"},{"alias":"mlu370","name":"cambricon.com/mlu370","unit":"device"},{"alias":"mlu370-share","name":"cambricon.com/mlu370.share","unit":"shared-device"},{"alias":"mlu370-mim-2m-8gb","name":"cambricon.com/mlu370.mim-2m.8gb","unit":"partition"}],
         "identitySignals":[{"kind":"node-label","key":"Model"}],
         "capabilities":{"health":"verified","topology":"verified","sharing":"verified","partitioning":"verified"},
         "evidenceRefs":["contract"]
       }],
       "models":[
-        {"id":"cambricon-mlu370","displayName":"Cambricon MLU370","aliases":["MLU370"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["mlu","mlu370","mlu370-mim-2m-8gb"],"evidenceRefs":["contract"]},
+        {"id":"cambricon-mlu370","displayName":"Cambricon MLU370","aliases":["MLU370"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["mlu","mlu370","mlu370-share","mlu370-mim-2m-8gb"],"evidenceRefs":["contract"]},
         {"id":"cambricon-mlu590","displayName":"Cambricon MLU590","aliases":["MLU590"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["mlu"],"evidenceRefs":["contract"]},
         {"id":"cambricon-mlu270","displayName":"Cambricon MLU270","aliases":["MLU270"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin"],"resourceAliases":["mlu"],"evidenceRefs":["contract"]},
         {"id":"cambricon-mlu290","displayName":"Cambricon MLU290","aliases":["MLU290"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin"],"resourceAliases":["mlu"],"evidenceRefs":["contract"]}
@@ -247,7 +267,8 @@
       "models":[
         {"id":"moore-threads-mtt-s3000","displayName":"Moore Threads MTT S3000","aliases":["MTT S3000"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu","sgpu-core","sgpu-memory"],"evidenceRefs":["contract"]},
         {"id":"moore-threads-mtt-s80","displayName":"Moore Threads MTT S80","aliases":["MTT S80"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu"],"evidenceRefs":["contract"]},
-        {"id":"moore-threads-mtt-s2000","displayName":"Moore Threads MTT S2000","aliases":["MTT S2000"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu"],"evidenceRefs":["contract"]}
+        {"id":"moore-threads-mtt-s2000","displayName":"Moore Threads MTT S2000","aliases":["MTT S2000"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu"],"evidenceRefs":["contract"]},
+        {"id":"moore-threads-mtt-s4000","displayName":"Moore Threads MTT S4000","aliases":["MTT S4000"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu"],"evidenceRefs":["contract"]}
       ]
     },
     {
@@ -336,45 +357,49 @@
     {
       "id":"metax",
       "displayName":"MetaX",
-      "class":"provisional",
-      "evidence":[{"id":"contract","grade":"B","source":"https://developer.metax-tech.com/forum/t/k8san-zhuang-wen-ti/344/","revision":"checked-page-2026-07-30","checkedAt":"2026-07-30"},{"id":"models","grade":"B","source":"https://developer.metax-tech.com/doc/221","revision":"checked-page-2026-07-30","checkedAt":"2026-07-30"}],
+      "class":"verified",
+      "evidence":[{"id":"contract","grade":"A","source":"https://developer.metax-tech.com/api/client/document/preview/1269/k8s/03_component.html","revision":"checked-page-2026-07-31","checkedAt":"2026-07-31"},{"id":"models","grade":"A","source":"https://developer.metax-tech.com/api/client/document/file/1212/preview/?file_type=pdf","revision":"checked-page-2026-07-31","checkedAt":"2026-07-31"},{"id":"c600","grade":"A","source":"https://developer.metax-tech.com/doc/1213","revision":"checked-page-2026-07-31","checkedAt":"2026-07-31"}],
       "contracts":[{
         "id":"device-plugin","kind":"extended-resource","providerScope":"any-kubernetes","fidelityModes":["scheduling"],
-        "resources":[{"alias":"gpu","name":"metax-tech.com/gpu","unit":"device"}],
-        "identitySignals":[],
-        "capabilities":{"health":"verified","topology":"verified","sharing":"not-public","partitioning":"not-public"},
+        "resources":[{"alias":"gpu","name":"metax-tech.com/gpu","unit":"device"},{"alias":"vfio-gpu","name":"metax-tech.com/vfio-gpu","unit":"device"},{"alias":"sgpu","name":"metax-tech.com/sgpu","unit":"virtual-device"}],
+        "identitySignals":[{"kind":"node-label","key":"metax-tech.com/gpu.topology.scores"},{"kind":"node-label","key":"metax-tech.com/gpu.topology.losses"}],
+        "capabilities":{"health":"verified","topology":"verified","sharing":"verified","partitioning":"verified"},
         "evidenceRefs":["contract"]
       }],
       "models":[
-        {"id":"metax-c500","displayName":"MetaX C500","aliases":["C500"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu"],"evidenceRefs":["models"]},
+        {"id":"metax-c500","displayName":"MetaX C500","aliases":["C500"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu","vfio-gpu","sgpu"],"evidenceRefs":["models"]},
         {"id":"metax-c500-p","displayName":"MetaX C500-P","aliases":["C500-P"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu"],"evidenceRefs":["models"]},
         {"id":"metax-c500x","displayName":"MetaX C500X","aliases":["C500X"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu"],"evidenceRefs":["models"]},
         {"id":"metax-c280","displayName":"MetaX C280","aliases":["C280"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu"],"evidenceRefs":["models"]},
         {"id":"metax-c290","displayName":"MetaX C290","aliases":["C290"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu"],"evidenceRefs":["models"]},
         {"id":"metax-c550","displayName":"MetaX C550","aliases":["C550"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu"],"evidenceRefs":["models"]},
+        {"id":"metax-c600","displayName":"MetaX C600","aliases":["C600"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu"],"evidenceRefs":["c600"]},
         {"id":"metax-n260","displayName":"MetaX N260","aliases":["N260"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu"],"evidenceRefs":["models"]}
       ]
     },
     {
       "id":"hygon",
       "displayName":"Hygon DCU",
-      "class":"provisional",
-      "evidence":[{"id":"contract","grade":"B","source":"https://developer.sourcefind.cn/servicelist","revision":"checked-page-2026-07-30","checkedAt":"2026-07-30"},{"id":"models","grade":"B","source":"https://developer.sourcefind.cn/document","revision":"checked-page-2026-07-30","checkedAt":"2026-07-30"}],
+      "class":"verified",
+      "evidence":[{"id":"contract","grade":"A","source":"https://developer.sourcefind.cn/document/87ee5c5b-c10d-11f0-b077-0242ac150003?id=44dc5a98-c8d9-11f0-8db6-0242ac150003","revision":"checked-page-2026-07-31","checkedAt":"2026-07-31"},{"id":"mig","grade":"A","source":"https://developer.sourcefind.cn/document/87ee5c5b-c10d-11f0-b077-0242ac150003?id=4cca45d7-c8d9-11f0-8db6-0242ac150003","revision":"checked-page-2026-07-31","checkedAt":"2026-07-31"},{"id":"models","grade":"A","source":"https://developer.sourcefind.cn/document","revision":"checked-page-2026-07-31","checkedAt":"2026-07-31"}],
       "contracts":[{
         "id":"device-plugin","kind":"extended-resource","providerScope":"any-kubernetes","fidelityModes":["scheduling"],
-        "resources":[{"alias":"dcu","name":"hygon.com/dcu","unit":"device"}],
-        "identitySignals":[],
-        "capabilities":{"health":"verified","topology":"not-public","sharing":"not-public","partitioning":"not-public"},
-        "evidenceRefs":["contract"]
+        "resources":[{"alias":"dcu","name":"hygon.com/dcu","unit":"device"},{"alias":"dcu-share-30c-16g","name":"hygon.com/dcu-share-30c-16g","unit":"partition"},{"alias":"dcu-share-36c-16g","name":"hygon.com/dcu-share-36c-16g","unit":"partition"},{"alias":"dcu-share-36c-5g","name":"hygon.com/dcu-share-36c-5g","unit":"partition"},{"alias":"dcu-mig-2g-15gb","name":"hygon.com/dcu-mig-2g-15gb","unit":"partition"},{"alias":"dcu-mig-4g-31gb","name":"hygon.com/dcu-mig-4g-31gb","unit":"partition"}],
+        "identitySignals":[{"kind":"node-label","key":"hygon.com/dcu"},{"kind":"node-label","key":"hygon.com/dcu.name"},{"kind":"node-label","key":"hygon.com/dcu.cu-count"},{"kind":"node-label","key":"hygon.com/dcu.vram"}],
+        "capabilities":{"health":"verified","topology":"not-public","sharing":"verified","partitioning":"verified"},
+        "evidenceRefs":["contract","mig"]
       }],
       "models":[
-        {"id":"hygon-k100-ai","displayName":"Hygon K100_AI","aliases":["K100_AI"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu"],"evidenceRefs":["models"]},
-        {"id":"hygon-bw200","displayName":"Hygon BW200","aliases":["BW200"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu"],"evidenceRefs":["models"]}
+        {"id":"hygon-k100-ai","displayName":"Hygon K100_AI","aliases":["K100_AI"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu","dcu-share-30c-16g","dcu-share-36c-16g","dcu-share-36c-5g"],"evidenceRefs":["models"]},
+        {"id":"hygon-bw200","displayName":"Hygon BW200","aliases":["BW200"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu"],"evidenceRefs":["models"]},
+        {"id":"hygon-bw1000","displayName":"Hygon BW1000","aliases":["BW1000"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu"],"evidenceRefs":["models"]},
+        {"id":"hygon-z100l","displayName":"Hygon Z100L","aliases":["Z100L"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu"],"evidenceRefs":["models"]},
+        {"id":"hygon-bw1100","displayName":"Hygon BW1100","aliases":["BW1100"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu"],"evidenceRefs":["models"]}
       ]
     },
     {
-      "id":"kunlunxin",
-      "displayName":"Kunlunxin",
+      "id":"kunlunxin-hami",
+      "displayName":"Kunlunxin through HAMi",
       "class":"provisional",
       "evidence":[{"id":"contract","grade":"C","source":"https://github.com/Project-HAMi/HAMi/commit/e831337db299f331b170a46d6ca3dba256b9d6f1","revision":"e831337db299f331b170a46d6ca3dba256b9d6f1","checkedAt":"2026-07-30"}],
       "contracts":[
@@ -399,8 +424,8 @@
       ]
     },
     {
-      "id":"vastai",
-      "displayName":"Vastai",
+      "id":"vastai-hami",
+      "displayName":"Vastai through HAMi",
       "class":"provisional",
       "evidence":[{"id":"contract","grade":"C","source":"https://github.com/Project-HAMi/HAMi/commit/e831337db299f331b170a46d6ca3dba256b9d6f1","revision":"e831337db299f331b170a46d6ca3dba256b9d6f1","checkedAt":"2026-07-30"}],
       "contracts":[{

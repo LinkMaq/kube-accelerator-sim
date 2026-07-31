@@ -72,10 +72,10 @@ func TestBundledCatalogCoversRequiredAcceleratorEcosystemsAtHonestClasses(t *tes
 		"graphcore":             "verified",
 		"aws-neuron":            "verified",
 		"google-tpu":            "verified",
-		"metax":                 "provisional",
-		"hygon":                 "provisional",
-		"kunlunxin":             "provisional",
-		"vastai":                "provisional",
+		"metax":                 "verified",
+		"hygon":                 "verified",
+		"kunlunxin-hami":        "provisional",
+		"vastai-hami":           "provisional",
 		"qualcomm-cloud-ai-100": "provisional",
 	}
 
@@ -133,12 +133,15 @@ func TestBundledCatalogContainsRequiredCommonModelSeeds(t *testing.T) {
 			"cambricon-mlu270", "cambricon-mlu290", "cambricon-mlu370",
 			"cambricon-mlu590",
 		},
-		"biren":         {"biren-br100"},
-		"iluvatar":      {"iluvatar-bi-v150", "iluvatar-bi-v150s"},
-		"enflame":       {"enflame-s60", "enflame-s60g"},
-		"moore-threads": {"moore-threads-mtt-s3000", "moore-threads-mtt-s80", "moore-threads-mtt-s2000"},
-		"furiosa":       {"furiosa-rngd"},
-		"graphcore":     {"graphcore-gc200", "graphcore-m2000", "graphcore-ipu-pod"},
+		"biren":    {"biren-br100"},
+		"iluvatar": {"iluvatar-bi-v150", "iluvatar-bi-v150s"},
+		"enflame":  {"enflame-s60", "enflame-s60g"},
+		"moore-threads": {
+			"moore-threads-mtt-s3000", "moore-threads-mtt-s80",
+			"moore-threads-mtt-s2000", "moore-threads-mtt-s4000",
+		},
+		"furiosa":   {"furiosa-rngd"},
+		"graphcore": {"graphcore-gc200", "graphcore-m2000", "graphcore-ipu-pod"},
 		"aws-neuron": {
 			"aws-inferentia1", "aws-inferentia2", "aws-trainium1",
 			"aws-trainium2", "aws-trainium3",
@@ -149,10 +152,13 @@ func TestBundledCatalogContainsRequiredCommonModelSeeds(t *testing.T) {
 		},
 		"metax": {
 			"metax-c500", "metax-c500-p", "metax-c500x", "metax-c280",
-			"metax-c290", "metax-c550", "metax-n260",
+			"metax-c290", "metax-c550", "metax-c600", "metax-n260",
 		},
-		"hygon":     {"hygon-k100-ai", "hygon-bw200"},
-		"kunlunxin": {"kunlunxin-p800", "kunlunxin-r480"},
+		"hygon": {
+			"hygon-k100-ai", "hygon-bw200", "hygon-bw1000", "hygon-z100l",
+			"hygon-bw1100",
+		},
+		"kunlunxin-hami": {"kunlunxin-p800", "kunlunxin-r480"},
 	}
 
 	for profileID, requiredModels := range required {
@@ -171,7 +177,7 @@ func TestBundledCatalogContainsRequiredCommonModelSeeds(t *testing.T) {
 		}
 	}
 
-	vastai, err := snapshot.Show("vastai")
+	vastai, err := snapshot.Show("vastai-hami")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,6 +195,62 @@ func TestBundledCatalogContainsRequiredCommonModelSeeds(t *testing.T) {
 	}
 }
 
+func TestBundledCatalogResolvesSourceBackedResourceSignalVariants(t *testing.T) {
+	t.Parallel()
+
+	snapshot, err := catalog.LoadBundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fidelity, err := domain.ParseFidelityMode("scheduling")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name               string
+		profileID          string
+		modelID            string
+		contractID         string
+		resourceAlias      string
+		wantResource       string
+		acceptsProvisional bool
+	}{
+		{"nvidia-mig", "nvidia", "nvidia-a100-80gb", "device-plugin", "mig-1g-10gb", "nvidia.com/mig-1g.10gb", false},
+		{"nvidia-shared", "nvidia", "nvidia-l40s", "device-plugin", "gpu-shared", "nvidia.com/gpu.shared", false},
+		{"amd-partition", "amd", "amd-mi300x", "device-plugin", "cpx-nps1", "amd.com/cpx_nps1", false},
+		{"ascend-vnpu", "huawei-ascend", "huawei-ascend-310p", "device-plugin", "npu-core", "huawei.com/npu-core", false},
+		{"cambricon-shared", "cambricon", "cambricon-mlu370", "device-plugin", "mlu370-share", "cambricon.com/mlu370.share", false},
+		{"metax-sgpu", "metax", "metax-c500", "device-plugin", "sgpu", "metax-tech.com/sgpu", false},
+		{"metax-vfio", "metax", "metax-c500", "device-plugin", "vfio-gpu", "metax-tech.com/vfio-gpu", false},
+		{"hygon-vdcu", "hygon", "hygon-k100-ai", "device-plugin", "dcu-share-30c-16g", "hygon.com/dcu-share-30c-16g", false},
+		{"kunlunxin-hami", "kunlunxin-hami", "kunlunxin-p800", "hami-device", "xpu", "kunlunxin.com/xpu", true},
+	}
+	for _, test := range cases {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			resolved, err := snapshot.Resolve(catalog.ResolveRequest{
+				ProfileID:         test.profileID,
+				ModelID:           test.modelID,
+				ContractID:        test.contractID,
+				ResourceAlias:     test.resourceAlias,
+				Fidelity:          fidelity,
+				AcceptProvisional: test.acceptsProvisional,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resolved.ResourceName() != test.wantResource {
+				t.Errorf(
+					"resource = %q, want %q",
+					resolved.ResourceName(),
+					test.wantResource,
+				)
+			}
+		})
+	}
+}
+
 func TestProfileViewExposesImmutableOfflineContractEvidence(t *testing.T) {
 	t.Parallel()
 
@@ -203,7 +265,7 @@ func TestProfileViewExposesImmutableOfflineContractEvidence(t *testing.T) {
 	if profile.ID() != "nvidia" ||
 		profile.DisplayName() != "NVIDIA" ||
 		profile.Class() != "verified" ||
-		profile.Revision() != "2026-07-30" ||
+		profile.Revision() != "2026-07-31" ||
 		profile.Digest().String() == "" {
 		t.Fatalf("incomplete profile identity: %#v", profile)
 	}

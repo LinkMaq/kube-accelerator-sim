@@ -6,7 +6,7 @@
     "scenarioTransport": "v1alpha1",
     "productKubernetesTransport": "simulation.kasim.io/v1alpha1",
     "machineOutput": "v1alpha1",
-    "catalog": "2026-07-30",
+    "catalog": "2026-07-31",
     "compatibilityMatrix": "2026-07-30",
     "controllerImage": "v1",
     "chart": "0.1.0"
@@ -23,8 +23,8 @@
     "runtime": "gcr.io/distroless/static-debian13:nonroot@sha256:f7f8f729987ad0fdf6b05eeeae94b26e6a0f613bdf46feea7fc40f7bd72953e6"
   },
   "catalog": {
-    "revision": "2026-07-30",
-    "sha256": "571e5b3d6a59e5aa641cbb61c6719914140c5e031b38ff08feacb0642a72c260"
+    "revision": "2026-07-31",
+    "sha256": "c37d2624485a9e1ab6c775dcb22e6955187752c31058e8a59ea0dc2b7bb476aa"
   },
   "catalogSchema": {
     "version": "v1alpha1",

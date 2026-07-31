@@ -81,7 +81,7 @@ func TestReferenceScaleGateIsReleaseOnlyAndExact(t *testing.T) {
 		"model: nvidia-h100",
 		"contract: device-plugin",
 		"resource: gpu",
-		"digest: sha256:dfd6878266ba81287632d5a0cc9d5fe8856d2839ac735a460929ba5d7f519705",
+		"digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de",
 	} {
 		if !strings.Contains(scenario, required) {
 			t.Errorf("reference scale Scenario is missing %q", required)

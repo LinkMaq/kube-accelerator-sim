@@ -19,6 +19,14 @@ go build -trimpath -o ./dist/kasim ./cmd/kasim
 For a published release, verify the archive before unpacking it as described
 in [Release verification](release-verification.md).
 
+The matching controller image and Helm chart are published through GitHub
+Packages:
+
+```sh
+docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.1.0
+helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.1.0
+```
+
 ## 2. Inspect and compile offline
 
 Catalog inspection and client dry-run do not contact Kubernetes:
@@ -45,6 +53,19 @@ kubectl --kubeconfig ./target.kubeconfig --context target \
   create namespace kasim-system
 
 helm upgrade --install kasim-runtime ./charts/kasim-runtime \
+  --kubeconfig ./target.kubeconfig \
+  --kube-context target \
+  --namespace kasim-system \
+  --wait
+```
+
+For a published release, replace the local chart path with the immutable OCI
+package and pin its version:
+
+```sh
+helm upgrade --install kasim-runtime \
+  oci://ghcr.io/linkmaq/charts/kasim-runtime \
+  --version 0.1.0 \
   --kubeconfig ./target.kubeconfig \
   --kube-context target \
   --namespace kasim-system \

@@ -245,7 +245,7 @@ func TestChartVersionsAndImmutableRuntimeInputsStayExplicit(t *testing.T) {
 	for key, want := range map[string]string{
 		"simulation.kasim.io/schema-version":        "v1alpha1",
 		"simulation.kasim.io/product-crd-sha256":    "6edf364b62e22de7deb05e817a865601cfce0af9943a73f85c4a8bddb0d15be9",
-		"simulation.kasim.io/catalog-revision":      "2026-07-30",
+		"simulation.kasim.io/catalog-revision":      "2026-07-31",
 		"simulation.kasim.io/kubernetes-range":      "1.30-1.36",
 		"simulation.kasim.io/kwok-version":          "v0.8.0",
 		"simulation.kasim.io/kwok-manifest-sha256":  "a4c16e6431e382dcb5c1903139344b7a68652f16a6460337fe17a678a426f405",

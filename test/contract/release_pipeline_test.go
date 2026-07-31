@@ -33,6 +33,7 @@ func TestReleasePipelineIsEvidenceGatedAndReproducible(t *testing.T) {
 		"oci://ghcr.io/linkmaq/charts",
 		"gh release",
 		"refs/tags/v",
+		"--notes-file",
 	} {
 		if !strings.Contains(workflow, required) {
 			t.Errorf("release workflow is missing %q", required)
@@ -45,6 +46,7 @@ func TestReleasePipelineIsEvidenceGatedAndReproducible(t *testing.T) {
 		"continue-on-error:",
 		"--exclude .git",
 		"--exclude release-staging",
+		"--generate-notes",
 		"latest",
 	} {
 		if strings.Contains(workflow, forbidden) {
@@ -93,6 +95,27 @@ func TestReleasePipelineIsEvidenceGatedAndReproducible(t *testing.T) {
 	}
 }
 
+func TestVersionedReleaseNotesAreBilingualAndNamePublishedPackages(t *testing.T) {
+	t.Parallel()
+
+	notes := readReleaseContractFile(t, "../../release/notes/v0.1.0.md")
+	for _, required := range []string{
+		"# 中文",
+		"# English",
+		"ghcr.io/linkmaq/kube-accelerator-sim-controller:0.1.0",
+		"oci://ghcr.io/linkmaq/charts/kasim-runtime",
+		"Linux amd64/arm64",
+		"Windows amd64",
+	} {
+		if !strings.Contains(notes, required) {
+			t.Errorf("v0.1.0 release notes are missing %q", required)
+		}
+	}
+	if strings.Index(notes, "# 中文") > strings.Index(notes, "# English") {
+		t.Error("complete Chinese release notes must precede English release notes")
+	}
+}
+
 func TestReleaseInputsDeclareExplicitPublicSurfaceVersions(t *testing.T) {
 	t.Parallel()
 
@@ -102,7 +125,7 @@ func TestReleaseInputsDeclareExplicitPublicSurfaceVersions(t *testing.T) {
 		`"scenarioTransport": "v1alpha1"`,
 		`"productKubernetesTransport": "simulation.kasim.io/v1alpha1"`,
 		`"machineOutput": "v1alpha1"`,
-		`"catalog": "2026-07-30"`,
+		`"catalog": "2026-07-31"`,
 		`"compatibilityMatrix": "2026-07-30"`,
 		`"controllerImage": "v1"`,
 		`"chart": "0.1.0"`,
