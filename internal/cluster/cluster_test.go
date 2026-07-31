@@ -2,6 +2,7 @@ package cluster_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/LinkMaq/kube-accelerator-sim/internal/cluster"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/domain"
@@ -173,6 +174,107 @@ func TestOwnedChangeSetRequiresAllowlistedKindAndExactDeletePreconditions(t *tes
 
 	if _, err := cluster.NewObjectKey(cluster.ObjectKind("Secret"), "", "secret"); err == nil {
 		t.Fatal("unsupported object kind unexpectedly entered the Cluster port")
+	}
+}
+
+func TestOwnedChangeSetRequiresIndependentMutationTargets(t *testing.T) {
+	t.Parallel()
+
+	uid, err := domain.ParseInstanceUID("6cb2dd6f-c608-4e79-aaf6-e3fa1287f73c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	generation, err := domain.NewGeneration(7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scope, err := cluster.NewOwnershipScope(uid, generation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	leaseKey, err := cluster.NewObjectKey(
+		cluster.ObjectKindLease,
+		"kube-node-lease",
+		"synthetic-node",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lease, err := cluster.NewApplyLease(
+		leaseKey,
+		cluster.ObjectPreconditions{},
+		cluster.LeaseInput{
+			HolderIdentity:       "synthetic-node",
+			LeaseDurationSeconds: 40,
+			RenewTime:            time.Date(2026, 7, 30, 8, 0, 0, 0, time.UTC),
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cluster.NewOwnedChangeSet(
+		scope,
+		cluster.ExecutionPersistent,
+		[]cluster.OwnedChange{lease, lease},
+	); err == nil {
+		t.Fatal("duplicate Lease target unexpectedly entered one mutation batch")
+	}
+
+	nodeKey, err := cluster.NewObjectKey(
+		cluster.ObjectKindNode,
+		"",
+		"synthetic-node",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	node, err := cluster.NewApplySyntheticNode(
+		nodeKey,
+		cluster.ObjectPreconditions{
+			UID:             "node-uid",
+			ResourceVersion: "42",
+		},
+		cluster.SyntheticNodeInput{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	statusKey, err := cluster.NewObjectKey(
+		cluster.ObjectKindNodeStatus,
+		"",
+		nodeKey.Name(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, err := cluster.NewUpdateSyntheticNodeStatus(
+		statusKey,
+		cluster.ObjectPreconditions{
+			UID:             "node-uid",
+			ResourceVersion: "42",
+		},
+		cluster.SyntheticNodeStatusInput{
+			Capacity:    map[string]string{"cpu": "1"},
+			Allocatable: map[string]string{"cpu": "1"},
+			ObservedAt:  time.Date(2026, 7, 30, 8, 0, 0, 0, time.UTC),
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cluster.NewOwnedChangeSet(
+		scope,
+		cluster.ExecutionPersistent,
+		[]cluster.OwnedChange{node, status},
+	); err == nil {
+		t.Fatal("Node and NodeStatus target unexpectedly entered one mutation batch")
+	}
+	if _, err := cluster.NewOwnedChangeSet(
+		scope,
+		cluster.ExecutionPersistent,
+		[]cluster.OwnedChange{node, lease},
+	); err == nil {
+		t.Fatal("Node and Lease stages unexpectedly entered one mutation batch")
 	}
 }
 

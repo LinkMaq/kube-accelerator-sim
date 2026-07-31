@@ -1054,7 +1054,8 @@ func (reconciler *InstanceReconciler) missingIdentityChanges(
 		fragments[node.Name()] = node
 	}
 	contribution := reconciler.runtime.NodeContribution()
-	changes := make([]cluster.OwnedChange, 0, len(graph.Nodes())*2)
+	nodeChanges := make([]cluster.OwnedChange, 0, len(graph.Nodes()))
+	leaseChanges := make([]cluster.OwnedChange, 0, len(graph.Nodes()))
 	now := reconciler.now().UTC()
 	for _, node := range graph.Nodes() {
 		leaseKey, err := cluster.NewObjectKey(
@@ -1065,7 +1066,8 @@ func (reconciler *InstanceReconciler) missingIdentityChanges(
 		if err != nil {
 			return nil, err
 		}
-		if _, found := observedKeys[objectIdentity(leaseKey)]; !found {
+		_, leaseFound := observedKeys[objectIdentity(leaseKey)]
+		if !leaseFound {
 			change, err := cluster.NewApplyLease(
 				leaseKey,
 				cluster.ObjectPreconditions{},
@@ -1078,7 +1080,7 @@ func (reconciler *InstanceReconciler) missingIdentityChanges(
 			if err != nil {
 				return nil, err
 			}
-			changes = append(changes, change)
+			leaseChanges = append(leaseChanges, change)
 		}
 		nodeKey, err := cluster.NewObjectKey(
 			cluster.ObjectKindNode,
@@ -1088,8 +1090,17 @@ func (reconciler *InstanceReconciler) missingIdentityChanges(
 		if err != nil {
 			return nil, err
 		}
-		if _, found := observedKeys[objectIdentity(nodeKey)]; found {
-			continue
+		actualNode, nodeFound := observedKeys[objectIdentity(nodeKey)]
+		if nodeFound {
+			if actualNode.Node == nil {
+				return nil, fmt.Errorf(
+					"owned Node %q has no observable Node state",
+					node.Name(),
+				)
+			}
+			if leaseFound || actualNode.Node.Unschedulable {
+				continue
+			}
 		}
 		labels := node.Labels()
 		for key, value := range fragments[node.Name()].IdentityLabels() {
@@ -1105,7 +1116,7 @@ func (reconciler *InstanceReconciler) missingIdentityChanges(
 		}
 		change, err := cluster.NewApplySyntheticNode(
 			nodeKey,
-			cluster.ObjectPreconditions{},
+			preconditions(actualNode),
 			cluster.SyntheticNodeInput{
 				Labels:        labels,
 				Annotations:   contribution.Annotations(),
@@ -1116,9 +1127,14 @@ func (reconciler *InstanceReconciler) missingIdentityChanges(
 		if err != nil {
 			return nil, err
 		}
-		changes = append(changes, change)
+		nodeChanges = append(nodeChanges, change)
 	}
-	return changes, nil
+	if len(nodeChanges) != 0 {
+		// A later Reconcile must observe every closed Node before its Lease can
+		// enter the cluster.
+		return nodeChanges, nil
+	}
+	return leaseChanges, nil
 }
 
 func (reconciler *InstanceReconciler) metadataChanges(
@@ -1136,7 +1152,8 @@ func (reconciler *InstanceReconciler) metadataChanges(
 	}
 	contribution := reconciler.runtime.NodeContribution()
 	now := reconciler.now().UTC()
-	changes := make([]cluster.OwnedChange, 0)
+	nodeChanges := make([]cluster.OwnedChange, 0, len(graph.Nodes()))
+	leaseChanges := make([]cluster.OwnedChange, 0, len(graph.Nodes()))
 	for _, desired := range graph.Nodes() {
 		nodeKey, _ := cluster.NewObjectKey(
 			cluster.ObjectKindNode,
@@ -1187,7 +1204,7 @@ func (reconciler *InstanceReconciler) metadataChanges(
 			if err != nil {
 				return nil, err
 			}
-			changes = append(changes, change)
+			nodeChanges = append(nodeChanges, change)
 		}
 
 		leaseKey, _ := cluster.NewObjectKey(
@@ -1220,10 +1237,15 @@ func (reconciler *InstanceReconciler) metadataChanges(
 			if err != nil {
 				return nil, err
 			}
-			changes = append(changes, change)
+			leaseChanges = append(leaseChanges, change)
 		}
 	}
-	return changes, nil
+	if len(nodeChanges) != 0 {
+		// Preserve the replacement barrier: observe the closed Node at the new
+		// generation before publishing the matching Lease metadata.
+		return nodeChanges, nil
+	}
+	return leaseChanges, nil
 }
 
 func (reconciler *InstanceReconciler) schedulingChanges(

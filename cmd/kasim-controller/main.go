@@ -35,8 +35,11 @@ import (
 const (
 	leaderElectionID = "kasim-controller.simulation.kasim.io"
 
-	clusterClientQPS   = 100
-	clusterClientBurst = 200
+	// One 1,000-node revision can require 2,000 independent ownership metadata
+	// writes. This explicit budget keeps the 32-worker Cluster adapter useful
+	// while request concurrency remains separately bounded.
+	clusterClientQPS   = 400
+	clusterClientBurst = 800
 )
 
 type options struct {

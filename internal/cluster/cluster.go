@@ -947,8 +947,10 @@ const (
 	ExecutionPersistent   ExecutionMode = "persistent"
 )
 
-// OwnedChangeSet is one bounded ordered mutation batch under one exact
-// ownership root.
+// OwnedChangeSet is one bounded homogeneous mutation stage under one exact
+// ownership root. Every Kubernetes object may appear at most once so adapters
+// can execute the validated intentions concurrently without crossing lifecycle
+// ordering barriers.
 type OwnedChangeSet struct {
 	scope   OwnershipScope
 	mode    ExecutionMode
@@ -975,6 +977,8 @@ func NewOwnedChangeSet(
 		)
 	}
 	copied := make([]OwnedChange, len(changes))
+	targets := make(map[ObjectKey]int, len(changes))
+	var stage mutationStage
 	for index, change := range changes {
 		if change == nil || change.Key().name == "" {
 			return OwnedChangeSet{}, fmt.Errorf(
@@ -995,9 +999,48 @@ func NewOwnedChangeSet(
 				index,
 			)
 		}
+		currentStage := stageOf(change)
+		if index == 0 {
+			stage = currentStage
+		} else if currentStage != stage {
+			return OwnedChangeSet{}, fmt.Errorf(
+				"changes %d and %d cross mutation stages",
+				0,
+				index,
+			)
+		}
+		target := mutationTarget(change.Key())
+		if previous, found := targets[target]; found {
+			return OwnedChangeSet{}, fmt.Errorf(
+				"changes %d and %d target the same Kubernetes object",
+				previous,
+				index,
+			)
+		}
+		targets[target] = index
 		copied[index] = change
 	}
 	return OwnedChangeSet{scope: scope, mode: mode, changes: copied}, nil
+}
+
+type mutationStage struct {
+	changeKind ChangeKind
+	objectKind ObjectKind
+}
+
+func stageOf(change OwnedChange) mutationStage {
+	stage := mutationStage{changeKind: change.Kind()}
+	if change.Kind() == ChangeDeleteOwnedObject {
+		stage.objectKind = change.Key().Kind()
+	}
+	return stage
+}
+
+func mutationTarget(key ObjectKey) ObjectKey {
+	if key.kind == ObjectKindNodeStatus {
+		key.kind = ObjectKindNode
+	}
+	return key
 }
 
 func (changeSet OwnedChangeSet) Scope() OwnershipScope {

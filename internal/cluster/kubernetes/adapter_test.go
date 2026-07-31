@@ -1,12 +1,18 @@
 package kubernetes_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -24,6 +30,7 @@ import (
 	discoveryfake "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/kubernetes"
 	kubernetesfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/rest"
 	clienttesting "k8s.io/client-go/testing"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
@@ -31,6 +38,106 @@ import (
 	clusterkubernetes "github.com/LinkMaq/kube-accelerator-sim/internal/cluster/kubernetes"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/domain"
 )
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (roundTrip roundTripFunc) RoundTrip(
+	request *http.Request,
+) (*http.Response, error) {
+	return roundTrip(request)
+}
+
+type leaseTransportReaction func(
+	context.Context,
+	string,
+) (*metav1.Status, error)
+
+func newLeaseTransportClient(
+	t *testing.T,
+	reaction leaseTransportReaction,
+) kubernetes.Interface {
+	t.Helper()
+
+	kubernetesClient, err := kubernetes.NewForConfig(&rest.Config{
+		Host: "https://cluster.example.test",
+		ContentConfig: rest.ContentConfig{
+			AcceptContentTypes: runtime.ContentTypeJSON,
+			ContentType:        runtime.ContentTypeJSON,
+		},
+		Transport: roundTripFunc(func(
+			request *http.Request,
+		) (*http.Response, error) {
+			if request.Body != nil {
+				defer request.Body.Close()
+			}
+			if request.Method != http.MethodPost ||
+				request.URL.Path != "/apis/coordination.k8s.io/v1/namespaces/kube-node-lease/leases" {
+				t.Errorf("unexpected request: %s %s", request.Method, request.URL.Path)
+				return &http.Response{
+					StatusCode: http.StatusNotFound,
+					Header:     http.Header{"Content-Type": []string{runtime.ContentTypeJSON}},
+					Body: io.NopCloser(bytes.NewBufferString(
+						`{"apiVersion":"v1","kind":"Status","status":"Failure","reason":"NotFound","code":404}`,
+					)),
+					Request: request,
+				}, nil
+			}
+			lease := &coordinationv1.Lease{}
+			if decodeErr := json.NewDecoder(request.Body).Decode(lease); decodeErr != nil {
+				return nil, decodeErr
+			}
+			status, reactionErr := reaction(request.Context(), lease.Name)
+			if reactionErr != nil {
+				return nil, reactionErr
+			}
+			statusCode := http.StatusCreated
+			var responseObject any = lease
+			if status != nil {
+				statusCode = int(status.Code)
+				responseObject = status
+			} else {
+				lease.TypeMeta = metav1.TypeMeta{
+					APIVersion: "coordination.k8s.io/v1",
+					Kind:       "Lease",
+				}
+				lease.UID = types.UID("created-" + lease.Name)
+				lease.ResourceVersion = "1"
+			}
+			payload, encodeErr := json.Marshal(responseObject)
+			if encodeErr != nil {
+				return nil, encodeErr
+			}
+			return &http.Response{
+				StatusCode: statusCode,
+				Header: http.Header{
+					"Content-Type": []string{runtime.ContentTypeJSON},
+				},
+				Body:    io.NopCloser(bytes.NewReader(payload)),
+				Request: request,
+			}, nil
+		}),
+		QPS:   1000,
+		Burst: 1000,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return kubernetesClient
+}
+
+func leaseFailureStatus(
+	code int32,
+	reason metav1.StatusReason,
+	message string,
+) *metav1.Status {
+	return &metav1.Status{
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Status"},
+		Status:   metav1.StatusFailure,
+		Message:  message,
+		Reason:   reason,
+		Code:     code,
+	}
+}
 
 func TestAdapterDiscoversTheFrozenKubernetesRangeAndRuntimeAPI(t *testing.T) {
 	t.Parallel()
@@ -565,20 +672,22 @@ func TestAdapterPersistsOnlyPortableStableDRAFields(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	changeSet, err := cluster.NewOwnedChangeSet(
-		scope,
-		cluster.ExecutionPersistent,
-		[]cluster.OwnedChange{classChange, sliceChange},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	receipt, err := adapter.Execute(context.Background(), changeSet)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if receipt.Persisted != 2 {
-		t.Fatalf("receipt = %#v", receipt)
+	for _, change := range []cluster.OwnedChange{classChange, sliceChange} {
+		changeSet, err := cluster.NewOwnedChangeSet(
+			scope,
+			cluster.ExecutionPersistent,
+			[]cluster.OwnedChange{change},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		receipt, err := adapter.Execute(context.Background(), changeSet)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if receipt.Persisted != 1 {
+			t.Fatalf("stage receipt = %#v", receipt)
+		}
 	}
 	class, err := kubernetesClient.ResourceV1().DeviceClasses().Get(
 		context.Background(),
@@ -689,6 +798,212 @@ func TestAdapterPaginatesOwnedObservationUntilTheServerCursorCloses(t *testing.T
 	if nodeListCalls != 2 || len(graph.Objects) != 2 {
 		t.Fatalf("pagination calls=%d graph=%#v", nodeListCalls, graph)
 	}
+}
+
+func TestAdapterExecutesIndependentOwnedMutationsWithBoundedConcurrency(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	var active atomic.Int32
+	var peak atomic.Int32
+	started := make(chan struct{}, 64)
+	release := make(chan struct{})
+	kubernetesClient := newLeaseTransportClient(
+		t,
+		func(context.Context, string) (*metav1.Status, error) {
+			current := active.Add(1)
+			for {
+				observed := peak.Load()
+				if current <= observed || peak.CompareAndSwap(observed, current) {
+					break
+				}
+			}
+			started <- struct{}{}
+			<-release
+			active.Add(-1)
+			return nil, nil
+		},
+	)
+	const changeCount = 64
+	changeSet := ownedLeaseChangeSet(t, changeCount)
+	type executionResult struct {
+		receipt cluster.MutationReceipt
+		err     error
+	}
+	completed := make(chan executionResult, 1)
+	go func() {
+		receipt, executeErr := clusterkubernetes.NewAdapter(kubernetesClient).
+			Execute(context.Background(), changeSet)
+		completed <- executionResult{receipt: receipt, err: executeErr}
+	}()
+	for observed := 0; observed < 4; observed++ {
+		select {
+		case <-started:
+		case result := <-completed:
+			close(release)
+			t.Fatalf(
+				"owned mutation batch completed before concurrent progress: receipt %#v, error %v",
+				result.receipt,
+				result.err,
+			)
+		case <-time.After(time.Second):
+			close(release)
+			t.Fatalf(
+				"owned mutation batch did not make bounded concurrent progress: peak %d",
+				peak.Load(),
+			)
+		}
+	}
+	close(release)
+	result := <-completed
+	if result.err != nil {
+		t.Fatal(result.err)
+	}
+	if result.receipt.Persisted != changeCount ||
+		peak.Load() < 4 ||
+		peak.Load() > 32 {
+		t.Fatalf(
+			"bounded mutation execution = receipt %#v, peak %d",
+			result.receipt,
+			peak.Load(),
+		)
+	}
+}
+
+func TestAdapterReturnsLowestInputErrorAndStopsBeforeTheNextWave(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	var requests atomic.Int32
+	zeroStarted := make(chan struct{})
+	oneFailed := make(chan struct{})
+	kubernetesClient := newLeaseTransportClient(
+		t,
+		func(_ context.Context, name string) (*metav1.Status, error) {
+			requests.Add(1)
+			switch name {
+			case "concurrent-node-00":
+				close(zeroStarted)
+				<-oneFailed
+				time.Sleep(50 * time.Millisecond)
+				return leaseFailureStatus(
+					http.StatusTooManyRequests,
+					metav1.StatusReasonTooManyRequests,
+					"lower input index was rate limited",
+				), nil
+			case "concurrent-node-01":
+				<-zeroStarted
+				close(oneFailed)
+				return leaseFailureStatus(
+					http.StatusForbidden,
+					metav1.StatusReasonForbidden,
+					"higher input index was forbidden",
+				), nil
+			default:
+				return nil, nil
+			}
+		},
+	)
+	changeSet := ownedLeaseChangeSet(t, 64)
+	receipt, err := clusterkubernetes.NewAdapter(kubernetesClient).
+		Execute(context.Background(), changeSet)
+	if cluster.ErrorCodeOf(err) != cluster.ErrorRateLimited {
+		t.Fatalf("deterministic batch error = %v, want RateLimited", err)
+	}
+	if receipt.Attempted != 64 ||
+		receipt.Persisted != 30 ||
+		requests.Load() != 32 {
+		t.Fatalf(
+			"failed wave evidence = receipt %#v, requests %d",
+			receipt,
+			requests.Load(),
+		)
+	}
+}
+
+func TestAdapterParentCancellationStopsTheCurrentWave(t *testing.T) {
+	t.Parallel()
+
+	started := make(chan struct{}, 8)
+	kubernetesClient := newLeaseTransportClient(
+		t,
+		func(ctx context.Context, _ string) (*metav1.Status, error) {
+			started <- struct{}{}
+			<-ctx.Done()
+			return nil, ctx.Err()
+		},
+	)
+	changeSet := ownedLeaseChangeSet(t, 8)
+	ctx, cancel := context.WithCancel(context.Background())
+	type executionResult struct {
+		receipt cluster.MutationReceipt
+		err     error
+	}
+	completed := make(chan executionResult, 1)
+	go func() {
+		receipt, err := clusterkubernetes.NewAdapter(kubernetesClient).
+			Execute(ctx, changeSet)
+		completed <- executionResult{receipt: receipt, err: err}
+	}()
+	for range 8 {
+		select {
+		case <-started:
+		case <-time.After(time.Second):
+			cancel()
+			t.Fatal("current mutation wave did not start before cancellation")
+		}
+	}
+	cancel()
+	select {
+	case result := <-completed:
+		if cluster.ErrorCodeOf(result.err) != cluster.ErrorTargetUnavailable ||
+			result.receipt.Attempted != 8 ||
+			result.receipt.Persisted != 0 {
+			t.Fatalf("parent cancellation evidence = %#v, error %v", result.receipt, result.err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("parent cancellation did not stop the current mutation wave")
+	}
+}
+
+func ownedLeaseChangeSet(t *testing.T, count int) cluster.OwnedChangeSet {
+	t.Helper()
+
+	changes := make([]cluster.OwnedChange, 0, count)
+	for index := 0; index < count; index++ {
+		key, err := cluster.NewObjectKey(
+			cluster.ObjectKindLease,
+			"kube-node-lease",
+			fmt.Sprintf("concurrent-node-%02d", index),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		change, err := cluster.NewApplyLease(
+			key,
+			cluster.ObjectPreconditions{},
+			cluster.LeaseInput{
+				HolderIdentity:       key.Name(),
+				LeaseDurationSeconds: 40,
+				RenewTime:            time.Date(2026, 7, 30, 8, 0, 0, 0, time.UTC),
+			},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		changes = append(changes, change)
+	}
+	changeSet, err := cluster.NewOwnedChangeSet(
+		ownershipScope(t, 2),
+		cluster.ExecutionPersistent,
+		changes,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return changeSet
 }
 
 func TestAdapterRevalidatesOwnershipAndHonorsServerDryRunDelete(t *testing.T) {

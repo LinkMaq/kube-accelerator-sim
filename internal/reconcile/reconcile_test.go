@@ -23,7 +23,7 @@ import (
 
 var fixedTime = time.Date(2026, 7, 30, 8, 0, 0, 0, time.UTC)
 
-func TestReconcileCreatesOwnedLeaseThenClosedSyntheticNode(t *testing.T) {
+func TestReconcileCreatesClosedSyntheticNodeBeforeOwnedLease(t *testing.T) {
 	t.Parallel()
 
 	fixture := newFixture(t, recording.Options{
@@ -44,39 +44,78 @@ func TestReconcileCreatesOwnedLeaseThenClosedSyntheticNode(t *testing.T) {
 		t.Fatalf("persistent change sets = %d, want 1", len(changeSets))
 	}
 	changes := changeSets[0].Changes()
-	if len(changes) != 2 {
-		t.Fatalf("first change set = %d changes, want Lease and Node", len(changes))
+	if len(changes) != 1 {
+		t.Fatalf("first change set = %d changes, want one closed Node", len(changes))
 	}
-	lease, ok := changes[0].(cluster.ApplyLease)
+	node, ok := changes[0].(cluster.ApplySyntheticNode)
 	if !ok {
-		t.Fatalf("first change = %T, want ApplyLease", changes[0])
-	}
-	if lease.Key().Namespace() != "kube-node-lease" ||
-		lease.HolderIdentity() != lease.Key().Name() ||
-		lease.LeaseDurationSeconds() != 40 {
-		t.Fatalf("unexpected Lease intent: %#v", lease)
-	}
-	node, ok := changes[1].(cluster.ApplySyntheticNode)
-	if !ok {
-		t.Fatalf("second change = %T, want ApplySyntheticNode", changes[1])
+		t.Fatalf("first change = %T, want ApplySyntheticNode", changes[0])
 	}
 	if !node.Unschedulable() ||
-		node.Key().Name() != lease.Key().Name() ||
 		node.Annotations()["kwok.x-k8s.io/node"] != "fake" ||
 		node.Labels()["simulation.kasim.io/node-group"] != "nodes" {
 		t.Fatalf("unexpected closed Synthetic Node intent: %#v", node)
 	}
-	for _, change := range changes {
-		if change.Key().Kind() != cluster.ObjectKindLease &&
-			change.Key().Kind() != cluster.ObjectKindNode {
-			t.Fatalf("unexpected object mutation %s", change.Key().Kind())
-		}
+	if changes[0].Key().Kind() != cluster.ObjectKindNode {
+		t.Fatalf("unexpected object mutation %s", changes[0].Key().Kind())
 	}
 	if len(fixture.commits) != 1 ||
 		fixture.commits[0].ObservedGeneration.Value() != 0 ||
 		fixture.commits[0].Status.Phase != "Reconciling" ||
 		fixture.commits[0].Finalization != reconcile.FinalizationEnsure {
 		t.Fatalf("unexpected committed status intent: %#v", fixture.commits)
+	}
+}
+
+func TestReconcileCreatesLeaseOnlyAfterClosedNodeWasObserved(t *testing.T) {
+	t.Parallel()
+
+	observed := completeObservedGraph(t, true, nil)
+	observed.Objects = observed.Objects[1:]
+	fixture := newFixture(t, recording.Options{
+		Capabilities: schedulingCapabilities(),
+		Observed:     observed,
+	})
+	result, err := fixture.reconciler.Reconcile(context.Background(), fixture.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Requeue() || result.Phase() != "Reconciling" {
+		t.Fatalf("Lease stage result = %#v", result)
+	}
+	changes := fixture.cluster.PersistentChangeSets()[0].Changes()
+	lease, ok := changes[0].(cluster.ApplyLease)
+	if len(changes) != 1 ||
+		!ok ||
+		lease.Key().Name() != syntheticNodeName(t) ||
+		lease.LeaseDurationSeconds() != 40 {
+		t.Fatalf("Lease stage did not follow observed closed Node: %#v", changes)
+	}
+}
+
+func TestReconcileClosesExistingNodeBeforeRepairingMissingLease(t *testing.T) {
+	t.Parallel()
+
+	observed := completeObservedGraph(t, false, nil)
+	observed.Objects = observed.Objects[1:]
+	fixture := newFixture(t, recording.Options{
+		Capabilities: schedulingCapabilities(),
+		Observed:     observed,
+	})
+	result, err := fixture.reconciler.Reconcile(context.Background(), fixture.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Requeue() || result.Phase() != "Reconciling" {
+		t.Fatalf("missing Lease repair result = %#v", result)
+	}
+	changes := fixture.cluster.PersistentChangeSets()[0].Changes()
+	node, ok := changes[0].(cluster.ApplySyntheticNode)
+	if len(changes) != 1 ||
+		!ok ||
+		!node.Unschedulable() ||
+		node.Key().Name() != syntheticNodeName(t) {
+		t.Fatalf("missing Lease repair did not close Node first: %#v", changes)
 	}
 }
 
@@ -1106,15 +1145,41 @@ func TestReconcileReplacementClosesOldGenerationBeforeUpdatingIdentity(t *testin
 		t.Fatalf("replacement result = %#v", result)
 	}
 	changes := fixture.cluster.PersistentChangeSets()[0].Changes()
-	if len(changes) != 2 {
-		t.Fatalf("replacement changes = %d, want Node and Lease", len(changes))
+	if len(changes) != 1 {
+		t.Fatalf("replacement changes = %d, want closed Node only", len(changes))
 	}
 	node, ok := changes[0].(cluster.ApplySyntheticNode)
 	if !ok || !node.Unschedulable() {
 		t.Fatalf("replacement did not close scheduling first: %#v", changes[0])
 	}
-	if _, ok := changes[1].(cluster.ApplyLease); !ok {
-		t.Fatalf("replacement second change = %T, want ApplyLease", changes[1])
+}
+
+func TestReconcileReplacementUpdatesLeaseAfterClosedNodeWasObserved(t *testing.T) {
+	t.Parallel()
+
+	observed := completeObservedGraph(t, true, nil)
+	oldGeneration, err := domain.NewGeneration(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	observed.Objects[0].DesiredGeneration = oldGeneration
+	fixture := newFixture(t, recording.Options{
+		Capabilities: schedulingCapabilities(),
+		Observed:     observed,
+	})
+
+	result, err := fixture.reconciler.Reconcile(context.Background(), fixture.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Requeue() || result.Phase() != "Reconciling" {
+		t.Fatalf("replacement Lease result = %#v", result)
+	}
+	changes := fixture.cluster.PersistentChangeSets()[0].Changes()
+	lease, ok := changes[0].(cluster.ApplyLease)
+	if len(changes) != 1 || !ok ||
+		lease.Key().Name() != syntheticNodeName(t) {
+		t.Fatalf("replacement Lease did not follow observed closed Node: %#v", changes)
 	}
 }
 

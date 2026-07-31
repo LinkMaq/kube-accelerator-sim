@@ -32,9 +32,10 @@ import (
 )
 
 const (
-	discoveryPageSize = int64(200)
-	minimumMinor      = 30
-	maximumMinor      = 36
+	discoveryPageSize        = int64(200)
+	minimumMinor             = 30
+	maximumMinor             = 36
+	ownedMutationConcurrency = 32
 )
 
 var ownedMutationConflictBackoff = wait.Backoff{
@@ -650,66 +651,118 @@ func (adapter *Adapter) Execute(
 		DryRun:    changeSet.Mode() == cluster.ExecutionServerDryRun,
 		Attempted: len(changes),
 	}
-	for _, change := range changes {
-		var err error
-		switch typed := change.(type) {
-		case cluster.ApplySyntheticNode:
-			err = adapter.applySyntheticNode(
-				ctx,
-				changeSet.Scope(),
-				typed,
-				receipt.DryRun,
-			)
-		case cluster.UpdateSyntheticNodeStatus:
-			err = adapter.updateSyntheticNodeStatus(
-				ctx,
-				changeSet.Scope(),
-				typed,
-				receipt.DryRun,
-			)
-		case cluster.ApplyLease:
-			err = adapter.applyLease(
-				ctx,
-				changeSet.Scope(),
-				typed,
-				receipt.DryRun,
-			)
-		case cluster.ApplyDeviceClass:
-			err = adapter.applyDeviceClass(
-				ctx,
-				changeSet.Scope(),
-				typed,
-				receipt.DryRun,
-			)
-		case cluster.ApplyResourceSlice:
-			err = adapter.applyResourceSlice(
-				ctx,
-				changeSet.Scope(),
-				typed,
-				receipt.DryRun,
-			)
-		case cluster.DeleteOwnedObject:
-			err = adapter.deleteOwned(
-				ctx,
-				changeSet.Scope(),
-				typed,
-				receipt.DryRun,
-			)
-		default:
-			err = cluster.NewError(
-				cluster.ErrorInvalidIntent,
-				"Cluster adapter received an unsupported change intention",
-				false,
-			)
-		}
+	if len(changes) == 1 {
+		err := adapter.executeOwnedChange(
+			ctx,
+			changeSet.Scope(),
+			changes[0],
+			receipt.DryRun,
+		)
 		if err != nil {
 			return receipt, err
 		}
 		if !receipt.DryRun {
-			receipt.Persisted++
+			receipt.Persisted = 1
+		}
+		return receipt, nil
+	}
+
+	type indexedResult struct {
+		index int
+		err   error
+	}
+	for waveStart := 0; waveStart < len(changes); waveStart += ownedMutationConcurrency {
+		if err := ctx.Err(); err != nil {
+			return receipt, classify("execute owned mutation batch", err)
+		}
+		waveEnd := min(waveStart+ownedMutationConcurrency, len(changes))
+		results := make(chan indexedResult, waveEnd-waveStart)
+		for index := waveStart; index < waveEnd; index++ {
+			go func(index int) {
+				results <- indexedResult{
+					index: index,
+					err: adapter.executeOwnedChange(
+						ctx,
+						changeSet.Scope(),
+						changes[index],
+						receipt.DryRun,
+					),
+				}
+			}(index)
+		}
+		errorsByIndex := make([]error, waveEnd-waveStart)
+		for range waveEnd - waveStart {
+			result := <-results
+			errorsByIndex[result.index-waveStart] = result.err
+			if result.err == nil && !receipt.DryRun {
+				receipt.Persisted++
+			}
+		}
+		for _, err := range errorsByIndex {
+			if err != nil {
+				return receipt, err
+			}
 		}
 	}
 	return receipt, nil
+}
+
+func (adapter *Adapter) executeOwnedChange(
+	ctx context.Context,
+	scope cluster.OwnershipScope,
+	change cluster.OwnedChange,
+	dryRun bool,
+) error {
+	switch typed := change.(type) {
+	case cluster.ApplySyntheticNode:
+		return adapter.applySyntheticNode(
+			ctx,
+			scope,
+			typed,
+			dryRun,
+		)
+	case cluster.UpdateSyntheticNodeStatus:
+		return adapter.updateSyntheticNodeStatus(
+			ctx,
+			scope,
+			typed,
+			dryRun,
+		)
+	case cluster.ApplyLease:
+		return adapter.applyLease(
+			ctx,
+			scope,
+			typed,
+			dryRun,
+		)
+	case cluster.ApplyDeviceClass:
+		return adapter.applyDeviceClass(
+			ctx,
+			scope,
+			typed,
+			dryRun,
+		)
+	case cluster.ApplyResourceSlice:
+		return adapter.applyResourceSlice(
+			ctx,
+			scope,
+			typed,
+			dryRun,
+		)
+	case cluster.DeleteOwnedObject:
+		return adapter.deleteOwned(
+			ctx,
+			scope,
+			typed,
+			dryRun,
+		)
+	default:
+		return cluster.NewError(
+			cluster.ErrorInvalidIntent,
+			"Cluster adapter received an unsupported change intention",
+			false,
+		)
+	}
 }
 
 func (adapter *Adapter) applySyntheticNode(

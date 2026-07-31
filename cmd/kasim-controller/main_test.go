@@ -84,11 +84,11 @@ func TestClusterClientConfigUsesBoundedScaleThroughput(t *testing.T) {
 	if config == base {
 		t.Fatal("cluster client configuration aliases the manager configuration")
 	}
-	if config.QPS != 100 {
-		t.Errorf("cluster client QPS = %v, want 100", config.QPS)
+	if config.QPS != 400 {
+		t.Errorf("cluster client QPS = %v, want 400", config.QPS)
 	}
-	if config.Burst != 200 {
-		t.Errorf("cluster client burst = %d, want 200", config.Burst)
+	if config.Burst != 800 {
+		t.Errorf("cluster client burst = %d, want 800", config.Burst)
 	}
 	if config.Host != base.Host {
 		t.Errorf("cluster client host = %q, want %q", config.Host, base.Host)
