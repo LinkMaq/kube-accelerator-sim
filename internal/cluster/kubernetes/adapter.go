@@ -1364,35 +1364,21 @@ func (adapter *Adapter) deleteOwned(
 ) error {
 	key := change.Key()
 	preconditions := change.Preconditions()
+	switch key.Kind() {
+	case cluster.ObjectKindNode, cluster.ObjectKindLease:
+		return adapter.deleteRuntimeOwned(
+			ctx,
+			key,
+			scope,
+			preconditions,
+			dryRun,
+		)
+	}
 	var labels map[string]string
 	var actualUID types.UID
 	var resourceVersion string
 	var objectOwnerReferences []metav1.OwnerReference
 	switch key.Kind() {
-	case cluster.ObjectKindNode:
-		object, err := adapter.client.CoreV1().Nodes().Get(
-			ctx,
-			key.Name(),
-			metav1.GetOptions{},
-		)
-		if err != nil {
-			return classify("revalidate owned Node", err)
-		}
-		labels = object.Labels
-		actualUID = object.UID
-		resourceVersion = object.ResourceVersion
-		objectOwnerReferences = object.OwnerReferences
-	case cluster.ObjectKindLease:
-		object, err := adapter.client.CoordinationV1().
-			Leases(key.Namespace()).
-			Get(ctx, key.Name(), metav1.GetOptions{})
-		if err != nil {
-			return classify("revalidate owned Lease", err)
-		}
-		labels = object.Labels
-		actualUID = object.UID
-		resourceVersion = object.ResourceVersion
-		objectOwnerReferences = object.OwnerReferences
 	case cluster.ObjectKindDeviceClass:
 		object, err := adapter.client.ResourceV1().DeviceClasses().Get(
 			ctx,
@@ -1450,16 +1436,6 @@ func (adapter *Adapter) deleteOwned(
 	}
 	var err error
 	switch key.Kind() {
-	case cluster.ObjectKindNode:
-		err = adapter.client.CoreV1().Nodes().Delete(
-			ctx,
-			key.Name(),
-			options,
-		)
-	case cluster.ObjectKindLease:
-		err = adapter.client.CoordinationV1().
-			Leases(key.Namespace()).
-			Delete(ctx, key.Name(), options)
 	case cluster.ObjectKindDeviceClass:
 		err = adapter.client.ResourceV1().DeviceClasses().
 			Delete(ctx, key.Name(), options)
@@ -1478,6 +1454,115 @@ func (adapter *Adapter) deleteOwned(
 		return classify("delete exact owned object", err)
 	}
 	return nil
+}
+
+func (adapter *Adapter) deleteRuntimeOwned(
+	ctx context.Context,
+	key cluster.ObjectKey,
+	scope cluster.OwnershipScope,
+	preconditions cluster.ObjectPreconditions,
+	dryRun bool,
+) error {
+	err := retry.OnError(
+		ownedMutationConflictBackoff,
+		apierrors.IsConflict,
+		func() error {
+			var current ownedObjectMetadata
+			schedulingClosed := true
+			switch key.Kind() {
+			case cluster.ObjectKindNode:
+				object, getErr := adapter.client.CoreV1().Nodes().Get(
+					ctx,
+					key.Name(),
+					metav1.GetOptions{},
+				)
+				if apierrors.IsNotFound(getErr) {
+					return nil
+				}
+				if getErr != nil {
+					return getErr
+				}
+				current = metadataOf(object)
+				schedulingClosed = object.Spec.Unschedulable
+			case cluster.ObjectKindLease:
+				object, getErr := adapter.client.CoordinationV1().
+					Leases(key.Namespace()).
+					Get(ctx, key.Name(), metav1.GetOptions{})
+				if apierrors.IsNotFound(getErr) {
+					return nil
+				}
+				if getErr != nil {
+					return getErr
+				}
+				current = metadataOf(object)
+			default:
+				return cluster.NewError(
+					cluster.ErrorInvalidIntent,
+					"runtime delete target is not allowlisted",
+					false,
+				)
+			}
+			if err := validateOwnedIdentity(
+				key,
+				current.labels,
+				current.uid,
+				current.ownerReferences,
+				scope,
+				preconditions,
+			); err != nil {
+				return err
+			}
+			if !schedulingClosed {
+				return cluster.NewError(
+					cluster.ErrorStaleObservation,
+					"delete exact runtime-owned Node: scheduling reopened",
+					true,
+				)
+			}
+			propagation := metav1.DeletePropagationBackground
+			options := metav1.DeleteOptions{
+				Preconditions: &metav1.Preconditions{
+					UID:             &current.uid,
+					ResourceVersion: &current.resourceVersion,
+				},
+				PropagationPolicy: &propagation,
+			}
+			if dryRun {
+				options.DryRun = []string{metav1.DryRunAll}
+			}
+			var deleteErr error
+			switch key.Kind() {
+			case cluster.ObjectKindNode:
+				deleteErr = adapter.client.CoreV1().Nodes().Delete(
+					ctx,
+					key.Name(),
+					options,
+				)
+			case cluster.ObjectKindLease:
+				deleteErr = adapter.client.CoordinationV1().
+					Leases(key.Namespace()).
+					Delete(ctx, key.Name(), options)
+			default:
+				return cluster.NewError(
+					cluster.ErrorInvalidIntent,
+					"runtime delete target is not allowlisted",
+					false,
+				)
+			}
+			if apierrors.IsNotFound(deleteErr) {
+				return nil
+			}
+			return deleteErr
+		},
+	)
+	if apierrors.IsConflict(err) {
+		return cluster.NewError(
+			cluster.ErrorStaleObservation,
+			"delete exact runtime-owned object: resourceVersion kept changing",
+			true,
+		)
+	}
+	return classify("delete exact runtime-owned object", err)
 }
 
 func validateOwnedMetadata(

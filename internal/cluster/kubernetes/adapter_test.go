@@ -1299,6 +1299,7 @@ func TestAdapterRevalidatesOwnershipAndHonorsServerDryRunDelete(t *testing.T) {
 			ResourceVersion: "9",
 			Labels:          ownershipLabels(scope),
 		},
+		Spec: corev1.NodeSpec{Unschedulable: true},
 	}
 	kubernetesClient := kubernetesfake.NewSimpleClientset(node)
 	kubernetesClient.Fake.PrependReactor(
@@ -1372,7 +1373,7 @@ func TestAdapterRevalidatesOwnershipAndHonorsServerDryRunDelete(t *testing.T) {
 	}
 }
 
-func TestAdapterClassifiesDeleteSnapshotDriftSeparately(t *testing.T) {
+func TestAdapterRebasesRuntimeDeleteAcrossResourceVersionDrift(t *testing.T) {
 	t.Parallel()
 
 	scope := ownershipScope(t, 2)
@@ -1381,8 +1382,163 @@ func TestAdapterClassifiesDeleteSnapshotDriftSeparately(t *testing.T) {
 		UID:             types.UID("node-uid"),
 		ResourceVersion: "10",
 		Labels:          ownershipLabels(scope),
-	}}
+	}, Spec: corev1.NodeSpec{Unschedulable: true}}
 	kubernetesClient := kubernetesfake.NewSimpleClientset(node)
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+	changeSet, err := cluster.NewOwnedChangeSet(
+		scope,
+		cluster.ExecutionPersistent,
+		[]cluster.OwnedChange{ownedNodeDeletion(t)},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := adapter.Execute(context.Background(), changeSet); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := kubernetesClient.CoreV1().Nodes().Get(
+		context.Background(),
+		node.Name,
+		metav1.GetOptions{},
+	); !apierrors.IsNotFound(err) {
+		t.Fatalf("rebased runtime delete error = %v, want NotFound", err)
+	}
+}
+
+func TestAdapterRetriesRuntimeDeleteWhenTheServerWinsTheRace(t *testing.T) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 2)
+	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
+		Name:            "synthetic-node",
+		UID:             types.UID("node-uid"),
+		ResourceVersion: "9",
+		Labels:          ownershipLabels(scope),
+	}, Spec: corev1.NodeSpec{Unschedulable: true}}
+	kubernetesClient := kubernetesfake.NewSimpleClientset(node)
+	deleteAttempts := 0
+	kubernetesClient.Fake.PrependReactor(
+		"delete",
+		"nodes",
+		func(clienttesting.Action) (bool, runtime.Object, error) {
+			deleteAttempts++
+			if deleteAttempts == 1 {
+				return true, nil, apierrors.NewConflict(
+					schema.GroupResource{Resource: "nodes"},
+					node.Name,
+					nil,
+				)
+			}
+			return false, nil, nil
+		},
+	)
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+	changeSet, err := cluster.NewOwnedChangeSet(
+		scope,
+		cluster.ExecutionPersistent,
+		[]cluster.OwnedChange{ownedNodeDeletion(t)},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := adapter.Execute(context.Background(), changeSet); err != nil {
+		t.Fatal(err)
+	}
+	if deleteAttempts != 2 {
+		t.Fatalf("runtime delete attempts = %d, want 2", deleteAttempts)
+	}
+}
+
+func TestAdapterRuntimeDeleteTreatsDeleteTimeNotFoundAsSuccess(t *testing.T) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 2)
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "synthetic-node",
+			UID:             types.UID("node-uid"),
+			ResourceVersion: "9",
+			Labels:          ownershipLabels(scope),
+		},
+		Spec: corev1.NodeSpec{Unschedulable: true},
+	}
+	kubernetesClient := kubernetesfake.NewSimpleClientset(node)
+	deleteAttempts := 0
+	kubernetesClient.Fake.PrependReactor(
+		"delete",
+		"nodes",
+		func(clienttesting.Action) (bool, runtime.Object, error) {
+			deleteAttempts++
+			if err := kubernetesClient.Tracker().Delete(
+				corev1.SchemeGroupVersion.WithResource("nodes"),
+				"",
+				node.Name,
+			); err != nil {
+				t.Fatal(err)
+			}
+			return true, nil, apierrors.NewNotFound(
+				schema.GroupResource{Resource: "nodes"},
+				node.Name,
+			)
+		},
+	)
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+	changeSet, err := cluster.NewOwnedChangeSet(
+		scope,
+		cluster.ExecutionPersistent,
+		[]cluster.OwnedChange{ownedNodeDeletion(t)},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := adapter.Execute(context.Background(), changeSet); err != nil {
+		t.Fatal(err)
+	}
+	if deleteAttempts != 1 {
+		t.Fatalf("runtime delete attempts = %d, want 1", deleteAttempts)
+	}
+}
+
+func TestAdapterRuntimeDeleteStopsWhenNodeReopensScheduling(t *testing.T) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 2)
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "synthetic-node",
+			UID:             types.UID("node-uid"),
+			ResourceVersion: "9",
+			Labels:          ownershipLabels(scope),
+		},
+		Spec: corev1.NodeSpec{Unschedulable: true},
+	}
+	kubernetesClient := kubernetesfake.NewSimpleClientset(node)
+	deleteAttempts := 0
+	kubernetesClient.Fake.PrependReactor(
+		"delete",
+		"nodes",
+		func(clienttesting.Action) (bool, runtime.Object, error) {
+			deleteAttempts++
+			if deleteAttempts == 1 {
+				reopened := node.DeepCopy()
+				reopened.ResourceVersion = "10"
+				reopened.Spec.Unschedulable = false
+				if err := kubernetesClient.Tracker().Update(
+					corev1.SchemeGroupVersion.WithResource("nodes"),
+					reopened,
+					"",
+				); err != nil {
+					t.Fatal(err)
+				}
+				return true, nil, apierrors.NewConflict(
+					schema.GroupResource{Resource: "nodes"},
+					node.Name,
+					nil,
+				)
+			}
+			return false, nil, nil
+		},
+	)
 	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
 	changeSet, err := cluster.NewOwnedChangeSet(
 		scope,
@@ -1396,7 +1552,10 @@ func TestAdapterClassifiesDeleteSnapshotDriftSeparately(t *testing.T) {
 		context.Background(),
 		changeSet,
 	); cluster.ErrorCodeOf(err) != cluster.ErrorStaleObservation {
-		t.Fatalf("delete snapshot drift error = %v, want StaleObservation", err)
+		t.Fatalf("reopened Node delete error = %v, want StaleObservation", err)
+	}
+	if deleteAttempts != 1 {
+		t.Fatalf("reopened Node received %d delete attempts, want 1", deleteAttempts)
 	}
 }
 
@@ -1409,12 +1568,14 @@ func TestAdapterClassifiesExactDeleteAPIRaceAsStaleObservation(t *testing.T) {
 		UID:             types.UID("node-uid"),
 		ResourceVersion: "9",
 		Labels:          ownershipLabels(scope),
-	}}
+	}, Spec: corev1.NodeSpec{Unschedulable: true}}
 	kubernetesClient := kubernetesfake.NewSimpleClientset(node)
+	deleteAttempts := 0
 	kubernetesClient.Fake.PrependReactor(
 		"delete",
 		"nodes",
 		func(clienttesting.Action) (bool, runtime.Object, error) {
+			deleteAttempts++
 			return true, nil, apierrors.NewConflict(
 				schema.GroupResource{Resource: "nodes"},
 				node.Name,
@@ -1436,6 +1597,52 @@ func TestAdapterClassifiesExactDeleteAPIRaceAsStaleObservation(t *testing.T) {
 		changeSet,
 	); cluster.ErrorCodeOf(err) != cluster.ErrorStaleObservation {
 		t.Fatalf("exact delete API race error = %v, want StaleObservation", err)
+	}
+	if deleteAttempts < 2 || deleteAttempts > 8 {
+		t.Fatalf(
+			"runtime delete attempts = %d, want 2..8",
+			deleteAttempts,
+		)
+	}
+}
+
+func TestAdapterRuntimeDeleteStopsWhenDesiredGenerationAdvances(t *testing.T) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 2)
+	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
+		Name:            "synthetic-node",
+		UID:             types.UID("node-uid"),
+		ResourceVersion: "10",
+		Labels:          ownershipLabels(ownershipScope(t, 3)),
+	}, Spec: corev1.NodeSpec{Unschedulable: true}}
+	kubernetesClient := kubernetesfake.NewSimpleClientset(node)
+	deleteAttempts := 0
+	kubernetesClient.Fake.PrependReactor(
+		"delete",
+		"nodes",
+		func(clienttesting.Action) (bool, runtime.Object, error) {
+			deleteAttempts++
+			return false, nil, nil
+		},
+	)
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+	changeSet, err := cluster.NewOwnedChangeSet(
+		scope,
+		cluster.ExecutionPersistent,
+		[]cluster.OwnedChange{ownedNodeDeletion(t)},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := adapter.Execute(
+		context.Background(),
+		changeSet,
+	); cluster.ErrorCodeOf(err) != cluster.ErrorResourceVersionConflict {
+		t.Fatalf("generation-ahead delete error = %v, want ResourceVersionConflict", err)
+	}
+	if deleteAttempts != 0 {
+		t.Fatalf("generation-ahead object received %d delete attempts", deleteAttempts)
 	}
 }
 
