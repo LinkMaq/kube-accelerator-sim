@@ -88,10 +88,10 @@ materially wrote that object, managed-by identity, and the strongest legal
 owner reference. An object's generation may lag the Scenario Instance during
 an in-place revision that does not change that object, but it must never lead
 the accepted desired generation. This preserves per-object traceability
-without rewriting unchanged Nodes and Leases for a status-only revision.
-Before mutating Node status, reconciliation closes only the affected Node,
-advances its generation fence, and observes that fence. A stale status retry
-then stops if a newer accepted generation has advanced the same Node.
+without rewriting unchanged Nodes and Leases for a status-only revision. A
+Node status apply atomically publishes the affected Node's matching generation
+fence with the status update. A stale status retry then stops if a newer
+accepted generation has advanced the same Node.
 Cleanup and stale-object detection use the exact UID plus an allowlist of
 object kinds; a name prefix or generic KWOK label is never sufficient.
 

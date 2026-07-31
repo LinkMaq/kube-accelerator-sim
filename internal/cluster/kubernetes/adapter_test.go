@@ -1225,7 +1225,9 @@ func TestAdapterStopsNodeStatusRetryWhenOwnershipChanges(t *testing.T) {
 	}
 }
 
-func TestAdapterRequiresExactGenerationFenceBeforeNodeStatusMutation(t *testing.T) {
+func TestAdapterAtomicallyAdvancesLaggingGenerationWithNodeStatusMutation(
+	t *testing.T,
+) {
 	t.Parallel()
 
 	scope := ownershipScope(t, 2)
@@ -1258,14 +1260,24 @@ func TestAdapterRequiresExactGenerationFenceBeforeNodeStatusMutation(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := adapter.Execute(
-		context.Background(),
-		changeSet,
-	); cluster.ErrorCodeOf(err) != cluster.ErrorResourceVersionConflict {
-		t.Fatalf("missing generation fence error = %v, want ResourceVersionConflict", err)
+	if _, err := adapter.Execute(context.Background(), changeSet); err != nil {
+		t.Fatal(err)
 	}
-	if statusPatches != 0 {
-		t.Fatalf("status patch attempts = %d, want zero before generation fence", statusPatches)
+	updated, err := kubernetesClient.CoreV1().Nodes().Get(
+		context.Background(),
+		node.Name,
+		metav1.GetOptions{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if statusPatches != 1 ||
+		updated.Labels[cluster.DesiredGenerationLabel] != "2" {
+		t.Fatalf(
+			"atomic status fence patches=%d labels=%#v",
+			statusPatches,
+			updated.Labels,
+		)
 	}
 }
 
@@ -1930,6 +1942,55 @@ func TestEnvtestServerDryRunApplyStatusAndDeleteHaveExactPersistence(t *testing.
 	if node.Status.Capacity.Name("nvidia.com/gpu", resource.DecimalSI).String() != "8" ||
 		node.Status.Allocatable.Name("nvidia.com/gpu", resource.DecimalSI).String() != "6" {
 		t.Fatalf("status apply did not persist exact resources: %#v", node.Status)
+	}
+	node.Labels[cluster.DesiredGenerationLabel] = "1"
+	node, err = kubernetesClient.CoreV1().Nodes().Update(
+		context.Background(),
+		node,
+		metav1.UpdateOptions{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	laggingStatusChange, err := cluster.NewUpdateSyntheticNodeStatus(
+		statusKey,
+		cluster.ObjectPreconditions{
+			UID:             string(node.UID),
+			ResourceVersion: node.ResourceVersion,
+		},
+		cluster.SyntheticNodeStatusInput{
+			Capacity:    map[string]string{"nvidia.com/gpu": "8"},
+			Allocatable: map[string]string{"nvidia.com/gpu": "5"},
+			ObservedAt:  time.Date(2026, 7, 30, 6, 0, 30, 0, time.UTC),
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executeSingle(
+		t,
+		adapter,
+		scope,
+		cluster.ExecutionPersistent,
+		laggingStatusChange,
+	)
+	node, err = kubernetesClient.CoreV1().Nodes().Get(
+		context.Background(),
+		nodeKey.Name(),
+		metav1.GetOptions{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if node.Labels[cluster.DesiredGenerationLabel] != "2" ||
+		node.Status.Allocatable.
+			Name("nvidia.com/gpu", resource.DecimalSI).
+			String() != "5" {
+		t.Fatalf(
+			"status subresource did not atomically persist generation and resources: labels=%#v status=%#v",
+			node.Labels,
+			node.Status,
+		)
 	}
 	statusChange, err = cluster.NewUpdateSyntheticNodeStatus(
 		statusKey,

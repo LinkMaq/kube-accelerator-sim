@@ -1203,20 +1203,7 @@ func (reconciler *InstanceReconciler) metadataChanges(
 				Effect: taint.Effect(),
 			})
 		}
-		capacity, allocatable := desiredNodeResources(
-			desired,
-			fragments[desired.Name()],
-		)
-		statusNeedsGenerationFence :=
-			actual.DesiredGeneration.Value() < graph.Generation().Value() &&
-				!nodeResourcesConverged(
-					actual.Node,
-					capacity,
-					allocatable,
-					reconciler.resourceKeys,
-				)
 		if actual.DesiredGeneration.Value() > graph.Generation().Value() ||
-			statusNeedsGenerationFence ||
 			!containsStringMap(actual.Node.Labels, labels) ||
 			hasStaleManagedKey(
 				actual.Node.Labels,
@@ -1275,8 +1262,8 @@ func (reconciler *InstanceReconciler) metadataChanges(
 		}
 	}
 	if len(nodeChanges) != 0 {
-		// Preserve both barriers: observe a closed Node at the new generation
-		// before publishing Lease metadata or mutating that Node's status.
+		// Preserve the replacement barrier: observe the closed Node at the new
+		// generation before publishing the matching Lease metadata.
 		return nodeChanges, nil
 	}
 	return leaseChanges, nil

@@ -893,6 +893,11 @@ func (adapter *Adapter) updateSyntheticNodeStatus(
 				WithLastTransitionTime(observedAt),
 		)
 	}
+	// Node status requests preserve metadata. Publishing the ownership labels
+	// in the same resourceVersion-guarded ApplyStatus makes the desired
+	// generation fence atomic with the scheduler-visible resource change.
+	objectLabels := map[string]string{}
+	addOwnershipLabels(objectLabels, scope)
 	err = adapter.retryOwnedMutation(
 		ctx,
 		change.Key(),
@@ -902,16 +907,10 @@ func (adapter *Adapter) updateSyntheticNodeStatus(
 			return adapter.getNodeMetadata(ctx, change.Key().Name())
 		},
 		func(current ownedObjectMetadata) error {
-			if err := validateExactGenerationFence(
-				change.Key(),
-				current.labels,
-				scope,
-			); err != nil {
-				return err
-			}
 			configuration := coreapplyv1.Node(change.Key().Name()).
 				WithUID(current.uid).
 				WithResourceVersion(current.resourceVersion).
+				WithLabels(objectLabels).
 				WithStatus(status)
 			_, applyErr := adapter.client.CoreV1().Nodes().ApplyStatus(
 				ctx,
@@ -1353,27 +1352,6 @@ func (adapter *Adapter) deleteOwned(
 		return classify("delete exact owned object", err)
 	}
 	return nil
-}
-
-func validateExactGenerationFence(
-	key cluster.ObjectKey,
-	objectLabels map[string]string,
-	scope cluster.OwnershipScope,
-) error {
-	expected := strconv.FormatUint(scope.DesiredGeneration().Value(), 10)
-	if objectLabels[cluster.DesiredGenerationLabel] == expected {
-		return nil
-	}
-	return cluster.NewError(
-		cluster.ErrorResourceVersionConflict,
-		fmt.Sprintf(
-			"%s %q has not observed desired generation %s",
-			key.Kind(),
-			key.Name(),
-			expected,
-		),
-		false,
-	)
 }
 
 func validateOwnedMetadata(

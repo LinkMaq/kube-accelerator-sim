@@ -1466,14 +1466,14 @@ func TestReconcileFutureLeaseGenerationFollowsClosedNodeStage(t *testing.T) {
 	}
 }
 
-func TestReconcileHealthRevisionFencesOnlyChangedNodeMetadata(t *testing.T) {
+func TestReconcileHealthRevisionWritesOnlyChangedNodeStatus(t *testing.T) {
 	t.Parallel()
 
 	fixture := newFixtureWithInput(
 		t,
 		recording.Options{
 			Capabilities: schedulingCapabilities(),
-			Observed:     twoGroupObservedGraph(t, 1, false),
+			Observed:     twoGroupObservedGraph(t),
 		},
 		twoGroupScenarioInput(t, 8),
 		extended.New(),
@@ -1489,51 +1489,14 @@ func TestReconcileHealthRevisionFencesOnlyChangedNodeMetadata(t *testing.T) {
 	}
 	changes := fixture.cluster.PersistentChangeSets()[0].Changes()
 	if len(changes) != 1 {
-		t.Fatalf("health fence changes = %d, want 1 changed Node", len(changes))
-	}
-	node, ok := changes[0].(cluster.ApplySyntheticNode)
-	if !ok ||
-		node.Key().Name() !=
-			syntheticNodeNameForGroup(t, "health-sample", 0) ||
-		!node.Unschedulable() {
-		t.Fatalf(
-			"health revision did not fence only its changed Node: %#v",
-			changes,
-		)
-	}
-}
-
-func TestReconcileHealthRevisionAppliesStatusAfterGenerationFenceObserved(t *testing.T) {
-	t.Parallel()
-
-	fixture := newFixtureWithInput(
-		t,
-		recording.Options{
-			Capabilities: schedulingCapabilities(),
-			Observed:     twoGroupObservedGraph(t, 2, true),
-		},
-		twoGroupScenarioInput(t, 8),
-		extended.New(),
-	)
-	advanceFixtureInput(t, fixture, twoGroupScenarioInput(t, 0))
-
-	result, err := fixture.reconciler.Reconcile(context.Background(), fixture.key)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !result.Requeue() || result.Phase() != "Reconciling" {
-		t.Fatalf("health status result = %#v", result)
-	}
-	changes := fixture.cluster.PersistentChangeSets()[0].Changes()
-	if len(changes) != 1 {
-		t.Fatalf("health status changes = %d, want 1 Node status update", len(changes))
+		t.Fatalf("health changes = %d, want 1 changed Node status", len(changes))
 	}
 	status, ok := changes[0].(cluster.UpdateSyntheticNodeStatus)
 	if !ok ||
 		status.Key().Name() !=
 			syntheticNodeNameForGroup(t, "health-sample", 0) {
 		t.Fatalf(
-			"health status bypassed observed generation fence: %#v",
+			"health revision did not write only its changed Node status: %#v",
 			changes,
 		)
 	}
@@ -2174,31 +2137,12 @@ func observedNodeForGroup(
 	}
 }
 
-func twoGroupObservedGraph(
-	t *testing.T,
-	sampleGeneration int64,
-	sampleUnschedulable bool,
-) cluster.ObservedGraph {
+func twoGroupObservedGraph(t *testing.T) cluster.ObservedGraph {
 	t.Helper()
 	baselineLease := observedLeaseForGroup(t, "baseline", 0)
 	baselineNode := observedNodeForGroup(t, "baseline", 0, false, "fake")
 	sampleLease := observedLeaseForGroup(t, "health-sample", 0)
-	sampleNode := observedNodeForGroup(
-		t,
-		"health-sample",
-		0,
-		sampleUnschedulable,
-		"fake",
-	)
-	if sampleGeneration != 1 {
-		generation, err := domain.NewGeneration(sampleGeneration)
-		if err != nil {
-			t.Fatal(err)
-		}
-		sampleNode.DesiredGeneration = generation
-		sampleNode.Node.Labels[cluster.DesiredGenerationLabel] =
-			strconv.FormatInt(sampleGeneration, 10)
-	}
+	sampleNode := observedNodeForGroup(t, "health-sample", 0, false, "fake")
 	return cluster.ObservedGraph{Objects: []cluster.ObservedObject{
 		baselineLease,
 		baselineNode,

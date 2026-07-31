@@ -507,6 +507,16 @@ spec:
 		ctx,
 		kubectlBinary,
 		adminKubeconfig,
+		"2",
+		"get",
+		"node/"+syntheticNode,
+		"-o=jsonpath={.metadata.labels.simulation\\.kasim\\.io/desired-generation}",
+	)
+	assertKubeOutput(
+		t,
+		ctx,
+		kubectlBinary,
+		adminKubeconfig,
 		syntheticNode,
 		"get",
 		"pod/compat-placement",
