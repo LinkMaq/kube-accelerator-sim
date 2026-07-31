@@ -4,14 +4,20 @@
 package application
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"slices"
+	"time"
 
 	"github.com/LinkMaq/kube-accelerator-sim/internal/cluster"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/controlplane"
+	"github.com/LinkMaq/kube-accelerator-sim/internal/domain"
 )
 
 const serverDryRunWarning = "server dry-run does not reserve cluster state; apply repeats all conflict checks"
+
+const revisionSubmitAttemptLimit = 8
 
 // ConnectedTarget is one immutable explicit Simulation Target carrying the
 // two already-accepted remote seams. Target loading stays a concrete delivery
@@ -47,6 +53,7 @@ type PreflightApplyResult struct {
 	Intent        controlplane.RevisionIntent
 	Proposed      controlplane.SubmissionReceipt
 	Warning       string
+	retryBaseline *revisionRetryBaseline
 }
 
 // PreflightApply performs the normative checks in order and ends with
@@ -212,6 +219,7 @@ func PreflightApply(
 			return PreflightApplyResult{}, readErr
 		}
 		result.CurrentFound = true
+		result.retryBaseline = newRevisionRetryBaseline(current)
 		if command.Preconditions.ResourceVersion == "" &&
 			command.Preconditions.InstanceUID == current.InstanceUID &&
 			command.Preconditions.ExpectedGeneration == current.DesiredGeneration {
@@ -241,10 +249,17 @@ func PreflightApply(
 
 	dryRunCommand := command
 	dryRunCommand.ServerDryRun = true
-	result.Proposed, err = connection.ControlPlane.Submit(ctx, dryRunCommand)
+	result.Proposed, dryRunCommand, err = submitRevisionWithStatusDriftRetry(
+		ctx,
+		connection.ControlPlane,
+		dryRunCommand,
+		result.retryBaseline,
+	)
 	if err != nil {
 		return PreflightApplyResult{}, err
 	}
+	intent.Preconditions.ResourceVersion =
+		dryRunCommand.Preconditions.ResourceVersion
 	if !result.Proposed.DryRun || result.Proposed.Accepted {
 		return PreflightApplyResult{}, cluster.NewError(
 			cluster.ErrorAdmissionRejected,
@@ -255,6 +270,194 @@ func PreflightApply(
 	result.Intent = intent
 	result.Warning = serverDryRunWarning
 	return result, nil
+}
+
+type revisionRetryBaseline struct {
+	target            controlplane.ExplicitTarget
+	name              domain.Name
+	instanceUID       domain.InstanceUID
+	deletionRequested bool
+	creationIdentity  string
+	fidelity          domain.FidelityMode
+	desiredGeneration domain.Generation
+	revision          controlplane.ScenarioRevision
+	revisions         []controlplane.ScenarioRevision
+}
+
+func newRevisionRetryBaseline(
+	record controlplane.InstanceRecord,
+) *revisionRetryBaseline {
+	revisions := make(
+		[]controlplane.ScenarioRevision,
+		len(record.Revisions),
+	)
+	for index := range record.Revisions {
+		revisions[index] = controlplane.CloneRevision(record.Revisions[index])
+	}
+	return &revisionRetryBaseline{
+		target:            record.Target,
+		name:              record.Name,
+		instanceUID:       record.InstanceUID,
+		deletionRequested: record.DeletionRequested,
+		creationIdentity:  record.CreationIdentity,
+		fidelity:          record.Fidelity,
+		desiredGeneration: record.DesiredGeneration,
+		revision:          controlplane.CloneRevision(record.Revision),
+		revisions:         revisions,
+	}
+}
+
+func submitRevisionWithStatusDriftRetry(
+	ctx context.Context,
+	controlPlane controlplane.ScenarioControlPlane,
+	command controlplane.RevisionCommand,
+	baseline *revisionRetryBaseline,
+) (
+	controlplane.SubmissionReceipt,
+	controlplane.RevisionCommand,
+	error,
+) {
+	for attempt := 0; attempt < revisionSubmitAttemptLimit; attempt++ {
+		submission, err := controlPlane.Submit(ctx, command)
+		if controlplane.ErrorCodeOf(err) !=
+			controlplane.ErrorResourceVersionConflict {
+			return submission, command, err
+		}
+		if baseline == nil ||
+			command.Preconditions.InstanceUID.String() == "" ||
+			command.Preconditions.ExpectedGeneration.Value() == 0 {
+			return controlplane.SubmissionReceipt{}, command, err
+		}
+		if attempt == revisionSubmitAttemptLimit-1 {
+			return controlplane.SubmissionReceipt{}, command, controlplane.NewError(
+				controlplane.ErrorResourceVersionConflict,
+				"Scenario Instance kept changing during revision submission",
+				"",
+			)
+		}
+		if waitErr := waitForRevisionRetry(ctx, attempt); waitErr != nil {
+			return controlplane.SubmissionReceipt{}, command, waitErr
+		}
+		current, readErr := controlPlane.Read(ctx, controlplane.InstanceKey{
+			TargetFingerprint: command.Target.Fingerprint,
+			Name:              command.Name,
+		})
+		if readErr != nil {
+			return controlplane.SubmissionReceipt{}, command, readErr
+		}
+		if retryErr := validateRevisionRetry(
+			current,
+			command,
+			baseline,
+		); retryErr != nil {
+			return controlplane.SubmissionReceipt{}, command, retryErr
+		}
+		command.Preconditions.ResourceVersion = current.ResourceVersion
+	}
+	panic("unreachable revision submission loop")
+}
+
+func validateRevisionRetry(
+	current controlplane.InstanceRecord,
+	command controlplane.RevisionCommand,
+	baseline *revisionRetryBaseline,
+) error {
+	switch {
+	case baseline == nil:
+		return controlplane.NewError(
+			controlplane.ErrorResourceVersionConflict,
+			"Scenario Instance has no retry baseline",
+			"",
+		)
+	case current.Target.Fingerprint != command.Target.Fingerprint:
+		return controlplane.NewError(
+			controlplane.ErrorTargetMismatch,
+			"Scenario Instance target fingerprint changed during revision submission",
+			"",
+		)
+	case current.InstanceUID != command.Preconditions.InstanceUID:
+		return controlplane.NewError(
+			controlplane.ErrorUIDConflict,
+			"Scenario Instance UID changed during revision submission",
+			"",
+		)
+	case current.DesiredGeneration != command.Preconditions.ExpectedGeneration:
+		return controlplane.NewError(
+			controlplane.ErrorGenerationConflict,
+			"Scenario Instance generation changed during revision submission",
+			"",
+		)
+	case current.CreationIdentity != command.CreationIdentity:
+		return controlplane.NewError(
+			controlplane.ErrorCreationIdentityConflict,
+			"Scenario Instance creation identity changed during revision submission",
+			"",
+		)
+	case current.Fidelity != command.Fidelity:
+		return controlplane.NewError(
+			controlplane.ErrorFidelityConflict,
+			"Scenario Instance Fidelity Mode changed during revision submission",
+			"",
+		)
+	case current.DeletionRequested:
+		return controlplane.NewError(
+			controlplane.ErrorResourceVersionConflict,
+			"Scenario Instance deletion started during revision submission",
+			"",
+		)
+	case current.ResourceVersion == "":
+		return controlplane.NewError(
+			controlplane.ErrorResourceVersionConflict,
+			"Scenario Instance returned no resourceVersion during revision submission",
+			"",
+		)
+	case current.Target != baseline.target ||
+		current.Name != baseline.name ||
+		current.InstanceUID != baseline.instanceUID ||
+		current.DeletionRequested != baseline.deletionRequested ||
+		current.CreationIdentity != baseline.creationIdentity ||
+		current.Fidelity != baseline.fidelity ||
+		current.DesiredGeneration != baseline.desiredGeneration ||
+		!scenarioRevisionEqual(current.Revision, baseline.revision) ||
+		!scenarioRevisionsEqual(current.Revisions, baseline.revisions):
+		return controlplane.NewError(
+			controlplane.ErrorResourceVersionConflict,
+			"Scenario Instance logical spec or revision history changed during submission",
+			"",
+		)
+	default:
+		return nil
+	}
+}
+
+func scenarioRevisionsEqual(
+	left, right []controlplane.ScenarioRevision,
+) bool {
+	return slices.EqualFunc(left, right, scenarioRevisionEqual)
+}
+
+func scenarioRevisionEqual(
+	left, right controlplane.ScenarioRevision,
+) bool {
+	return left.Generation == right.Generation &&
+		left.Digest == right.Digest &&
+		bytes.Equal(left.CanonicalScenario, right.CanonicalScenario) &&
+		slices.Equal(left.Profiles, right.Profiles)
+}
+
+func waitForRevisionRetry(ctx context.Context, attempt int) error {
+	delay := 5 * time.Millisecond * time.Duration(1<<attempt)
+	if delay > 250*time.Millisecond {
+		delay = 250 * time.Millisecond
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func ownershipObservationAccessRequirements(

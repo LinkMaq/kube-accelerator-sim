@@ -37,7 +37,7 @@ const (
 	maximumMinor      = 36
 )
 
-var nodeMutationConflictBackoff = wait.Backoff{
+var ownedMutationConflictBackoff = wait.Backoff{
 	Steps:    8,
 	Duration: 5 * time.Millisecond,
 	Factor:   2,
@@ -774,15 +774,18 @@ func (adapter *Adapter) applySyntheticNode(
 		}
 		return classify("create exact Synthetic Node", err)
 	}
-	err := adapter.retryOwnedNodeMutation(
+	err := adapter.retryOwnedMutation(
 		ctx,
 		change.Key(),
 		scope,
 		preconditions,
-		func(current *corev1.Node) error {
+		func() (ownedObjectMetadata, error) {
+			return adapter.getNodeMetadata(ctx, change.Key().Name())
+		},
+		func(current ownedObjectMetadata) error {
 			configuration := coreapplyv1.Node(change.Key().Name()).
-				WithUID(current.UID).
-				WithResourceVersion(current.ResourceVersion).
+				WithUID(current.uid).
+				WithResourceVersion(current.resourceVersion).
 				WithLabels(objectLabels).
 				WithAnnotations(change.Annotations()).
 				WithSpec(
@@ -837,15 +840,18 @@ func (adapter *Adapter) updateSyntheticNodeStatus(
 				WithLastTransitionTime(observedAt),
 		)
 	}
-	err = adapter.retryOwnedNodeMutation(
+	err = adapter.retryOwnedMutation(
 		ctx,
 		change.Key(),
 		scope,
 		change.Preconditions(),
-		func(current *corev1.Node) error {
+		func() (ownedObjectMetadata, error) {
+			return adapter.getNodeMetadata(ctx, change.Key().Name())
+		},
+		func(current ownedObjectMetadata) error {
 			configuration := coreapplyv1.Node(change.Key().Name()).
-				WithUID(current.UID).
-				WithResourceVersion(current.ResourceVersion).
+				WithUID(current.uid).
+				WithResourceVersion(current.resourceVersion).
 				WithStatus(status)
 			_, applyErr := adapter.client.CoreV1().Nodes().ApplyStatus(
 				ctx,
@@ -858,30 +864,61 @@ func (adapter *Adapter) updateSyntheticNodeStatus(
 	return classify("apply exact Synthetic Node status", err)
 }
 
-func (adapter *Adapter) retryOwnedNodeMutation(
+type ownedObjectMetadata struct {
+	labels          map[string]string
+	uid             types.UID
+	resourceVersion string
+	ownerReferences []metav1.OwnerReference
+}
+
+func metadataOf(object metav1.Object) ownedObjectMetadata {
+	if object == nil {
+		return ownedObjectMetadata{}
+	}
+	return ownedObjectMetadata{
+		labels:          object.GetLabels(),
+		uid:             object.GetUID(),
+		resourceVersion: object.GetResourceVersion(),
+		ownerReferences: object.GetOwnerReferences(),
+	}
+}
+
+func (adapter *Adapter) getNodeMetadata(
+	ctx context.Context,
+	name string,
+) (ownedObjectMetadata, error) {
+	current, err := adapter.client.CoreV1().Nodes().Get(
+		ctx,
+		name,
+		metav1.GetOptions{},
+	)
+	if err != nil {
+		return ownedObjectMetadata{}, err
+	}
+	return metadataOf(current), nil
+}
+
+func (adapter *Adapter) retryOwnedMutation(
 	ctx context.Context,
 	key cluster.ObjectKey,
 	scope cluster.OwnershipScope,
 	preconditions cluster.ObjectPreconditions,
-	mutate func(*corev1.Node) error,
+	get func() (ownedObjectMetadata, error),
+	mutate func(ownedObjectMetadata) error,
 ) error {
 	return retry.OnError(
-		nodeMutationConflictBackoff,
+		ownedMutationConflictBackoff,
 		apierrors.IsConflict,
 		func() error {
-			current, err := adapter.client.CoreV1().Nodes().Get(
-				ctx,
-				key.Name(),
-				metav1.GetOptions{},
-			)
+			current, err := get()
 			if err != nil {
 				return err
 			}
 			if err := validateOwnedIdentity(
 				key,
-				current.Labels,
-				current.UID,
-				current.OwnerReferences,
+				current.labels,
+				current.uid,
+				current.ownerReferences,
 				scope,
 				preconditions,
 			); err != nil {
@@ -934,42 +971,43 @@ func (adapter *Adapter) applyLease(
 		}
 		return classify("create exact Synthetic Node Lease", err)
 	}
-	current, err := adapter.client.CoordinationV1().
-		Leases(change.Key().Namespace()).
-		Get(ctx, change.Key().Name(), metav1.GetOptions{})
-	if err != nil {
-		return classify("revalidate Synthetic Node Lease before apply", err)
-	}
-	if err := validateOwnedMetadata(
+	err := adapter.retryOwnedMutation(
+		ctx,
 		change.Key(),
-		current.Labels,
-		current.UID,
-		current.ResourceVersion,
-		current.OwnerReferences,
 		scope,
 		preconditions,
-	); err != nil {
-		return err
-	}
-	configuration := coordinationapplyv1.Lease(
-		change.Key().Name(),
-		change.Key().Namespace(),
-	).
-		WithUID(current.UID).
-		WithResourceVersion(current.ResourceVersion).
-		WithLabels(objectLabels).
-		WithSpec(
-			coordinationapplyv1.LeaseSpec().
-				WithHolderIdentity(holderIdentity).
-				WithLeaseDurationSeconds(duration).
-				WithRenewTime(renewTime),
-		)
-	if owner := ownerReferenceApply(scope); owner != nil {
-		configuration = configuration.WithOwnerReferences(owner)
-	}
-	_, err = adapter.client.CoordinationV1().
-		Leases(change.Key().Namespace()).
-		Apply(ctx, configuration, options)
+		func() (ownedObjectMetadata, error) {
+			current, getErr := adapter.client.CoordinationV1().
+				Leases(change.Key().Namespace()).
+				Get(ctx, change.Key().Name(), metav1.GetOptions{})
+			if getErr != nil {
+				return ownedObjectMetadata{}, getErr
+			}
+			return metadataOf(current), nil
+		},
+		func(current ownedObjectMetadata) error {
+			configuration := coordinationapplyv1.Lease(
+				change.Key().Name(),
+				change.Key().Namespace(),
+			).
+				WithUID(current.uid).
+				WithResourceVersion(current.resourceVersion).
+				WithLabels(objectLabels).
+				WithSpec(
+					coordinationapplyv1.LeaseSpec().
+						WithHolderIdentity(holderIdentity).
+						WithLeaseDurationSeconds(duration).
+						WithRenewTime(renewTime),
+				)
+			if owner := ownerReferenceApply(scope); owner != nil {
+				configuration = configuration.WithOwnerReferences(owner)
+			}
+			_, applyErr := adapter.client.CoordinationV1().
+				Leases(change.Key().Namespace()).
+				Apply(ctx, configuration, options)
+			return applyErr
+		},
+	)
 	return classify("server-side apply exact Synthetic Node Lease", err)
 }
 

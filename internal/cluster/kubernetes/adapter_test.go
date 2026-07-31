@@ -1058,6 +1058,157 @@ func TestAdapterRetriesOwnedNodeSpecWhenTheServerWinsTheApplyRace(t *testing.T) 
 	}
 }
 
+func TestAdapterRebasesOwnedLeaseAcrossResourceVersionDrift(t *testing.T) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 2)
+	lease := ownedLease("synthetic-node", "lease-uid", "10", scope)
+	kubernetesClient := kubernetesfake.NewSimpleClientset(&lease)
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+
+	executeSingle(
+		t,
+		adapter,
+		scope,
+		cluster.ExecutionPersistent,
+		ownedLeaseChange(t, lease, "9"),
+	)
+}
+
+func TestAdapterRetriesOwnedLeaseWhenTheServerWinsTheApplyRace(t *testing.T) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 2)
+	lease := ownedLease("synthetic-node", "lease-uid", "10", scope)
+	kubernetesClient := kubernetesfake.NewSimpleClientset(&lease)
+	leasePatches := 0
+	kubernetesClient.Fake.PrependReactor(
+		"patch",
+		"leases",
+		func(clienttesting.Action) (bool, runtime.Object, error) {
+			leasePatches++
+			if leasePatches == 1 {
+				return true, nil, apierrors.NewConflict(
+					schema.GroupResource{Resource: "leases"},
+					lease.Name,
+					nil,
+				)
+			}
+			return false, nil, nil
+		},
+	)
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+
+	executeSingle(
+		t,
+		adapter,
+		scope,
+		cluster.ExecutionPersistent,
+		ownedLeaseChange(t, lease, "9"),
+	)
+	if leasePatches != 2 {
+		t.Fatalf("Lease patch attempts = %d, want 2", leasePatches)
+	}
+}
+
+func TestAdapterStopsLeaseRetryWhenOwnershipChanges(t *testing.T) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 2)
+	lease := ownedLease("synthetic-node", "lease-uid", "10", scope)
+	kubernetesClient := kubernetesfake.NewSimpleClientset(&lease)
+	leasePatches := 0
+	kubernetesClient.Fake.PrependReactor(
+		"patch",
+		"leases",
+		func(clienttesting.Action) (bool, runtime.Object, error) {
+			leasePatches++
+			foreign := lease.DeepCopy()
+			foreign.ResourceVersion = "11"
+			foreign.Labels[cluster.InstanceUIDLabel] = "foreign-instance"
+			if err := kubernetesClient.Tracker().Update(
+				coordinationv1.SchemeGroupVersion.WithResource("leases"),
+				foreign,
+				lease.Namespace,
+			); err != nil {
+				t.Fatalf("replace Lease ownership during conflict: %v", err)
+			}
+			return true, nil, apierrors.NewConflict(
+				schema.GroupResource{Resource: "leases"},
+				lease.Name,
+				nil,
+			)
+		},
+	)
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+	changeSet, err := cluster.NewOwnedChangeSet(
+		scope,
+		cluster.ExecutionPersistent,
+		[]cluster.OwnedChange{ownedLeaseChange(t, lease, "9")},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := adapter.Execute(
+		context.Background(),
+		changeSet,
+	); cluster.ErrorCodeOf(err) != cluster.ErrorOwnershipConflict {
+		t.Fatalf("Lease ownership change error = %v, want OwnershipConflict", err)
+	}
+	if leasePatches != 1 {
+		t.Fatalf("Lease patch attempts = %d, want 1 before ownership rejection", leasePatches)
+	}
+}
+
+func TestAdapterStopsLeaseRetryWhenDesiredGenerationAdvances(t *testing.T) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 2)
+	lease := ownedLease("synthetic-node", "lease-uid", "10", scope)
+	kubernetesClient := kubernetesfake.NewSimpleClientset(&lease)
+	leasePatches := 0
+	kubernetesClient.Fake.PrependReactor(
+		"patch",
+		"leases",
+		func(clienttesting.Action) (bool, runtime.Object, error) {
+			leasePatches++
+			newer := lease.DeepCopy()
+			newer.ResourceVersion = "11"
+			newer.Labels[cluster.DesiredGenerationLabel] = "3"
+			if err := kubernetesClient.Tracker().Update(
+				coordinationv1.SchemeGroupVersion.WithResource("leases"),
+				newer,
+				lease.Namespace,
+			); err != nil {
+				t.Fatalf("advance Lease desired generation during conflict: %v", err)
+			}
+			return true, nil, apierrors.NewConflict(
+				schema.GroupResource{Resource: "leases"},
+				lease.Name,
+				nil,
+			)
+		},
+	)
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+	changeSet, err := cluster.NewOwnedChangeSet(
+		scope,
+		cluster.ExecutionPersistent,
+		[]cluster.OwnedChange{ownedLeaseChange(t, lease, "9")},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := adapter.Execute(
+		context.Background(),
+		changeSet,
+	); cluster.ErrorCodeOf(err) != cluster.ErrorResourceVersionConflict {
+		t.Fatalf("Lease generation advance error = %v, want ResourceVersionConflict", err)
+	}
+	if leasePatches != 1 {
+		t.Fatalf("Lease patch attempts = %d, want 1 before generation rejection", leasePatches)
+	}
+}
+
 func ownedNodeStatusChange(
 	t *testing.T,
 	node corev1.Node,
@@ -1482,6 +1633,50 @@ func TestEnvtestServerDryRunApplyStatusAndDeleteHaveExactPersistence(t *testing.
 		*lease.Spec.HolderIdentity != nodeKey.Name() {
 		t.Fatalf("persisted Lease lost owned intent: %#v", lease)
 	}
+	staleLeaseResourceVersion := lease.ResourceVersion
+	lease = lease.DeepCopy()
+	lease.Annotations = map[string]string{
+		"simulation.kasim.io/status-drift": "observed",
+	}
+	lease, err = kubernetesClient.CoordinationV1().
+		Leases(leaseKey.Namespace()).
+		Update(context.Background(), lease, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lease.ResourceVersion == staleLeaseResourceVersion {
+		t.Fatal("envtest Lease metadata update did not advance resourceVersion")
+	}
+	leaseUpdate, err := cluster.NewApplyLease(
+		leaseKey,
+		cluster.ObjectPreconditions{
+			UID:             string(lease.UID),
+			ResourceVersion: staleLeaseResourceVersion,
+		},
+		cluster.LeaseInput{
+			HolderIdentity:       nodeKey.Name(),
+			LeaseDurationSeconds: 45,
+			RenewTime:            time.Date(2026, 7, 30, 6, 1, 0, 0, time.UTC),
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executeSingle(t, adapter, scope, cluster.ExecutionPersistent, leaseUpdate)
+	lease, err = kubernetesClient.CoordinationV1().
+		Leases(leaseKey.Namespace()).
+		Get(context.Background(), leaseKey.Name(), metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lease.Spec.LeaseDurationSeconds == nil ||
+		*lease.Spec.LeaseDurationSeconds != 45 ||
+		lease.Spec.RenewTime == nil ||
+		!lease.Spec.RenewTime.Time.Equal(
+			time.Date(2026, 7, 30, 6, 1, 0, 0, time.UTC),
+		) {
+		t.Fatalf("envtest Lease stale-RV rebase lost desired state: %#v", lease.Spec)
+	}
 
 	classKey, err := cluster.NewObjectKey(
 		cluster.ObjectKindDeviceClass,
@@ -1764,6 +1959,51 @@ func ownedNode(
 		ResourceVersion: resourceVersion,
 		Labels:          ownershipLabels(scope),
 	}}
+}
+
+func ownedLease(
+	name, uid, resourceVersion string,
+	scope cluster.OwnershipScope,
+) coordinationv1.Lease {
+	return coordinationv1.Lease{ObjectMeta: metav1.ObjectMeta{
+		Namespace:       "kube-node-lease",
+		Name:            name,
+		UID:             types.UID(uid),
+		ResourceVersion: resourceVersion,
+		Labels:          ownershipLabels(scope),
+	}}
+}
+
+func ownedLeaseChange(
+	t *testing.T,
+	lease coordinationv1.Lease,
+	resourceVersion string,
+) cluster.OwnedChange {
+	t.Helper()
+	key, err := cluster.NewObjectKey(
+		cluster.ObjectKindLease,
+		lease.Namespace,
+		lease.Name,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	change, err := cluster.NewApplyLease(
+		key,
+		cluster.ObjectPreconditions{
+			UID:             string(lease.UID),
+			ResourceVersion: resourceVersion,
+		},
+		cluster.LeaseInput{
+			HolderIdentity:       lease.Name,
+			LeaseDurationSeconds: 40,
+			RenewTime:            time.Date(2026, 7, 30, 8, 0, 0, 0, time.UTC),
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return change
 }
 
 func ownedNodeDeletion(t *testing.T) cluster.OwnedChange {

@@ -244,13 +244,17 @@ func (runtime *ScenarioRuntime) Apply(
 		}, nil
 	}
 
-	submission, err := connected.ControlPlane.Submit(
+	submission, command, err := submitRevisionWithStatusDriftRetry(
 		ctx,
+		connected.ControlPlane,
 		preflight.Intent.Bind(connected.Target),
+		preflight.retryBaseline,
 	)
 	if err != nil {
 		return LifecycleResult{}, err
 	}
+	preflight.Intent.Preconditions.ResourceVersion =
+		command.Preconditions.ResourceVersion
 	return runtime.finishApply(
 		ctx,
 		connected,
@@ -456,13 +460,21 @@ func (runtime *ScenarioRuntime) applyTyped(
 	if _, err := connected.Cluster.Observe(ctx, scope); err != nil {
 		return LifecycleResult{}, err
 	}
+	retryBaseline := newRevisionRetryBaseline(current)
 
 	dryRunCommand := intent.Bind(connected.Target)
 	dryRunCommand.ServerDryRun = true
-	proposed, err := connected.ControlPlane.Submit(ctx, dryRunCommand)
+	proposed, dryRunCommand, err := submitRevisionWithStatusDriftRetry(
+		ctx,
+		connected.ControlPlane,
+		dryRunCommand,
+		retryBaseline,
+	)
 	if err != nil {
 		return LifecycleResult{}, err
 	}
+	intent.Preconditions.ResourceVersion =
+		dryRunCommand.Preconditions.ResourceVersion
 	if !proposed.DryRun || proposed.Accepted {
 		return LifecycleResult{}, cluster.NewError(
 			cluster.ErrorAdmissionRejected,
@@ -487,13 +499,17 @@ func (runtime *ScenarioRuntime) applyTyped(
 		}, nil
 	}
 
-	submission, err := connected.ControlPlane.Submit(
+	submission, persistentCommand, err := submitRevisionWithStatusDriftRetry(
 		ctx,
+		connected.ControlPlane,
 		intent.Bind(connected.Target),
+		retryBaseline,
 	)
 	if err != nil {
 		return LifecycleResult{}, err
 	}
+	intent.Preconditions.ResourceVersion =
+		persistentCommand.Preconditions.ResourceVersion
 	return runtime.finishApply(
 		ctx,
 		connected,
