@@ -466,21 +466,12 @@ func runReferenceScaleTrial(
 		"-f",
 		"-",
 	)
-	waitForScaleCondition(
+	waitForScaleWorkload(
 		t,
 		ctx,
+		tools.kubectl,
+		kubeconfig,
 		scaleWorkloadLimit,
-		"100-Pod workload",
-		func() bool {
-			pods := observeScalePods(
-				ctx,
-				tools.kubectl,
-				kubeconfig,
-			)
-			return pods.Total == scaleRepresentativePods &&
-				pods.Running == scaleRepresentativePods &&
-				pods.ScheduledNodes == scaleRepresentativePods
-		},
 	)
 	measurements.WorkloadSeconds = time.Since(workloadStarted).Seconds()
 	requireScaleDuration(
@@ -941,9 +932,12 @@ func scaleQuantity(value string) int {
 }
 
 type scalePodInventory struct {
-	Total          int
-	Running        int
-	ScheduledNodes int
+	Total            int
+	Running          int
+	ScheduledNodes   int
+	Unscheduled      int
+	Phases           map[string]int
+	ObservationError string
 }
 
 func observeScalePods(
@@ -963,7 +957,7 @@ func observeScalePods(
 		"-o=json",
 	)
 	if err != nil {
-		return scalePodInventory{}
+		return scalePodInventory{ObservationError: err.Error()}
 	}
 	var list struct {
 		Items []struct {
@@ -975,21 +969,144 @@ func observeScalePods(
 			} `json:"status"`
 		} `json:"items"`
 	}
-	if json.Unmarshal([]byte(output), &list) != nil {
-		return scalePodInventory{}
+	if err := json.Unmarshal([]byte(output), &list); err != nil {
+		return scalePodInventory{ObservationError: err.Error()}
 	}
-	inventory := scalePodInventory{Total: len(list.Items)}
+	inventory := scalePodInventory{
+		Total:  len(list.Items),
+		Phases: make(map[string]int),
+	}
 	nodes := make(map[string]struct{}, len(list.Items))
 	for _, item := range list.Items {
+		inventory.Phases[item.Status.Phase]++
 		if item.Status.Phase == "Running" {
 			inventory.Running++
 		}
-		if item.Spec.NodeName != "" {
-			nodes[item.Spec.NodeName] = struct{}{}
+		if item.Spec.NodeName == "" {
+			inventory.Unscheduled++
+			continue
 		}
+		nodes[item.Spec.NodeName] = struct{}{}
 	}
 	inventory.ScheduledNodes = len(nodes)
 	return inventory
+}
+
+func waitForScaleWorkload(
+	t *testing.T,
+	ctx context.Context,
+	kubectlBinary,
+	kubeconfig string,
+	limit time.Duration,
+) {
+	t.Helper()
+	deadline := time.NewTimer(limit)
+	defer deadline.Stop()
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	last := scalePodInventory{}
+	for {
+		last = observeScalePods(ctx, kubectlBinary, kubeconfig)
+		if last.Total == scaleRepresentativePods &&
+			last.Running == scaleRepresentativePods &&
+			last.ScheduledNodes == scaleRepresentativePods {
+			return
+		}
+		select {
+		case <-ctx.Done():
+			logScaleWorkloadDiagnostics(
+				t,
+				ctx,
+				kubectlBinary,
+				kubeconfig,
+				last,
+			)
+			t.Fatalf("wait for 100-Pod workload: %v", ctx.Err())
+		case <-deadline.C:
+			logScaleWorkloadDiagnostics(
+				t,
+				ctx,
+				kubectlBinary,
+				kubeconfig,
+				last,
+			)
+			t.Fatalf(
+				"wait for 100-Pod workload exceeded %s: last inventory %#v",
+				limit,
+				last,
+			)
+		case <-ticker.C:
+		}
+	}
+}
+
+func logScaleWorkloadDiagnostics(
+	t *testing.T,
+	ctx context.Context,
+	kubectlBinary,
+	kubeconfig string,
+	inventory scalePodInventory,
+) {
+	t.Helper()
+	t.Logf("100-Pod workload last inventory: %#v", inventory)
+	commands := []struct {
+		description string
+		arguments   []string
+	}{
+		{
+			description: "workload Pods",
+			arguments: []string{
+				"get",
+				"pods",
+				"--namespace=" + scaleWorkloadNamespace,
+				"--selector=" + scaleWorkloadSelectorLabel + "=true",
+				"-o=wide",
+			},
+		},
+		{
+			description: "workload events",
+			arguments: []string{
+				"get",
+				"events",
+				"--namespace=" + scaleWorkloadNamespace,
+				"--sort-by=.metadata.creationTimestamp",
+			},
+		},
+		{
+			description: "scheduler logs",
+			arguments: []string{
+				"logs",
+				"--namespace=kube-system",
+				"--selector=component=kube-scheduler",
+				"--tail=200",
+			},
+		},
+		{
+			description: "KWOK logs",
+			arguments: []string{
+				"logs",
+				"--namespace=kasim-system",
+				"--selector=app.kubernetes.io/component=kwok-controller",
+				"--tail=200",
+			},
+		},
+	}
+	for _, command := range commands {
+		arguments := append(
+			[]string{"--kubeconfig", kubeconfig},
+			command.arguments...,
+		)
+		output, err := protocolOracleCommandOutput(
+			ctx,
+			kubectlBinary,
+			arguments...,
+		)
+		if err != nil {
+			t.Logf("%s unavailable: %v\n%s", command.description, err, output)
+			continue
+		}
+		t.Logf("%s:\n%s", command.description, output)
+	}
 }
 
 func scaleWorkloadManifest(instanceUID string) string {
