@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	coordinationv1 "k8s.io/api/coordination/v1"
@@ -17,12 +18,14 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	coordinationapplyv1 "k8s.io/client-go/applyconfigurations/coordination/v1"
 	coreapplyv1 "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1apply "k8s.io/client-go/applyconfigurations/meta/v1"
 	resourceapplyv1 "k8s.io/client-go/applyconfigurations/resource/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 
 	"github.com/LinkMaq/kube-accelerator-sim/internal/cluster"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/domain"
@@ -33,6 +36,14 @@ const (
 	minimumMinor      = 30
 	maximumMinor      = 36
 )
+
+var nodeMutationConflictBackoff = wait.Backoff{
+	Steps:    8,
+	Duration: 5 * time.Millisecond,
+	Factor:   2,
+	Jitter:   0.1,
+	Cap:      250 * time.Millisecond,
+}
 
 var requiredResources = []struct {
 	groupVersion string
@@ -763,41 +774,48 @@ func (adapter *Adapter) applySyntheticNode(
 		}
 		return classify("create exact Synthetic Node", err)
 	}
-	current, err := adapter.client.CoreV1().Nodes().Get(
-		ctx,
-		change.Key().Name(),
-		metav1.GetOptions{},
-	)
-	if err != nil {
-		return classify("revalidate Synthetic Node before apply", err)
-	}
-	if err := validateOwnedIdentity(
-		change.Key(),
-		current.Labels,
-		current.UID,
-		current.OwnerReferences,
-		scope,
-		preconditions,
-	); err != nil {
-		return err
-	}
-	configuration := coreapplyv1.Node(change.Key().Name()).
-		WithUID(current.UID).
-		WithResourceVersion(current.ResourceVersion).
-		WithLabels(objectLabels).
-		WithAnnotations(change.Annotations()).
-		WithSpec(
-			coreapplyv1.NodeSpec().
-				WithUnschedulable(change.Unschedulable()).
-				WithTaints(applyTaints...),
-		)
-	if owner := ownerReferenceApply(scope); owner != nil {
-		configuration = configuration.WithOwnerReferences(owner)
-	}
-	_, err = adapter.client.CoreV1().Nodes().Apply(
-		ctx,
-		configuration,
-		options,
+	err := retry.OnError(
+		nodeMutationConflictBackoff,
+		apierrors.IsConflict,
+		func() error {
+			current, getErr := adapter.client.CoreV1().Nodes().Get(
+				ctx,
+				change.Key().Name(),
+				metav1.GetOptions{},
+			)
+			if getErr != nil {
+				return getErr
+			}
+			if ownedErr := validateOwnedIdentity(
+				change.Key(),
+				current.Labels,
+				current.UID,
+				current.OwnerReferences,
+				scope,
+				preconditions,
+			); ownedErr != nil {
+				return ownedErr
+			}
+			configuration := coreapplyv1.Node(change.Key().Name()).
+				WithUID(current.UID).
+				WithResourceVersion(current.ResourceVersion).
+				WithLabels(objectLabels).
+				WithAnnotations(change.Annotations()).
+				WithSpec(
+					coreapplyv1.NodeSpec().
+						WithUnschedulable(change.Unschedulable()).
+						WithTaints(applyTaints...),
+				)
+			if owner := ownerReferenceApply(scope); owner != nil {
+				configuration = configuration.WithOwnerReferences(owner)
+			}
+			_, applyErr := adapter.client.CoreV1().Nodes().Apply(
+				ctx,
+				configuration,
+				options,
+			)
+			return applyErr
+		},
 	)
 	return classify("server-side apply exact Synthetic Node", err)
 }
@@ -808,24 +826,6 @@ func (adapter *Adapter) updateSyntheticNodeStatus(
 	change cluster.UpdateSyntheticNodeStatus,
 	dryRun bool,
 ) error {
-	current, err := adapter.client.CoreV1().Nodes().Get(
-		ctx,
-		change.Key().Name(),
-		metav1.GetOptions{},
-	)
-	if err != nil {
-		return classify("revalidate Synthetic Node before status apply", err)
-	}
-	if err := validateOwnedIdentity(
-		change.Key(),
-		current.Labels,
-		current.UID,
-		current.OwnerReferences,
-		scope,
-		change.Preconditions(),
-	); err != nil {
-		return err
-	}
 	capacity, err := resourceList(change.Capacity())
 	if err != nil {
 		return err
@@ -853,14 +853,39 @@ func (adapter *Adapter) updateSyntheticNodeStatus(
 				WithLastTransitionTime(observedAt),
 		)
 	}
-	configuration := coreapplyv1.Node(change.Key().Name()).
-		WithUID(current.UID).
-		WithResourceVersion(current.ResourceVersion).
-		WithStatus(status)
-	_, err = adapter.client.CoreV1().Nodes().ApplyStatus(
-		ctx,
-		configuration,
-		applyOptions(dryRun),
+	err = retry.OnError(
+		nodeMutationConflictBackoff,
+		apierrors.IsConflict,
+		func() error {
+			current, getErr := adapter.client.CoreV1().Nodes().Get(
+				ctx,
+				change.Key().Name(),
+				metav1.GetOptions{},
+			)
+			if getErr != nil {
+				return getErr
+			}
+			if ownedErr := validateOwnedIdentity(
+				change.Key(),
+				current.Labels,
+				current.UID,
+				current.OwnerReferences,
+				scope,
+				change.Preconditions(),
+			); ownedErr != nil {
+				return ownedErr
+			}
+			configuration := coreapplyv1.Node(change.Key().Name()).
+				WithUID(current.UID).
+				WithResourceVersion(current.ResourceVersion).
+				WithStatus(status)
+			_, applyErr := adapter.client.CoreV1().Nodes().ApplyStatus(
+				ctx,
+				configuration,
+				applyOptions(dryRun),
+			)
+			return applyErr
+		},
 	)
 	return classify("apply exact Synthetic Node status", err)
 }
@@ -1887,6 +1912,9 @@ func parseMinor(info *version.Info) (int, error) {
 func classify(operation string, err error) error {
 	if err == nil {
 		return nil
+	}
+	if cluster.ErrorCodeOf(err) != "" {
+		return err
 	}
 	switch {
 	case apierrors.IsUnauthorized(err):

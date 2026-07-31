@@ -816,6 +816,99 @@ func TestAdapterRebasesNodeStatusAcrossOwnedResourceVersionDrift(t *testing.T) {
 	)
 }
 
+func TestAdapterRetriesOwnedNodeStatusWhenTheServerWinsTheApplyRace(t *testing.T) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 2)
+	node := ownedNode("synthetic-node", "node-uid", "10", scope)
+	kubernetesClient := kubernetesfake.NewSimpleClientset(&node)
+	statusPatches := 0
+	kubernetesClient.Fake.PrependReactor(
+		"patch",
+		"nodes",
+		func(action clienttesting.Action) (bool, runtime.Object, error) {
+			if action.GetSubresource() != "status" {
+				return false, nil, nil
+			}
+			statusPatches++
+			if statusPatches == 1 {
+				return true, nil, apierrors.NewConflict(
+					schema.GroupResource{Resource: "nodes"},
+					node.Name,
+					nil,
+				)
+			}
+			return false, nil, nil
+		},
+	)
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+	change := ownedNodeStatusChange(t, node, "9")
+
+	executeSingle(
+		t,
+		adapter,
+		scope,
+		cluster.ExecutionPersistent,
+		change,
+	)
+	if statusPatches != 2 {
+		t.Fatalf("status patch attempts = %d, want 2", statusPatches)
+	}
+}
+
+func TestAdapterStopsNodeStatusRetryWhenOwnershipChanges(t *testing.T) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 2)
+	node := ownedNode("synthetic-node", "node-uid", "10", scope)
+	kubernetesClient := kubernetesfake.NewSimpleClientset(&node)
+	statusPatches := 0
+	kubernetesClient.Fake.PrependReactor(
+		"patch",
+		"nodes",
+		func(action clienttesting.Action) (bool, runtime.Object, error) {
+			if action.GetSubresource() != "status" {
+				return false, nil, nil
+			}
+			statusPatches++
+			foreign := node.DeepCopy()
+			foreign.ResourceVersion = "11"
+			foreign.Labels[cluster.InstanceUIDLabel] = "foreign-instance"
+			if err := kubernetesClient.Tracker().Update(
+				corev1.SchemeGroupVersion.WithResource("nodes"),
+				foreign,
+				"",
+			); err != nil {
+				t.Fatalf("replace ownership during conflict: %v", err)
+			}
+			return true, nil, apierrors.NewConflict(
+				schema.GroupResource{Resource: "nodes"},
+				node.Name,
+				nil,
+			)
+		},
+	)
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+	change := ownedNodeStatusChange(t, node, "9")
+	changeSet, err := cluster.NewOwnedChangeSet(
+		scope,
+		cluster.ExecutionPersistent,
+		[]cluster.OwnedChange{change},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := adapter.Execute(
+		context.Background(),
+		changeSet,
+	); cluster.ErrorCodeOf(err) != cluster.ErrorOwnershipConflict {
+		t.Fatalf("ownership change error = %v, want OwnershipConflict", err)
+	}
+	if statusPatches != 1 {
+		t.Fatalf("status patch attempts = %d, want 1 before ownership rejection", statusPatches)
+	}
+}
+
 func TestAdapterRebasesOwnedNodeSpecAcrossStatusResourceVersionDrift(t *testing.T) {
 	t.Parallel()
 
@@ -849,6 +942,97 @@ func TestAdapterRebasesOwnedNodeSpecAcrossStatusResourceVersionDrift(t *testing.
 		cluster.ExecutionPersistent,
 		change,
 	)
+}
+
+func TestAdapterRetriesOwnedNodeSpecWhenTheServerWinsTheApplyRace(t *testing.T) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 2)
+	node := ownedNode("synthetic-node", "node-uid", "10", scope)
+	kubernetesClient := kubernetesfake.NewSimpleClientset(&node)
+	specPatches := 0
+	kubernetesClient.Fake.PrependReactor(
+		"patch",
+		"nodes",
+		func(action clienttesting.Action) (bool, runtime.Object, error) {
+			if action.GetSubresource() != "" {
+				return false, nil, nil
+			}
+			specPatches++
+			if specPatches == 1 {
+				return true, nil, apierrors.NewConflict(
+					schema.GroupResource{Resource: "nodes"},
+					node.Name,
+					nil,
+				)
+			}
+			return false, nil, nil
+		},
+	)
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+	key, err := cluster.NewObjectKey(cluster.ObjectKindNode, "", node.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	change, err := cluster.NewApplySyntheticNode(
+		key,
+		cluster.ObjectPreconditions{
+			UID:             string(node.UID),
+			ResourceVersion: "9",
+		},
+		cluster.SyntheticNodeInput{
+			Labels:        map[string]string{"workload.example.com/class": "training"},
+			Unschedulable: true,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	executeSingle(
+		t,
+		adapter,
+		scope,
+		cluster.ExecutionPersistent,
+		change,
+	)
+	if specPatches != 2 {
+		t.Fatalf("spec patch attempts = %d, want 2", specPatches)
+	}
+}
+
+func ownedNodeStatusChange(
+	t *testing.T,
+	node corev1.Node,
+	resourceVersion string,
+) cluster.OwnedChange {
+	t.Helper()
+	key, err := cluster.NewObjectKey(
+		cluster.ObjectKindNodeStatus,
+		"",
+		node.Name,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	change, err := cluster.NewUpdateSyntheticNodeStatus(
+		key,
+		cluster.ObjectPreconditions{
+			UID:             string(node.UID),
+			ResourceVersion: resourceVersion,
+		},
+		cluster.SyntheticNodeStatusInput{
+			Capacity:    map[string]string{"nvidia.com/gpu": "8"},
+			Allocatable: map[string]string{"nvidia.com/gpu": "8"},
+			ManageReady: true,
+			Ready:       true,
+			ObservedAt:  time.Date(2026, 7, 30, 8, 0, 0, 0, time.UTC),
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return change
 }
 
 func TestAdapterCreatesNodeAndLeaseWithScenarioInstanceOwnerReference(t *testing.T) {
