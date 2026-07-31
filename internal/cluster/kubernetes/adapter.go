@@ -774,28 +774,12 @@ func (adapter *Adapter) applySyntheticNode(
 		}
 		return classify("create exact Synthetic Node", err)
 	}
-	err := retry.OnError(
-		nodeMutationConflictBackoff,
-		apierrors.IsConflict,
-		func() error {
-			current, getErr := adapter.client.CoreV1().Nodes().Get(
-				ctx,
-				change.Key().Name(),
-				metav1.GetOptions{},
-			)
-			if getErr != nil {
-				return getErr
-			}
-			if ownedErr := validateOwnedIdentity(
-				change.Key(),
-				current.Labels,
-				current.UID,
-				current.OwnerReferences,
-				scope,
-				preconditions,
-			); ownedErr != nil {
-				return ownedErr
-			}
+	err := adapter.retryOwnedNodeMutation(
+		ctx,
+		change.Key(),
+		scope,
+		preconditions,
+		func(current *corev1.Node) error {
 			configuration := coreapplyv1.Node(change.Key().Name()).
 				WithUID(current.UID).
 				WithResourceVersion(current.ResourceVersion).
@@ -853,28 +837,12 @@ func (adapter *Adapter) updateSyntheticNodeStatus(
 				WithLastTransitionTime(observedAt),
 		)
 	}
-	err = retry.OnError(
-		nodeMutationConflictBackoff,
-		apierrors.IsConflict,
-		func() error {
-			current, getErr := adapter.client.CoreV1().Nodes().Get(
-				ctx,
-				change.Key().Name(),
-				metav1.GetOptions{},
-			)
-			if getErr != nil {
-				return getErr
-			}
-			if ownedErr := validateOwnedIdentity(
-				change.Key(),
-				current.Labels,
-				current.UID,
-				current.OwnerReferences,
-				scope,
-				change.Preconditions(),
-			); ownedErr != nil {
-				return ownedErr
-			}
+	err = adapter.retryOwnedNodeMutation(
+		ctx,
+		change.Key(),
+		scope,
+		change.Preconditions(),
+		func(current *corev1.Node) error {
 			configuration := coreapplyv1.Node(change.Key().Name()).
 				WithUID(current.UID).
 				WithResourceVersion(current.ResourceVersion).
@@ -888,6 +856,40 @@ func (adapter *Adapter) updateSyntheticNodeStatus(
 		},
 	)
 	return classify("apply exact Synthetic Node status", err)
+}
+
+func (adapter *Adapter) retryOwnedNodeMutation(
+	ctx context.Context,
+	key cluster.ObjectKey,
+	scope cluster.OwnershipScope,
+	preconditions cluster.ObjectPreconditions,
+	mutate func(*corev1.Node) error,
+) error {
+	return retry.OnError(
+		nodeMutationConflictBackoff,
+		apierrors.IsConflict,
+		func() error {
+			current, err := adapter.client.CoreV1().Nodes().Get(
+				ctx,
+				key.Name(),
+				metav1.GetOptions{},
+			)
+			if err != nil {
+				return err
+			}
+			if err := validateOwnedIdentity(
+				key,
+				current.Labels,
+				current.UID,
+				current.OwnerReferences,
+				scope,
+				preconditions,
+			); err != nil {
+				return err
+			}
+			return mutate(current)
+		},
+	)
 }
 
 func (adapter *Adapter) applyLease(
@@ -1304,6 +1306,33 @@ func validateOwnedIdentity(
 				"%s %q is not owned by the exact Scenario Instance UID",
 				key.Kind(),
 				key.Name(),
+			),
+			false,
+		)
+	}
+	encodedGeneration := objectLabels[cluster.DesiredGenerationLabel]
+	actualGeneration, err := strconv.ParseUint(encodedGeneration, 10, 64)
+	if err != nil || actualGeneration == 0 ||
+		strconv.FormatUint(actualGeneration, 10) != encodedGeneration {
+		return cluster.NewError(
+			cluster.ErrorOwnershipConflict,
+			fmt.Sprintf(
+				"%s %q does not carry a valid desired generation",
+				key.Kind(),
+				key.Name(),
+			),
+			false,
+		)
+	}
+	if actualGeneration > scope.DesiredGeneration().Value() {
+		return cluster.NewError(
+			cluster.ErrorResourceVersionConflict,
+			fmt.Sprintf(
+				"%s %q desired generation advanced from %d to %d",
+				key.Kind(),
+				key.Name(),
+				scope.DesiredGeneration().Value(),
+				actualGeneration,
 			),
 			false,
 		)

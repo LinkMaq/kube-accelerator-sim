@@ -110,15 +110,14 @@
       "id": "CAT-001",
       "implementation": [
         "profiles/catalog.json",
-        "internal/catalog/catalog.go"
+        "internal/catalog/catalog.go",
+        "docs/research/vendor-model-evidence-catalog.md"
       ],
       "tests": [
         "internal/catalog/catalog_test.go",
-        "internal/catalog/golden_test.go",
         "internal/catalog/schema_test.go"
       ],
       "evidence": [
-        "docs/research/vendor-model-evidence-catalog.md",
         ".github/workflows/ci.yml"
       ]
     },
@@ -126,15 +125,14 @@
       "id": "CAT-002",
       "implementation": [
         "profiles/catalog.json",
-        "internal/catalog/catalog.go"
+        "internal/catalog/catalog.go",
+        "docs/research/vendor-model-evidence-catalog.md"
       ],
       "tests": [
         "internal/catalog/catalog_test.go",
-        "internal/catalog/golden_test.go",
         "internal/catalog/schema_test.go"
       ],
       "evidence": [
-        "docs/research/vendor-model-evidence-catalog.md",
         ".github/workflows/ci.yml"
       ]
     },
@@ -142,15 +140,14 @@
       "id": "CAT-003",
       "implementation": [
         "profiles/catalog.json",
-        "internal/catalog/catalog.go"
+        "internal/catalog/catalog.go",
+        "docs/research/vendor-model-evidence-catalog.md"
       ],
       "tests": [
         "internal/catalog/catalog_test.go",
-        "internal/catalog/golden_test.go",
         "internal/catalog/schema_test.go"
       ],
       "evidence": [
-        "docs/research/vendor-model-evidence-catalog.md",
         ".github/workflows/ci.yml"
       ]
     },
@@ -158,15 +155,14 @@
       "id": "CAT-004",
       "implementation": [
         "profiles/catalog.json",
-        "internal/catalog/catalog.go"
+        "internal/catalog/catalog.go",
+        "docs/research/vendor-model-evidence-catalog.md"
       ],
       "tests": [
         "internal/catalog/catalog_test.go",
-        "internal/catalog/golden_test.go",
         "internal/catalog/schema_test.go"
       ],
       "evidence": [
-        "docs/research/vendor-model-evidence-catalog.md",
         ".github/workflows/ci.yml"
       ]
     },
@@ -174,31 +170,28 @@
       "id": "CAT-005",
       "implementation": [
         "profiles/catalog.json",
-        "internal/catalog/catalog.go"
+        "internal/catalog/catalog.go",
+        "docs/research/vendor-model-evidence-catalog.md"
       ],
       "tests": [
         "internal/catalog/catalog_test.go",
-        "internal/catalog/golden_test.go",
         "internal/catalog/schema_test.go"
       ],
       "evidence": [
-        "docs/research/vendor-model-evidence-catalog.md",
         ".github/workflows/ci.yml"
       ]
     },
     {
       "id": "CAT-006",
       "implementation": [
-        "profiles/catalog.json",
+        "profiles/schema.json",
         "internal/catalog/catalog.go"
       ],
       "tests": [
-        "internal/catalog/catalog_test.go",
-        "internal/catalog/golden_test.go",
-        "internal/catalog/schema_test.go"
+        "internal/catalog/schema_test.go",
+        "internal/catalog/catalog_test.go"
       ],
       "evidence": [
-        "docs/research/vendor-model-evidence-catalog.md",
         ".github/workflows/ci.yml"
       ]
     },
@@ -206,15 +199,12 @@
       "id": "CAT-007",
       "implementation": [
         "profiles/catalog.json",
-        "internal/catalog/catalog.go"
+        "profiles/embed.go"
       ],
       "tests": [
-        "internal/catalog/catalog_test.go",
-        "internal/catalog/golden_test.go",
-        "internal/catalog/schema_test.go"
+        "internal/catalog/golden_test.go"
       ],
       "evidence": [
-        "docs/research/vendor-model-evidence-catalog.md",
         ".github/workflows/ci.yml"
       ]
     },
@@ -222,70 +212,75 @@
       "id": "CLI-001",
       "implementation": [
         "internal/cli/cli.go",
-        "internal/presentation/presentation.go"
+        "internal/catalog/catalog.go",
+        "internal/scenario/compiler.go"
       ],
       "tests": [
         "internal/cli/cli_test.go",
-        "internal/presentation/presentation_test.go"
+        "test/contract/documentation_test.go"
       ],
       "evidence": [
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
       "id": "CLI-002",
       "implementation": [
         "internal/cli/cli.go",
-        "internal/presentation/presentation.go"
+        "internal/scenario/compiler.go",
+        "examples/heterogeneous.yaml"
       ],
       "tests": [
         "internal/cli/cli_test.go",
-        "internal/presentation/presentation_test.go"
+        "internal/scenario/compile_test.go",
+        "test/contract/documentation_test.go"
       ],
       "evidence": [
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
       "id": "CLI-003",
       "implementation": [
         "internal/cli/cli.go",
-        "internal/presentation/presentation.go"
+        "internal/scenario/compiler.go",
+        "examples/heterogeneous.yaml"
       ],
       "tests": [
         "internal/cli/cli_test.go",
-        "internal/presentation/presentation_test.go"
+        "internal/scenario/compile_test.go",
+        "test/contract/documentation_test.go"
       ],
       "evidence": [
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
       "id": "CLI-004",
       "implementation": [
         "internal/cli/cli.go",
-        "internal/presentation/presentation.go"
+        "internal/scenario/compiler.go",
+        "examples/heterogeneous.yaml"
       ],
       "tests": [
         "internal/cli/cli_test.go",
-        "internal/presentation/presentation_test.go"
+        "internal/scenario/compile_test.go",
+        "test/contract/documentation_test.go"
       ],
       "evidence": [
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
       "id": "CLI-005",
       "implementation": [
         "internal/cli/cli.go",
+        "internal/application/runtime.go",
         "internal/presentation/presentation.go"
       ],
       "tests": [
         "internal/cli/cli_test.go",
+        "internal/application/runtime_test.go",
         "internal/presentation/presentation_test.go"
       ],
       "evidence": [
@@ -297,10 +292,12 @@
       "id": "CLI-006",
       "implementation": [
         "internal/cli/cli.go",
+        "internal/application/runtime.go",
         "internal/presentation/presentation.go"
       ],
       "tests": [
         "internal/cli/cli_test.go",
+        "internal/application/runtime_test.go",
         "internal/presentation/presentation_test.go"
       ],
       "evidence": [
@@ -312,10 +309,12 @@
       "id": "CLI-007",
       "implementation": [
         "internal/cli/cli.go",
+        "internal/application/runtime.go",
         "internal/presentation/presentation.go"
       ],
       "tests": [
         "internal/cli/cli_test.go",
+        "internal/application/runtime_test.go",
         "internal/presentation/presentation_test.go"
       ],
       "evidence": [
@@ -327,10 +326,12 @@
       "id": "CLI-008",
       "implementation": [
         "internal/cli/cli.go",
+        "internal/application/runtime.go",
         "internal/presentation/presentation.go"
       ],
       "tests": [
         "internal/cli/cli_test.go",
+        "internal/application/runtime_test.go",
         "internal/presentation/presentation_test.go"
       ],
       "evidence": [
@@ -342,10 +343,12 @@
       "id": "CLI-009",
       "implementation": [
         "internal/cli/cli.go",
+        "internal/application/runtime.go",
         "internal/presentation/presentation.go"
       ],
       "tests": [
         "internal/cli/cli_test.go",
+        "internal/application/runtime_test.go",
         "internal/presentation/presentation_test.go"
       ],
       "evidence": [
@@ -357,45 +360,48 @@
       "id": "CLI-010",
       "implementation": [
         "internal/cli/cli.go",
-        "internal/presentation/presentation.go"
+        "internal/application/runtime.go",
+        "internal/reconcile/reconcile.go"
       ],
       "tests": [
         "internal/cli/cli_test.go",
-        "internal/presentation/presentation_test.go"
+        "internal/application/runtime_test.go",
+        "test/e2e/compatibility_test.go"
       ],
       "evidence": [
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/compatibility.yml"
       ]
     },
     {
       "id": "CLI-011",
       "implementation": [
         "internal/cli/cli.go",
-        "internal/presentation/presentation.go"
+        "internal/application/runtime.go",
+        "internal/reconcile/reconcile.go"
       ],
       "tests": [
         "internal/cli/cli_test.go",
-        "internal/presentation/presentation_test.go"
+        "internal/application/runtime_test.go",
+        "test/e2e/compatibility_test.go"
       ],
       "evidence": [
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/compatibility.yml"
       ]
     },
     {
       "id": "CLI-012",
       "implementation": [
         "internal/cli/cli.go",
-        "internal/presentation/presentation.go"
+        "internal/application/runtime.go",
+        "internal/reconcile/reconcile.go"
       ],
       "tests": [
         "internal/cli/cli_test.go",
-        "internal/presentation/presentation_test.go"
+        "internal/application/runtime_test.go",
+        "test/e2e/compatibility_test.go"
       ],
       "evidence": [
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/compatibility.yml"
       ]
     },
     {
@@ -491,13 +497,12 @@
     {
       "id": "COMPAT-007",
       "implementation": [
-        "release/compatibility-lock.json",
-        "docs/operators/kubernetes-compatibility.md"
+        ".github/workflows/ci.yml",
+        ".github/workflows/compatibility.yml",
+        "release/compatibility-lock.json"
       ],
       "tests": [
-        "test/contract/compatibility_matrix_test.go",
-        "test/e2e/compatibility_test.go",
-        "test/e2e/dra_smoke_test.go"
+        "test/contract/compatibility_matrix_test.go"
       ],
       "evidence": [
         ".github/workflows/compatibility.yml"
@@ -506,13 +511,12 @@
     {
       "id": "COMPAT-008",
       "implementation": [
-        "release/compatibility-lock.json",
-        "docs/operators/kubernetes-compatibility.md"
+        ".github/workflows/ci.yml",
+        ".github/workflows/compatibility.yml",
+        "release/compatibility-lock.json"
       ],
       "tests": [
-        "test/contract/compatibility_matrix_test.go",
-        "test/e2e/compatibility_test.go",
-        "test/e2e/dra_smoke_test.go"
+        "test/contract/compatibility_matrix_test.go"
       ],
       "evidence": [
         ".github/workflows/compatibility.yml"
@@ -521,13 +525,12 @@
     {
       "id": "COMPAT-009",
       "implementation": [
-        "release/compatibility-lock.json",
-        "docs/operators/kubernetes-compatibility.md"
+        ".github/workflows/ci.yml",
+        ".github/workflows/compatibility.yml",
+        "release/compatibility-lock.json"
       ],
       "tests": [
-        "test/contract/compatibility_matrix_test.go",
-        "test/e2e/compatibility_test.go",
-        "test/e2e/dra_smoke_test.go"
+        "test/contract/compatibility_matrix_test.go"
       ],
       "evidence": [
         ".github/workflows/compatibility.yml"
@@ -536,13 +539,12 @@
     {
       "id": "COMPAT-010",
       "implementation": [
-        "release/compatibility-lock.json",
-        "docs/operators/kubernetes-compatibility.md"
+        ".github/workflows/ci.yml",
+        ".github/workflows/compatibility.yml",
+        "release/compatibility-lock.json"
       ],
       "tests": [
-        "test/contract/compatibility_matrix_test.go",
-        "test/e2e/compatibility_test.go",
-        "test/e2e/dra_smoke_test.go"
+        "test/contract/compatibility_matrix_test.go"
       ],
       "evidence": [
         ".github/workflows/compatibility.yml"
@@ -551,15 +553,14 @@
     {
       "id": "DOM-001",
       "implementation": [
-        "internal/domain/doc.go",
-        "internal/domain/scenario.go",
-        "internal/domain/receipt.go",
-        "internal/domain/status.go"
+        "internal/domain/fidelity.go",
+        "internal/domain/status.go",
+        "internal/projection/projection.go"
       ],
       "tests": [
-        "internal/domain/scenario_test.go",
-        "internal/domain/receipt_test.go",
-        "internal/domain/status_test.go"
+        "internal/domain/fidelity_test.go",
+        "internal/domain/status_test.go",
+        "internal/projection/contract_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -568,15 +569,14 @@
     {
       "id": "DOM-002",
       "implementation": [
-        "internal/domain/doc.go",
-        "internal/domain/scenario.go",
-        "internal/domain/receipt.go",
-        "internal/domain/status.go"
+        "internal/domain/fidelity.go",
+        "internal/domain/status.go",
+        "internal/projection/projection.go"
       ],
       "tests": [
-        "internal/domain/scenario_test.go",
-        "internal/domain/receipt_test.go",
-        "internal/domain/status_test.go"
+        "internal/domain/fidelity_test.go",
+        "internal/domain/status_test.go",
+        "internal/projection/contract_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -585,15 +585,14 @@
     {
       "id": "DOM-003",
       "implementation": [
-        "internal/domain/doc.go",
-        "internal/domain/scenario.go",
-        "internal/domain/receipt.go",
-        "internal/domain/status.go"
+        "internal/domain/fidelity.go",
+        "internal/domain/status.go",
+        "internal/projection/projection.go"
       ],
       "tests": [
-        "internal/domain/scenario_test.go",
-        "internal/domain/receipt_test.go",
-        "internal/domain/status_test.go"
+        "internal/domain/fidelity_test.go",
+        "internal/domain/status_test.go",
+        "internal/projection/contract_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -602,15 +601,14 @@
     {
       "id": "DOM-004",
       "implementation": [
-        "internal/domain/doc.go",
         "internal/domain/scenario.go",
-        "internal/domain/receipt.go",
-        "internal/domain/status.go"
+        "internal/catalog/catalog.go",
+        "profiles/catalog.json"
       ],
       "tests": [
         "internal/domain/scenario_test.go",
-        "internal/domain/receipt_test.go",
-        "internal/domain/status_test.go"
+        "internal/catalog/catalog_test.go",
+        "internal/catalog/custom_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -619,15 +617,14 @@
     {
       "id": "DOM-005",
       "implementation": [
-        "internal/domain/doc.go",
         "internal/domain/scenario.go",
-        "internal/domain/receipt.go",
-        "internal/domain/status.go"
+        "internal/catalog/catalog.go",
+        "profiles/catalog.json"
       ],
       "tests": [
         "internal/domain/scenario_test.go",
-        "internal/domain/receipt_test.go",
-        "internal/domain/status_test.go"
+        "internal/catalog/catalog_test.go",
+        "internal/catalog/custom_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -636,15 +633,14 @@
     {
       "id": "DOM-006",
       "implementation": [
-        "internal/domain/doc.go",
         "internal/domain/scenario.go",
-        "internal/domain/receipt.go",
-        "internal/domain/status.go"
+        "internal/catalog/catalog.go",
+        "profiles/catalog.json"
       ],
       "tests": [
         "internal/domain/scenario_test.go",
-        "internal/domain/receipt_test.go",
-        "internal/domain/status_test.go"
+        "internal/catalog/catalog_test.go",
+        "internal/catalog/custom_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -653,15 +649,14 @@
     {
       "id": "DOM-007",
       "implementation": [
-        "internal/domain/doc.go",
         "internal/domain/scenario.go",
-        "internal/domain/receipt.go",
-        "internal/domain/status.go"
+        "internal/catalog/catalog.go",
+        "profiles/catalog.json"
       ],
       "tests": [
         "internal/domain/scenario_test.go",
-        "internal/domain/receipt_test.go",
-        "internal/domain/status_test.go"
+        "internal/catalog/catalog_test.go",
+        "internal/catalog/custom_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -670,15 +665,14 @@
     {
       "id": "DOM-008",
       "implementation": [
-        "internal/domain/doc.go",
         "internal/domain/scenario.go",
-        "internal/domain/receipt.go",
-        "internal/domain/status.go"
+        "internal/catalog/catalog.go",
+        "profiles/catalog.json"
       ],
       "tests": [
         "internal/domain/scenario_test.go",
-        "internal/domain/receipt_test.go",
-        "internal/domain/status_test.go"
+        "internal/catalog/catalog_test.go",
+        "internal/catalog/custom_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -687,15 +681,14 @@
     {
       "id": "DOM-009",
       "implementation": [
-        "internal/domain/doc.go",
         "internal/domain/scenario.go",
-        "internal/domain/receipt.go",
-        "internal/domain/status.go"
+        "internal/catalog/catalog.go",
+        "profiles/catalog.json"
       ],
       "tests": [
         "internal/domain/scenario_test.go",
-        "internal/domain/receipt_test.go",
-        "internal/domain/status_test.go"
+        "internal/catalog/catalog_test.go",
+        "internal/catalog/custom_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -704,15 +697,12 @@
     {
       "id": "DOM-010",
       "implementation": [
-        "internal/domain/doc.go",
-        "internal/domain/scenario.go",
-        "internal/domain/receipt.go",
-        "internal/domain/status.go"
+        "internal/catalog/catalog.go",
+        "profiles/catalog.json"
       ],
       "tests": [
-        "internal/domain/scenario_test.go",
-        "internal/domain/receipt_test.go",
-        "internal/domain/status_test.go"
+        "internal/catalog/catalog_test.go",
+        "internal/catalog/schema_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -721,15 +711,12 @@
     {
       "id": "DOM-011",
       "implementation": [
-        "internal/domain/doc.go",
-        "internal/domain/scenario.go",
-        "internal/domain/receipt.go",
-        "internal/domain/status.go"
+        "internal/catalog/catalog.go",
+        "profiles/catalog.json"
       ],
       "tests": [
-        "internal/domain/scenario_test.go",
-        "internal/domain/receipt_test.go",
-        "internal/domain/status_test.go"
+        "internal/catalog/catalog_test.go",
+        "internal/catalog/schema_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -738,15 +725,12 @@
     {
       "id": "DOM-012",
       "implementation": [
-        "internal/domain/doc.go",
-        "internal/domain/scenario.go",
-        "internal/domain/receipt.go",
-        "internal/domain/status.go"
+        "internal/catalog/catalog.go",
+        "profiles/catalog.json"
       ],
       "tests": [
-        "internal/domain/scenario_test.go",
-        "internal/domain/receipt_test.go",
-        "internal/domain/status_test.go"
+        "internal/catalog/catalog_test.go",
+        "internal/catalog/schema_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -755,15 +739,12 @@
     {
       "id": "DOM-013",
       "implementation": [
-        "internal/domain/doc.go",
-        "internal/domain/scenario.go",
-        "internal/domain/receipt.go",
-        "internal/domain/status.go"
+        "internal/catalog/catalog.go",
+        "profiles/catalog.json"
       ],
       "tests": [
-        "internal/domain/scenario_test.go",
-        "internal/domain/receipt_test.go",
-        "internal/domain/status_test.go"
+        "internal/catalog/catalog_test.go",
+        "internal/catalog/schema_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -772,15 +753,12 @@
     {
       "id": "DOM-014",
       "implementation": [
-        "internal/domain/doc.go",
-        "internal/domain/scenario.go",
-        "internal/domain/receipt.go",
-        "internal/domain/status.go"
+        "internal/catalog/catalog.go",
+        "profiles/catalog.json"
       ],
       "tests": [
-        "internal/domain/scenario_test.go",
-        "internal/domain/receipt_test.go",
-        "internal/domain/status_test.go"
+        "internal/catalog/catalog_test.go",
+        "internal/catalog/schema_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -789,15 +767,12 @@
     {
       "id": "DOM-015",
       "implementation": [
-        "internal/domain/doc.go",
-        "internal/domain/scenario.go",
-        "internal/domain/receipt.go",
-        "internal/domain/status.go"
+        "internal/catalog/catalog.go",
+        "profiles/catalog.json"
       ],
       "tests": [
-        "internal/domain/scenario_test.go",
-        "internal/domain/receipt_test.go",
-        "internal/domain/status_test.go"
+        "internal/catalog/catalog_test.go",
+        "internal/catalog/golden_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -806,15 +781,12 @@
     {
       "id": "DOM-016",
       "implementation": [
-        "internal/domain/doc.go",
-        "internal/domain/scenario.go",
-        "internal/domain/receipt.go",
-        "internal/domain/status.go"
+        "internal/catalog/catalog.go",
+        "profiles/catalog.json"
       ],
       "tests": [
-        "internal/domain/scenario_test.go",
-        "internal/domain/receipt_test.go",
-        "internal/domain/status_test.go"
+        "internal/catalog/catalog_test.go",
+        "internal/catalog/golden_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -823,15 +795,12 @@
     {
       "id": "DOM-017",
       "implementation": [
-        "internal/domain/doc.go",
-        "internal/domain/scenario.go",
-        "internal/domain/receipt.go",
-        "internal/domain/status.go"
+        "internal/catalog/catalog.go",
+        "profiles/catalog.json"
       ],
       "tests": [
-        "internal/domain/scenario_test.go",
-        "internal/domain/receipt_test.go",
-        "internal/domain/status_test.go"
+        "internal/catalog/catalog_test.go",
+        "internal/catalog/golden_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -840,15 +809,12 @@
     {
       "id": "DOM-018",
       "implementation": [
-        "internal/domain/doc.go",
-        "internal/domain/scenario.go",
-        "internal/domain/receipt.go",
-        "internal/domain/status.go"
+        "internal/catalog/catalog.go",
+        "profiles/catalog.json"
       ],
       "tests": [
-        "internal/domain/scenario_test.go",
-        "internal/domain/receipt_test.go",
-        "internal/domain/status_test.go"
+        "internal/catalog/catalog_test.go",
+        "internal/catalog/golden_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -857,10 +823,12 @@
     {
       "id": "DRA-001",
       "implementation": [
-        "internal/projection/dra/dra.go"
+        "internal/projection/dra/dra.go",
+        "internal/application/preflight.go"
       ],
       "tests": [
         "internal/projection/dra/dra_test.go",
+        "internal/projection/contract_test.go",
         "test/e2e/dra_smoke_test.go"
       ],
       "evidence": [
@@ -871,10 +839,12 @@
     {
       "id": "DRA-002",
       "implementation": [
-        "internal/projection/dra/dra.go"
+        "internal/projection/dra/dra.go",
+        "internal/application/preflight.go"
       ],
       "tests": [
         "internal/projection/dra/dra_test.go",
+        "internal/projection/contract_test.go",
         "test/e2e/dra_smoke_test.go"
       ],
       "evidence": [
@@ -885,10 +855,12 @@
     {
       "id": "DRA-003",
       "implementation": [
-        "internal/projection/dra/dra.go"
+        "internal/projection/dra/dra.go",
+        "internal/application/preflight.go"
       ],
       "tests": [
         "internal/projection/dra/dra_test.go",
+        "internal/projection/contract_test.go",
         "test/e2e/dra_smoke_test.go"
       ],
       "evidence": [
@@ -899,10 +871,12 @@
     {
       "id": "DRA-004",
       "implementation": [
-        "internal/projection/dra/dra.go"
+        "internal/projection/dra/dra.go",
+        "internal/application/preflight.go"
       ],
       "tests": [
         "internal/projection/dra/dra_test.go",
+        "internal/projection/contract_test.go",
         "test/e2e/dra_smoke_test.go"
       ],
       "evidence": [
@@ -913,10 +887,12 @@
     {
       "id": "DRA-005",
       "implementation": [
-        "internal/projection/dra/dra.go"
+        "internal/projection/dra/dra.go",
+        "internal/application/preflight.go"
       ],
       "tests": [
         "internal/projection/dra/dra_test.go",
+        "internal/projection/contract_test.go",
         "test/e2e/dra_smoke_test.go"
       ],
       "evidence": [
@@ -927,10 +903,12 @@
     {
       "id": "DRA-006",
       "implementation": [
-        "internal/projection/dra/dra.go"
+        "internal/projection/dra/dra.go",
+        "internal/application/preflight.go"
       ],
       "tests": [
         "internal/projection/dra/dra_test.go",
+        "internal/projection/contract_test.go",
         "test/e2e/dra_smoke_test.go"
       ],
       "evidence": [
@@ -942,132 +920,124 @@
       "id": "LIFE-001",
       "implementation": [
         "internal/application/runtime.go",
-        "internal/reconcile/reconcile.go",
-        "internal/reconcile/kubernetes/adapter.go"
+        "internal/controlplane/kubernetes/kubernetes.go",
+        "api/simulation/v1alpha1/types.go"
       ],
       "tests": [
         "internal/application/runtime_test.go",
-        "internal/reconcile/reconcile_test.go",
-        "internal/reconcile/kubernetes/adapter_test.go"
+        "internal/controlplane/controlplane_test.go",
+        "api/simulation/v1alpha1/types_test.go"
       ],
       "evidence": [
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/compatibility.yml"
       ]
     },
     {
       "id": "LIFE-002",
       "implementation": [
         "internal/application/runtime.go",
-        "internal/reconcile/reconcile.go",
-        "internal/reconcile/kubernetes/adapter.go"
+        "internal/controlplane/kubernetes/kubernetes.go",
+        "api/simulation/v1alpha1/types.go"
       ],
       "tests": [
         "internal/application/runtime_test.go",
-        "internal/reconcile/reconcile_test.go",
-        "internal/reconcile/kubernetes/adapter_test.go"
+        "internal/controlplane/controlplane_test.go",
+        "api/simulation/v1alpha1/types_test.go"
       ],
       "evidence": [
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/compatibility.yml"
       ]
     },
     {
       "id": "LIFE-003",
       "implementation": [
         "internal/application/runtime.go",
-        "internal/reconcile/reconcile.go",
-        "internal/reconcile/kubernetes/adapter.go"
+        "internal/controlplane/kubernetes/kubernetes.go",
+        "api/simulation/v1alpha1/types.go"
       ],
       "tests": [
         "internal/application/runtime_test.go",
-        "internal/reconcile/reconcile_test.go",
-        "internal/reconcile/kubernetes/adapter_test.go"
+        "internal/controlplane/controlplane_test.go",
+        "api/simulation/v1alpha1/types_test.go"
       ],
       "evidence": [
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/compatibility.yml"
       ]
     },
     {
       "id": "LIFE-004",
       "implementation": [
         "internal/application/runtime.go",
-        "internal/reconcile/reconcile.go",
-        "internal/reconcile/kubernetes/adapter.go"
+        "internal/controlplane/kubernetes/kubernetes.go",
+        "api/simulation/v1alpha1/types.go"
       ],
       "tests": [
         "internal/application/runtime_test.go",
-        "internal/reconcile/reconcile_test.go",
-        "internal/reconcile/kubernetes/adapter_test.go"
+        "internal/controlplane/controlplane_test.go",
+        "api/simulation/v1alpha1/types_test.go"
       ],
       "evidence": [
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/compatibility.yml"
       ]
     },
     {
       "id": "LIFE-005",
       "implementation": [
         "internal/application/runtime.go",
-        "internal/reconcile/reconcile.go",
-        "internal/reconcile/kubernetes/adapter.go"
+        "internal/controlplane/kubernetes/kubernetes.go",
+        "api/simulation/v1alpha1/types.go"
       ],
       "tests": [
         "internal/application/runtime_test.go",
-        "internal/reconcile/reconcile_test.go",
-        "internal/reconcile/kubernetes/adapter_test.go"
+        "internal/controlplane/controlplane_test.go",
+        "api/simulation/v1alpha1/types_test.go"
       ],
       "evidence": [
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/compatibility.yml"
       ]
     },
     {
       "id": "LIFE-006",
       "implementation": [
         "internal/application/runtime.go",
-        "internal/reconcile/reconcile.go",
-        "internal/reconcile/kubernetes/adapter.go"
+        "internal/controlplane/kubernetes/kubernetes.go",
+        "api/simulation/v1alpha1/types.go"
       ],
       "tests": [
         "internal/application/runtime_test.go",
-        "internal/reconcile/reconcile_test.go",
-        "internal/reconcile/kubernetes/adapter_test.go"
+        "internal/controlplane/controlplane_test.go",
+        "api/simulation/v1alpha1/types_test.go"
       ],
       "evidence": [
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/compatibility.yml"
       ]
     },
     {
       "id": "LIFE-007",
       "implementation": [
         "internal/application/runtime.go",
-        "internal/reconcile/reconcile.go",
-        "internal/reconcile/kubernetes/adapter.go"
+        "internal/controlplane/kubernetes/kubernetes.go",
+        "api/simulation/v1alpha1/types.go"
       ],
       "tests": [
         "internal/application/runtime_test.go",
-        "internal/reconcile/reconcile_test.go",
-        "internal/reconcile/kubernetes/adapter_test.go"
+        "internal/controlplane/controlplane_test.go",
+        "api/simulation/v1alpha1/types_test.go"
       ],
       "evidence": [
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/compatibility.yml"
       ]
     },
     {
       "id": "LIFE-008",
       "implementation": [
-        "internal/application/runtime.go",
         "internal/reconcile/reconcile.go",
-        "internal/reconcile/kubernetes/adapter.go"
+        "internal/reconcile/kubernetes/delivery.go"
       ],
       "tests": [
-        "internal/application/runtime_test.go",
         "internal/reconcile/reconcile_test.go",
-        "internal/reconcile/kubernetes/adapter_test.go"
+        "test/e2e/compatibility_test.go",
+        "test/e2e/scale_test.go"
       ],
       "evidence": [
         ".github/workflows/compatibility.yml",
@@ -1077,14 +1047,13 @@
     {
       "id": "LIFE-009",
       "implementation": [
-        "internal/application/runtime.go",
         "internal/reconcile/reconcile.go",
-        "internal/reconcile/kubernetes/adapter.go"
+        "internal/reconcile/kubernetes/delivery.go"
       ],
       "tests": [
-        "internal/application/runtime_test.go",
         "internal/reconcile/reconcile_test.go",
-        "internal/reconcile/kubernetes/adapter_test.go"
+        "test/e2e/compatibility_test.go",
+        "test/e2e/scale_test.go"
       ],
       "evidence": [
         ".github/workflows/compatibility.yml",
@@ -1094,14 +1063,13 @@
     {
       "id": "LIFE-010",
       "implementation": [
-        "internal/application/runtime.go",
         "internal/reconcile/reconcile.go",
-        "internal/reconcile/kubernetes/adapter.go"
+        "internal/reconcile/kubernetes/delivery.go"
       ],
       "tests": [
-        "internal/application/runtime_test.go",
         "internal/reconcile/reconcile_test.go",
-        "internal/reconcile/kubernetes/adapter_test.go"
+        "test/e2e/compatibility_test.go",
+        "test/e2e/scale_test.go"
       ],
       "evidence": [
         ".github/workflows/compatibility.yml",
@@ -1111,11 +1079,13 @@
     {
       "id": "OUT-001",
       "implementation": [
-        "internal/presentation/presentation.go"
+        "internal/presentation/presentation.go",
+        "internal/domain/diagnostic.go"
       ],
       "tests": [
         "internal/presentation/presentation_test.go",
-        "internal/presentation/testdata/version.json.golden"
+        "internal/cli/cli_test.go",
+        "internal/presentation/testdata/error-invocation.json.golden"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -1124,11 +1094,13 @@
     {
       "id": "OUT-002",
       "implementation": [
-        "internal/presentation/presentation.go"
+        "internal/presentation/presentation.go",
+        "internal/domain/diagnostic.go"
       ],
       "tests": [
         "internal/presentation/presentation_test.go",
-        "internal/presentation/testdata/version.json.golden"
+        "internal/cli/cli_test.go",
+        "internal/presentation/testdata/error-invocation.json.golden"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -1137,11 +1109,13 @@
     {
       "id": "OUT-003",
       "implementation": [
-        "internal/presentation/presentation.go"
+        "internal/presentation/presentation.go",
+        "internal/domain/diagnostic.go"
       ],
       "tests": [
         "internal/presentation/presentation_test.go",
-        "internal/presentation/testdata/version.json.golden"
+        "internal/cli/cli_test.go",
+        "internal/presentation/testdata/error-invocation.json.golden"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -1150,11 +1124,13 @@
     {
       "id": "OUT-004",
       "implementation": [
-        "internal/presentation/presentation.go"
+        "internal/presentation/presentation.go",
+        "internal/domain/diagnostic.go"
       ],
       "tests": [
         "internal/presentation/presentation_test.go",
-        "internal/presentation/testdata/version.json.golden"
+        "internal/cli/cli_test.go",
+        "internal/presentation/testdata/error-invocation.json.golden"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -1163,11 +1139,13 @@
     {
       "id": "OUT-005",
       "implementation": [
-        "internal/presentation/presentation.go"
+        "internal/presentation/presentation.go",
+        "internal/domain/diagnostic.go"
       ],
       "tests": [
         "internal/presentation/presentation_test.go",
-        "internal/presentation/testdata/version.json.golden"
+        "internal/cli/cli_test.go",
+        "internal/presentation/testdata/error-invocation.json.golden"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -1177,7 +1155,7 @@
       "id": "PACK-001",
       "implementation": [
         "charts/kasim-runtime/Chart.yaml",
-        "charts/kasim-runtime/values.schema.json",
+        "charts/kasim-runtime/templates/controller-deployment.yaml",
         "release/inputs.json"
       ],
       "tests": [
@@ -1193,7 +1171,7 @@
       "id": "PACK-002",
       "implementation": [
         "charts/kasim-runtime/Chart.yaml",
-        "charts/kasim-runtime/values.schema.json",
+        "charts/kasim-runtime/templates/controller-deployment.yaml",
         "release/inputs.json"
       ],
       "tests": [
@@ -1209,7 +1187,7 @@
       "id": "PACK-003",
       "implementation": [
         "charts/kasim-runtime/Chart.yaml",
-        "charts/kasim-runtime/values.schema.json",
+        "charts/kasim-runtime/templates/controller-deployment.yaml",
         "release/inputs.json"
       ],
       "tests": [
@@ -1225,7 +1203,7 @@
       "id": "PACK-004",
       "implementation": [
         "charts/kasim-runtime/Chart.yaml",
-        "charts/kasim-runtime/values.schema.json",
+        "charts/kasim-runtime/templates/controller-deployment.yaml",
         "release/inputs.json"
       ],
       "tests": [
@@ -1241,7 +1219,7 @@
       "id": "PERF-001",
       "implementation": [
         "test/e2e/testdata/reference-scale.yaml",
-        "internal/application/runtime.go"
+        "test/e2e/scale_test.go"
       ],
       "tests": [
         "test/e2e/scale_test.go",
@@ -1255,7 +1233,7 @@
       "id": "PERF-002",
       "implementation": [
         "test/e2e/testdata/reference-scale.yaml",
-        "internal/application/runtime.go"
+        "test/e2e/scale_test.go"
       ],
       "tests": [
         "test/e2e/scale_test.go",
@@ -1269,7 +1247,7 @@
       "id": "PERF-003",
       "implementation": [
         "test/e2e/testdata/reference-scale.yaml",
-        "internal/application/runtime.go"
+        "test/e2e/scale_test.go"
       ],
       "tests": [
         "test/e2e/scale_test.go",
@@ -1283,7 +1261,7 @@
       "id": "PERF-004",
       "implementation": [
         "test/e2e/testdata/reference-scale.yaml",
-        "internal/application/runtime.go"
+        "test/e2e/scale_test.go"
       ],
       "tests": [
         "test/e2e/scale_test.go",
@@ -1297,7 +1275,7 @@
       "id": "PERF-005",
       "implementation": [
         "test/e2e/testdata/reference-scale.yaml",
-        "internal/application/runtime.go"
+        "test/e2e/scale_test.go"
       ],
       "tests": [
         "test/e2e/scale_test.go",
@@ -1311,7 +1289,7 @@
       "id": "PERF-006",
       "implementation": [
         "test/e2e/testdata/reference-scale.yaml",
-        "internal/application/runtime.go"
+        "test/e2e/scale_test.go"
       ],
       "tests": [
         "test/e2e/scale_test.go",
@@ -1325,7 +1303,7 @@
       "id": "PERF-007",
       "implementation": [
         "test/e2e/testdata/reference-scale.yaml",
-        "internal/application/runtime.go"
+        "test/e2e/scale_test.go"
       ],
       "tests": [
         "test/e2e/scale_test.go",
@@ -1339,7 +1317,7 @@
       "id": "PERF-008",
       "implementation": [
         "test/e2e/testdata/reference-scale.yaml",
-        "internal/application/runtime.go"
+        "test/e2e/scale_test.go"
       ],
       "tests": [
         "test/e2e/scale_test.go",
@@ -1353,7 +1331,7 @@
       "id": "PERF-009",
       "implementation": [
         "test/e2e/testdata/reference-scale.yaml",
-        "internal/application/runtime.go"
+        "test/e2e/scale_test.go"
       ],
       "tests": [
         "test/e2e/scale_test.go",
@@ -1367,10 +1345,12 @@
       "id": "PREFLIGHT-001",
       "implementation": [
         "internal/application/preflight.go",
-        "internal/application/runtime.go"
+        "internal/application/runtime.go",
+        "internal/cluster/kubernetes/adapter.go"
       ],
       "tests": [
         "internal/application/preflight_test.go",
+        "internal/cli/cli_test.go",
         "test/e2e/compatibility_test.go"
       ],
       "evidence": [
@@ -1381,10 +1361,12 @@
       "id": "PREFLIGHT-002",
       "implementation": [
         "internal/application/preflight.go",
-        "internal/application/runtime.go"
+        "internal/application/runtime.go",
+        "internal/cluster/kubernetes/adapter.go"
       ],
       "tests": [
         "internal/application/preflight_test.go",
+        "internal/cli/cli_test.go",
         "test/e2e/compatibility_test.go"
       ],
       "evidence": [
@@ -1395,10 +1377,12 @@
       "id": "PREFLIGHT-003",
       "implementation": [
         "internal/application/preflight.go",
-        "internal/application/runtime.go"
+        "internal/application/runtime.go",
+        "internal/cluster/kubernetes/adapter.go"
       ],
       "tests": [
         "internal/application/preflight_test.go",
+        "internal/cli/cli_test.go",
         "test/e2e/compatibility_test.go"
       ],
       "evidence": [
@@ -1409,10 +1393,12 @@
       "id": "PREFLIGHT-004",
       "implementation": [
         "internal/application/preflight.go",
-        "internal/application/runtime.go"
+        "internal/application/runtime.go",
+        "internal/cluster/kubernetes/adapter.go"
       ],
       "tests": [
         "internal/application/preflight_test.go",
+        "internal/cli/cli_test.go",
         "test/e2e/compatibility_test.go"
       ],
       "evidence": [
@@ -1423,10 +1409,12 @@
       "id": "PREFLIGHT-005",
       "implementation": [
         "internal/application/preflight.go",
-        "internal/application/runtime.go"
+        "internal/application/runtime.go",
+        "internal/cluster/kubernetes/adapter.go"
       ],
       "tests": [
         "internal/application/preflight_test.go",
+        "internal/cli/cli_test.go",
         "test/e2e/compatibility_test.go"
       ],
       "evidence": [
@@ -1437,10 +1425,12 @@
       "id": "PREFLIGHT-006",
       "implementation": [
         "internal/application/preflight.go",
-        "internal/application/runtime.go"
+        "internal/application/runtime.go",
+        "internal/cluster/kubernetes/adapter.go"
       ],
       "tests": [
         "internal/application/preflight_test.go",
+        "internal/cli/cli_test.go",
         "test/e2e/compatibility_test.go"
       ],
       "evidence": [
@@ -1451,7 +1441,8 @@
       "id": "PROTO-001",
       "implementation": [
         "test/oracle/deviceplugin/plugin.go",
-        "test/oracle/deviceplugin/main.go"
+        "test/e2e/device_plugin_oracle_test.go",
+        "docs/operators/kubelet-protocol-oracle.md"
       ],
       "tests": [
         "test/oracle/deviceplugin/plugin_test.go",
@@ -1465,7 +1456,8 @@
       "id": "PROTO-002",
       "implementation": [
         "test/oracle/deviceplugin/plugin.go",
-        "test/oracle/deviceplugin/main.go"
+        "test/e2e/device_plugin_oracle_test.go",
+        "docs/operators/kubelet-protocol-oracle.md"
       ],
       "tests": [
         "test/oracle/deviceplugin/plugin_test.go",
@@ -1479,7 +1471,8 @@
       "id": "PROTO-003",
       "implementation": [
         "test/oracle/deviceplugin/plugin.go",
-        "test/oracle/deviceplugin/main.go"
+        "test/e2e/device_plugin_oracle_test.go",
+        "docs/operators/kubelet-protocol-oracle.md"
       ],
       "tests": [
         "test/oracle/deviceplugin/plugin_test.go",
@@ -1493,7 +1486,6 @@
       "id": "RBAC-001",
       "implementation": [
         "charts/kasim-runtime/templates/controller-rbac.yaml",
-        "charts/kasim-runtime/templates/persona-rbac.yaml",
         "charts/kasim-runtime/templates/kwok-rbac.yaml"
       ],
       "tests": [
@@ -1507,13 +1499,12 @@
     {
       "id": "RBAC-002",
       "implementation": [
-        "charts/kasim-runtime/templates/controller-rbac.yaml",
         "charts/kasim-runtime/templates/persona-rbac.yaml",
-        "charts/kasim-runtime/templates/kwok-rbac.yaml"
+        "docs/operators/runtime-installation.md"
       ],
       "tests": [
         "test/packaging/chart_test.go",
-        "test/e2e/chart_smoke_test.go"
+        "test/contract/documentation_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -1522,24 +1513,22 @@
     {
       "id": "RBAC-003",
       "implementation": [
-        "charts/kasim-runtime/templates/controller-rbac.yaml",
-        "charts/kasim-runtime/templates/persona-rbac.yaml",
-        "charts/kasim-runtime/templates/kwok-rbac.yaml"
+        "internal/application/preflight.go",
+        "charts/kasim-runtime/templates/persona-rbac.yaml"
       ],
       "tests": [
-        "test/packaging/chart_test.go",
-        "test/e2e/chart_smoke_test.go"
+        "test/e2e/compatibility_test.go"
       ],
       "evidence": [
-        ".github/workflows/ci.yml"
+        ".github/workflows/compatibility.yml"
       ]
     },
     {
       "id": "RBAC-004",
       "implementation": [
-        "charts/kasim-runtime/templates/controller-rbac.yaml",
-        "charts/kasim-runtime/templates/persona-rbac.yaml",
-        "charts/kasim-runtime/templates/kwok-rbac.yaml"
+        "Dockerfile",
+        "charts/kasim-runtime/templates/controller-deployment.yaml",
+        "charts/kasim-runtime/templates/kwok-deployment.yaml"
       ],
       "tests": [
         "test/packaging/chart_test.go",
@@ -1552,61 +1541,55 @@
     {
       "id": "REL-001",
       "implementation": [
-        "internal/tools/releasebuild/main.go",
-        "internal/tools/releaseevidence/main.go",
+        "go.mod",
+        "go.sum",
         "release/inputs.json"
       ],
       "tests": [
-        "internal/tools/releasebuild/main_test.go",
-        "internal/tools/releaseevidence/main_test.go",
-        "test/release/smoke_test.go"
+        "test/contract/version_test.go",
+        "test/contract/compatibility_matrix_test.go"
       ],
       "evidence": [
-        ".github/workflows/release.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
       "id": "REL-002",
       "implementation": [
-        "internal/tools/releasebuild/main.go",
-        "internal/tools/releaseevidence/main.go",
+        "go.mod",
+        "go.sum",
         "release/inputs.json"
       ],
       "tests": [
-        "internal/tools/releasebuild/main_test.go",
-        "internal/tools/releaseevidence/main_test.go",
-        "test/release/smoke_test.go"
+        "test/contract/version_test.go",
+        "test/contract/compatibility_matrix_test.go"
       ],
       "evidence": [
-        ".github/workflows/release.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
       "id": "REL-003",
       "implementation": [
-        "internal/tools/releasebuild/main.go",
-        "internal/tools/releaseevidence/main.go",
-        "release/inputs.json"
+        "cmd/kasim/main.go",
+        "cmd/kasim-controller/main.go",
+        "Makefile"
       ],
       "tests": [
-        "internal/tools/releasebuild/main_test.go",
-        "internal/tools/releaseevidence/main_test.go",
-        "test/release/smoke_test.go"
+        "cmd/kasim/main_test.go",
+        "cmd/kasim-controller/main_test.go"
       ],
       "evidence": [
-        ".github/workflows/release.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
       "id": "REL-004",
       "implementation": [
-        "internal/tools/releasebuild/main.go",
-        "internal/tools/releaseevidence/main.go",
-        "release/inputs.json"
+        "internal/tools/releasebuild/main.go"
       ],
       "tests": [
         "internal/tools/releasebuild/main_test.go",
-        "internal/tools/releaseevidence/main_test.go",
         "test/release/smoke_test.go"
       ],
       "evidence": [
@@ -1616,13 +1599,12 @@
     {
       "id": "REL-005",
       "implementation": [
-        "internal/tools/releasebuild/main.go",
-        "internal/tools/releaseevidence/main.go",
-        "release/inputs.json"
+        "Dockerfile",
+        "charts/kasim-runtime/Chart.yaml",
+        "internal/tools/releasebuild/main.go"
       ],
       "tests": [
-        "internal/tools/releasebuild/main_test.go",
-        "internal/tools/releaseevidence/main_test.go",
+        "test/e2e/chart_smoke_test.go",
         "test/release/smoke_test.go"
       ],
       "evidence": [
@@ -1632,14 +1614,13 @@
     {
       "id": "REL-006",
       "implementation": [
+        "release/inputs.json",
         "internal/tools/releasebuild/main.go",
-        "internal/tools/releaseevidence/main.go",
-        "release/inputs.json"
+        "internal/tools/releaseevidence/main.go"
       ],
       "tests": [
         "internal/tools/releasebuild/main_test.go",
-        "internal/tools/releaseevidence/main_test.go",
-        "test/release/smoke_test.go"
+        "internal/tools/releaseevidence/main_test.go"
       ],
       "evidence": [
         ".github/workflows/release.yml"
@@ -1648,14 +1629,13 @@
     {
       "id": "REL-007",
       "implementation": [
-        "internal/tools/releasebuild/main.go",
-        "internal/tools/releaseevidence/main.go",
-        "release/inputs.json"
+        "release/inputs.json",
+        "charts/kasim-runtime/Chart.yaml",
+        "docs/research/kwok-v0.8.0-runtime-lock.md"
       ],
       "tests": [
-        "internal/tools/releasebuild/main_test.go",
-        "internal/tools/releaseevidence/main_test.go",
-        "test/release/smoke_test.go"
+        "test/packaging/chart_test.go",
+        "internal/runtime/kwok/kwok_test.go"
       ],
       "evidence": [
         ".github/workflows/release.yml"
@@ -1664,11 +1644,12 @@
     {
       "id": "SAFE-001",
       "implementation": [
-        "internal/reconcile/kubernetes/adapter.go",
-        "internal/cluster/kubernetes/adapter.go"
+        "internal/reconcile/reconcile.go",
+        "internal/cluster/kubernetes/adapter.go",
+        "internal/application/runtime.go"
       ],
       "tests": [
-        "internal/reconcile/kubernetes/adapter_test.go",
+        "internal/reconcile/reconcile_test.go",
         "internal/cluster/kubernetes/adapter_test.go",
         "test/e2e/compatibility_test.go"
       ],
@@ -1680,11 +1661,12 @@
     {
       "id": "SAFE-002",
       "implementation": [
-        "internal/reconcile/kubernetes/adapter.go",
-        "internal/cluster/kubernetes/adapter.go"
+        "internal/reconcile/reconcile.go",
+        "internal/cluster/kubernetes/adapter.go",
+        "internal/application/runtime.go"
       ],
       "tests": [
-        "internal/reconcile/kubernetes/adapter_test.go",
+        "internal/reconcile/reconcile_test.go",
         "internal/cluster/kubernetes/adapter_test.go",
         "test/e2e/compatibility_test.go"
       ],
@@ -1696,11 +1678,12 @@
     {
       "id": "SAFE-003",
       "implementation": [
-        "internal/reconcile/kubernetes/adapter.go",
-        "internal/cluster/kubernetes/adapter.go"
+        "internal/reconcile/reconcile.go",
+        "internal/cluster/kubernetes/adapter.go",
+        "internal/application/runtime.go"
       ],
       "tests": [
-        "internal/reconcile/kubernetes/adapter_test.go",
+        "internal/reconcile/reconcile_test.go",
         "internal/cluster/kubernetes/adapter_test.go",
         "test/e2e/compatibility_test.go"
       ],
@@ -1712,11 +1695,12 @@
     {
       "id": "SAFE-004",
       "implementation": [
-        "internal/reconcile/kubernetes/adapter.go",
-        "internal/cluster/kubernetes/adapter.go"
+        "internal/reconcile/reconcile.go",
+        "internal/cluster/kubernetes/adapter.go",
+        "internal/application/runtime.go"
       ],
       "tests": [
-        "internal/reconcile/kubernetes/adapter_test.go",
+        "internal/reconcile/reconcile_test.go",
         "internal/cluster/kubernetes/adapter_test.go",
         "test/e2e/compatibility_test.go"
       ],
@@ -1728,11 +1712,12 @@
     {
       "id": "SAFE-005",
       "implementation": [
-        "internal/reconcile/kubernetes/adapter.go",
-        "internal/cluster/kubernetes/adapter.go"
+        "internal/reconcile/reconcile.go",
+        "internal/cluster/kubernetes/adapter.go",
+        "internal/application/runtime.go"
       ],
       "tests": [
-        "internal/reconcile/kubernetes/adapter_test.go",
+        "internal/reconcile/reconcile_test.go",
         "internal/cluster/kubernetes/adapter_test.go",
         "test/e2e/compatibility_test.go"
       ],
@@ -1744,11 +1729,12 @@
     {
       "id": "SAFE-006",
       "implementation": [
-        "internal/reconcile/kubernetes/adapter.go",
-        "internal/cluster/kubernetes/adapter.go"
+        "internal/reconcile/reconcile.go",
+        "internal/cluster/kubernetes/adapter.go",
+        "internal/application/runtime.go"
       ],
       "tests": [
-        "internal/reconcile/kubernetes/adapter_test.go",
+        "internal/reconcile/reconcile_test.go",
         "internal/cluster/kubernetes/adapter_test.go",
         "test/e2e/compatibility_test.go"
       ],
@@ -1760,11 +1746,12 @@
     {
       "id": "SAFE-007",
       "implementation": [
-        "internal/reconcile/kubernetes/adapter.go",
-        "internal/cluster/kubernetes/adapter.go"
+        "internal/reconcile/reconcile.go",
+        "internal/cluster/kubernetes/adapter.go",
+        "internal/application/runtime.go"
       ],
       "tests": [
-        "internal/reconcile/kubernetes/adapter_test.go",
+        "internal/reconcile/reconcile_test.go",
         "internal/cluster/kubernetes/adapter_test.go",
         "test/e2e/compatibility_test.go"
       ],
@@ -1776,11 +1763,12 @@
     {
       "id": "SAFE-008",
       "implementation": [
-        "internal/reconcile/kubernetes/adapter.go",
-        "internal/cluster/kubernetes/adapter.go"
+        "internal/reconcile/reconcile.go",
+        "internal/cluster/kubernetes/adapter.go",
+        "internal/application/runtime.go"
       ],
       "tests": [
-        "internal/reconcile/kubernetes/adapter_test.go",
+        "internal/reconcile/reconcile_test.go",
         "internal/cluster/kubernetes/adapter_test.go",
         "test/e2e/compatibility_test.go"
       ],
@@ -1797,6 +1785,7 @@
       ],
       "tests": [
         "internal/projection/extended/extended_test.go",
+        "internal/projection/contract_test.go",
         "test/e2e/compatibility_test.go"
       ],
       "evidence": [
@@ -1811,6 +1800,7 @@
       ],
       "tests": [
         "internal/projection/extended/extended_test.go",
+        "internal/projection/contract_test.go",
         "test/e2e/compatibility_test.go"
       ],
       "evidence": [
@@ -1825,6 +1815,7 @@
       ],
       "tests": [
         "internal/projection/extended/extended_test.go",
+        "internal/projection/contract_test.go",
         "test/e2e/compatibility_test.go"
       ],
       "evidence": [
@@ -1839,6 +1830,7 @@
       ],
       "tests": [
         "internal/projection/extended/extended_test.go",
+        "internal/projection/contract_test.go",
         "test/e2e/compatibility_test.go"
       ],
       "evidence": [
@@ -1853,6 +1845,7 @@
       ],
       "tests": [
         "internal/projection/extended/extended_test.go",
+        "internal/projection/contract_test.go",
         "test/e2e/compatibility_test.go"
       ],
       "evidence": [
@@ -1870,8 +1863,7 @@
         "test/contract/documentation_test.go"
       ],
       "evidence": [
-        ".github/workflows/ci.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
@@ -1885,8 +1877,7 @@
         "test/contract/documentation_test.go"
       ],
       "evidence": [
-        ".github/workflows/ci.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
@@ -1900,8 +1891,7 @@
         "test/contract/documentation_test.go"
       ],
       "evidence": [
-        ".github/workflows/ci.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
@@ -1915,8 +1905,7 @@
         "test/contract/documentation_test.go"
       ],
       "evidence": [
-        ".github/workflows/ci.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
@@ -1930,8 +1919,7 @@
         "test/contract/documentation_test.go"
       ],
       "evidence": [
-        ".github/workflows/ci.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
@@ -1945,8 +1933,7 @@
         "test/contract/documentation_test.go"
       ],
       "evidence": [
-        ".github/workflows/ci.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
@@ -1960,8 +1947,7 @@
         "test/contract/documentation_test.go"
       ],
       "evidence": [
-        ".github/workflows/ci.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
@@ -1975,247 +1961,238 @@
         "test/contract/documentation_test.go"
       ],
       "evidence": [
-        ".github/workflows/ci.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
       "id": "SCN-009",
       "implementation": [
         "internal/scenario/compiler.go",
-        "internal/domain/scenario.go"
+        "internal/projection/projection.go",
+        "internal/cli/cli.go"
       ],
       "tests": [
         "internal/scenario/compile_test.go",
-        "test/contract/documentation_test.go"
+        "internal/projection/contract_test.go",
+        "internal/cli/cli_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/compatibility.yml"
       ]
     },
     {
       "id": "SCN-010",
       "implementation": [
         "internal/scenario/compiler.go",
-        "internal/domain/scenario.go"
+        "internal/projection/projection.go",
+        "internal/cli/cli.go"
       ],
       "tests": [
         "internal/scenario/compile_test.go",
-        "test/contract/documentation_test.go"
+        "internal/projection/contract_test.go",
+        "internal/cli/cli_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/compatibility.yml"
       ]
     },
     {
       "id": "SCN-011",
       "implementation": [
         "internal/scenario/compiler.go",
-        "internal/domain/scenario.go"
+        "internal/projection/projection.go",
+        "internal/cli/cli.go"
       ],
       "tests": [
         "internal/scenario/compile_test.go",
-        "test/contract/documentation_test.go"
+        "internal/projection/contract_test.go",
+        "internal/cli/cli_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/compatibility.yml"
       ]
     },
     {
       "id": "SCN-012",
       "implementation": [
         "internal/scenario/compiler.go",
-        "internal/domain/scenario.go"
+        "internal/projection/projection.go",
+        "internal/cli/cli.go"
       ],
       "tests": [
         "internal/scenario/compile_test.go",
-        "test/contract/documentation_test.go"
+        "internal/projection/contract_test.go",
+        "internal/cli/cli_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/compatibility.yml"
       ]
     },
     {
       "id": "SCN-013",
       "implementation": [
         "internal/scenario/compiler.go",
-        "internal/domain/scenario.go"
+        "internal/projection/projection.go",
+        "internal/cli/cli.go"
       ],
       "tests": [
         "internal/scenario/compile_test.go",
-        "test/contract/documentation_test.go"
+        "internal/projection/contract_test.go",
+        "internal/cli/cli_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/compatibility.yml"
       ]
     },
     {
       "id": "SCOPE-001",
       "implementation": [
-        "docs/adr/0001-fidelity-modes-and-simulation-backends.md",
-        "docs/adr/0005-explicit-target-receipt-driven-cli.md",
-        "internal/cli/cli.go"
+        "internal/scenario/compiler.go",
+        "examples/heterogeneous.yaml",
+        "test/e2e/testdata/reference-scale.yaml"
       ],
       "tests": [
-        "test/architecture/architecture_test.go",
-        "internal/cli/cli_test.go",
-        "test/contract/documentation_test.go"
+        "test/contract/documentation_test.go",
+        "test/e2e/compatibility_test.go",
+        "test/e2e/scale_test.go"
       ],
       "evidence": [
         ".github/workflows/compatibility.yml",
-        ".github/workflows/protocol-oracle.yml"
+        ".github/workflows/scale.yml"
       ]
     },
     {
       "id": "SCOPE-002",
       "implementation": [
-        "docs/adr/0001-fidelity-modes-and-simulation-backends.md",
-        "docs/adr/0005-explicit-target-receipt-driven-cli.md",
-        "internal/cli/cli.go"
+        "internal/projection/extended/extended.go",
+        "release/compatibility-lock.json"
       ],
       "tests": [
-        "test/architecture/architecture_test.go",
-        "internal/cli/cli_test.go",
-        "test/contract/documentation_test.go"
+        "internal/projection/extended/extended_test.go",
+        "test/e2e/compatibility_test.go"
       ],
       "evidence": [
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/protocol-oracle.yml"
+        ".github/workflows/compatibility.yml"
       ]
     },
     {
       "id": "SCOPE-003",
       "implementation": [
-        "docs/adr/0001-fidelity-modes-and-simulation-backends.md",
-        "docs/adr/0005-explicit-target-receipt-driven-cli.md",
-        "internal/cli/cli.go"
+        "internal/projection/dra/dra.go",
+        "internal/application/preflight.go"
       ],
       "tests": [
-        "test/architecture/architecture_test.go",
-        "internal/cli/cli_test.go",
-        "test/contract/documentation_test.go"
+        "internal/projection/dra/dra_test.go",
+        "test/e2e/dra_smoke_test.go"
       ],
       "evidence": [
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/protocol-oracle.yml"
+        ".github/workflows/compatibility.yml"
       ]
     },
     {
       "id": "SCOPE-004",
       "implementation": [
-        "docs/adr/0001-fidelity-modes-and-simulation-backends.md",
-        "docs/adr/0005-explicit-target-receipt-driven-cli.md",
-        "internal/cli/cli.go"
+        "internal/domain/fidelity.go",
+        "internal/domain/status.go",
+        "README.md"
       ],
       "tests": [
-        "test/architecture/architecture_test.go",
-        "internal/cli/cli_test.go",
+        "internal/domain/fidelity_test.go",
         "test/contract/documentation_test.go"
       ],
       "evidence": [
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/protocol-oracle.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
       "id": "SCOPE-005",
       "implementation": [
-        "docs/adr/0001-fidelity-modes-and-simulation-backends.md",
-        "docs/adr/0005-explicit-target-receipt-driven-cli.md",
-        "internal/cli/cli.go"
+        "internal/domain/fidelity.go",
+        "internal/domain/status.go",
+        "README.md"
       ],
       "tests": [
-        "test/architecture/architecture_test.go",
-        "internal/cli/cli_test.go",
+        "internal/domain/fidelity_test.go",
         "test/contract/documentation_test.go"
       ],
       "evidence": [
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/protocol-oracle.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
       "id": "SCOPE-006",
       "implementation": [
-        "docs/adr/0001-fidelity-modes-and-simulation-backends.md",
-        "docs/adr/0005-explicit-target-receipt-driven-cli.md",
-        "internal/cli/cli.go"
+        "internal/cli/cli.go",
+        "internal/cluster/kubernetes/connect.go"
       ],
       "tests": [
-        "test/architecture/architecture_test.go",
         "internal/cli/cli_test.go",
-        "test/contract/documentation_test.go"
+        "internal/cluster/kubernetes/connect_test.go"
       ],
       "evidence": [
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/protocol-oracle.yml"
+        ".github/workflows/compatibility.yml"
       ]
     },
     {
       "id": "SCOPE-007",
       "implementation": [
-        "docs/adr/0001-fidelity-modes-and-simulation-backends.md",
-        "docs/adr/0005-explicit-target-receipt-driven-cli.md",
-        "internal/cli/cli.go"
+        "internal/cli/cli.go",
+        "internal/cluster/kubernetes/connect.go"
       ],
       "tests": [
-        "test/architecture/architecture_test.go",
         "internal/cli/cli_test.go",
-        "test/contract/documentation_test.go"
+        "internal/cluster/kubernetes/connect_test.go"
       ],
       "evidence": [
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/protocol-oracle.yml"
+        ".github/workflows/compatibility.yml"
       ]
     },
     {
       "id": "SCOPE-008",
       "implementation": [
-        "docs/adr/0001-fidelity-modes-and-simulation-backends.md",
-        "docs/adr/0005-explicit-target-receipt-driven-cli.md",
-        "internal/cli/cli.go"
+        "test/e2e/compatibility_test.go",
+        "test/e2e/scale_test.go"
       ],
       "tests": [
-        "test/architecture/architecture_test.go",
-        "internal/cli/cli_test.go",
-        "test/contract/documentation_test.go"
+        "test/contract/compatibility_matrix_test.go",
+        "test/contract/scale_gate_test.go"
       ],
       "evidence": [
         ".github/workflows/compatibility.yml",
-        ".github/workflows/protocol-oracle.yml"
+        ".github/workflows/scale.yml"
       ]
     },
     {
       "id": "SCOPE-009",
       "implementation": [
-        "docs/adr/0001-fidelity-modes-and-simulation-backends.md",
-        "docs/adr/0005-explicit-target-receipt-driven-cli.md",
-        "internal/cli/cli.go"
+        "internal/cli/cli.go",
+        "charts/kasim-runtime/Chart.yaml",
+        "docs/operators/runtime-installation.md"
       ],
       "tests": [
-        "test/architecture/architecture_test.go",
         "internal/cli/cli_test.go",
-        "test/contract/documentation_test.go"
+        "test/e2e/chart_smoke_test.go"
       ],
       "evidence": [
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/protocol-oracle.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
       "id": "STAT-001",
       "implementation": [
         "internal/domain/status.go",
-        "internal/presentation/presentation.go"
+        "internal/presentation/presentation.go",
+        "internal/reconcile/reconcile.go"
       ],
       "tests": [
         "internal/domain/status_test.go",
-        "internal/presentation/presentation_test.go"
+        "internal/presentation/presentation_test.go",
+        "internal/reconcile/reconcile_test.go"
       ],
       "evidence": [
         ".github/workflows/compatibility.yml",
@@ -2226,11 +2203,13 @@
       "id": "STAT-002",
       "implementation": [
         "internal/domain/status.go",
-        "internal/presentation/presentation.go"
+        "internal/presentation/presentation.go",
+        "internal/reconcile/reconcile.go"
       ],
       "tests": [
         "internal/domain/status_test.go",
-        "internal/presentation/presentation_test.go"
+        "internal/presentation/presentation_test.go",
+        "internal/reconcile/reconcile_test.go"
       ],
       "evidence": [
         ".github/workflows/compatibility.yml",
@@ -2241,11 +2220,13 @@
       "id": "STAT-003",
       "implementation": [
         "internal/domain/status.go",
-        "internal/presentation/presentation.go"
+        "internal/presentation/presentation.go",
+        "internal/reconcile/reconcile.go"
       ],
       "tests": [
         "internal/domain/status_test.go",
-        "internal/presentation/presentation_test.go"
+        "internal/presentation/presentation_test.go",
+        "internal/reconcile/reconcile_test.go"
       ],
       "evidence": [
         ".github/workflows/compatibility.yml",
@@ -2256,11 +2237,13 @@
       "id": "STAT-004",
       "implementation": [
         "internal/domain/status.go",
-        "internal/presentation/presentation.go"
+        "internal/presentation/presentation.go",
+        "internal/reconcile/reconcile.go"
       ],
       "tests": [
         "internal/domain/status_test.go",
-        "internal/presentation/presentation_test.go"
+        "internal/presentation/presentation_test.go",
+        "internal/reconcile/reconcile_test.go"
       ],
       "evidence": [
         ".github/workflows/compatibility.yml",
@@ -2271,11 +2254,13 @@
       "id": "STAT-005",
       "implementation": [
         "internal/domain/status.go",
-        "internal/presentation/presentation.go"
+        "internal/presentation/presentation.go",
+        "internal/reconcile/reconcile.go"
       ],
       "tests": [
         "internal/domain/status_test.go",
-        "internal/presentation/presentation_test.go"
+        "internal/presentation/presentation_test.go",
+        "internal/reconcile/reconcile_test.go"
       ],
       "evidence": [
         ".github/workflows/compatibility.yml",
@@ -2286,11 +2271,13 @@
       "id": "TARGET-001",
       "implementation": [
         "internal/cluster/kubernetes/connect.go",
-        "internal/cli/cli.go"
+        "internal/cli/cli.go",
+        "internal/cluster/cluster.go"
       ],
       "tests": [
         "internal/cluster/kubernetes/connect_test.go",
-        "internal/cli/cli_test.go"
+        "internal/cli/cli_test.go",
+        "test/e2e/compatibility_test.go"
       ],
       "evidence": [
         ".github/workflows/compatibility.yml"
@@ -2300,11 +2287,13 @@
       "id": "TARGET-002",
       "implementation": [
         "internal/cluster/kubernetes/connect.go",
-        "internal/cli/cli.go"
+        "internal/cli/cli.go",
+        "internal/cluster/cluster.go"
       ],
       "tests": [
         "internal/cluster/kubernetes/connect_test.go",
-        "internal/cli/cli_test.go"
+        "internal/cli/cli_test.go",
+        "test/e2e/compatibility_test.go"
       ],
       "evidence": [
         ".github/workflows/compatibility.yml"
@@ -2314,11 +2303,13 @@
       "id": "TARGET-003",
       "implementation": [
         "internal/cluster/kubernetes/connect.go",
-        "internal/cli/cli.go"
+        "internal/cli/cli.go",
+        "internal/cluster/cluster.go"
       ],
       "tests": [
         "internal/cluster/kubernetes/connect_test.go",
-        "internal/cli/cli_test.go"
+        "internal/cli/cli_test.go",
+        "test/e2e/compatibility_test.go"
       ],
       "evidence": [
         ".github/workflows/compatibility.yml"
@@ -2328,11 +2319,13 @@
       "id": "TARGET-004",
       "implementation": [
         "internal/cluster/kubernetes/connect.go",
-        "internal/cli/cli.go"
+        "internal/cli/cli.go",
+        "internal/cluster/cluster.go"
       ],
       "tests": [
         "internal/cluster/kubernetes/connect_test.go",
-        "internal/cli/cli_test.go"
+        "internal/cli/cli_test.go",
+        "test/e2e/compatibility_test.go"
       ],
       "evidence": [
         ".github/workflows/compatibility.yml"
@@ -2342,11 +2335,13 @@
       "id": "TARGET-005",
       "implementation": [
         "internal/cluster/kubernetes/connect.go",
-        "internal/cli/cli.go"
+        "internal/cli/cli.go",
+        "internal/cluster/cluster.go"
       ],
       "tests": [
         "internal/cluster/kubernetes/connect_test.go",
-        "internal/cli/cli_test.go"
+        "internal/cli/cli_test.go",
+        "test/e2e/compatibility_test.go"
       ],
       "evidence": [
         ".github/workflows/compatibility.yml"
@@ -2355,163 +2350,125 @@
     {
       "id": "TEST-001",
       "implementation": [
-        "Makefile",
-        "release/compatibility-lock.json"
+        "internal/scenario/compiler.go"
       ],
       "tests": [
-        "test/architecture/architecture_test.go",
-        "test/contract/documentation_test.go",
-        "test/e2e/compatibility_test.go"
+        "internal/scenario/compile_test.go"
       ],
       "evidence": [
-        ".github/workflows/ci.yml",
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/protocol-oracle.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
       "id": "TEST-002",
       "implementation": [
-        "Makefile",
-        "release/compatibility-lock.json"
+        "internal/catalog/catalog.go",
+        "profiles/catalog.json"
       ],
       "tests": [
-        "test/architecture/architecture_test.go",
-        "test/contract/documentation_test.go",
-        "test/e2e/compatibility_test.go"
+        "internal/catalog/catalog_test.go",
+        "internal/catalog/schema_test.go",
+        "internal/catalog/golden_test.go"
       ],
       "evidence": [
-        ".github/workflows/ci.yml",
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/protocol-oracle.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
       "id": "TEST-003",
       "implementation": [
-        "Makefile",
-        "release/compatibility-lock.json"
+        "internal/application/runtime.go",
+        "internal/controlplane/memory/memory.go"
       ],
       "tests": [
-        "test/architecture/architecture_test.go",
-        "test/contract/documentation_test.go",
-        "test/e2e/compatibility_test.go"
+        "internal/application/runtime_test.go"
       ],
       "evidence": [
-        ".github/workflows/ci.yml",
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/protocol-oracle.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
       "id": "TEST-004",
       "implementation": [
-        "Makefile",
-        "release/compatibility-lock.json"
+        "internal/reconcile/reconcile.go",
+        "internal/cluster/recording/recording.go"
       ],
       "tests": [
-        "test/architecture/architecture_test.go",
-        "test/contract/documentation_test.go",
-        "test/e2e/compatibility_test.go"
+        "internal/reconcile/reconcile_test.go"
       ],
       "evidence": [
-        ".github/workflows/ci.yml",
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/protocol-oracle.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
       "id": "TEST-005",
       "implementation": [
-        "Makefile",
-        "release/compatibility-lock.json"
+        "internal/projection/projection.go",
+        "internal/projection/extended/extended.go",
+        "internal/projection/dra/dra.go"
       ],
       "tests": [
-        "test/architecture/architecture_test.go",
-        "test/contract/documentation_test.go",
-        "test/e2e/compatibility_test.go"
+        "internal/projection/contract_test.go"
       ],
       "evidence": [
-        ".github/workflows/ci.yml",
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/protocol-oracle.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
       "id": "TEST-006",
       "implementation": [
-        "Makefile",
-        "release/compatibility-lock.json"
+        "internal/presentation/presentation.go"
       ],
       "tests": [
-        "test/architecture/architecture_test.go",
-        "test/contract/documentation_test.go",
-        "test/e2e/compatibility_test.go"
+        "internal/presentation/presentation_test.go",
+        "internal/presentation/testdata/error-invocation.human.golden",
+        "internal/presentation/testdata/error-invocation.json.golden"
       ],
       "evidence": [
-        ".github/workflows/ci.yml",
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/protocol-oracle.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/ci.yml"
       ]
     },
     {
       "id": "TEST-007",
       "implementation": [
-        "Makefile",
-        "release/compatibility-lock.json"
+        "test/e2e/compatibility_test.go",
+        "test/e2e/chart_smoke_test.go"
       ],
       "tests": [
-        "test/architecture/architecture_test.go",
-        "test/contract/documentation_test.go",
-        "test/e2e/compatibility_test.go"
+        "test/e2e/compatibility_test.go",
+        "test/e2e/chart_smoke_test.go"
       ],
       "evidence": [
-        ".github/workflows/ci.yml",
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/protocol-oracle.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/compatibility.yml"
       ]
     },
     {
       "id": "TEST-008",
       "implementation": [
-        "Makefile",
-        "release/compatibility-lock.json"
-      ],
-      "tests": [
-        "test/architecture/architecture_test.go",
-        "test/contract/documentation_test.go",
+        "docs/adr/0007-deep-modules-and-extension-seams.md",
         "test/e2e/compatibility_test.go"
       ],
+      "tests": [
+        "test/e2e/compatibility_test.go",
+        "test/e2e/scale_test.go"
+      ],
       "evidence": [
-        ".github/workflows/ci.yml",
         ".github/workflows/compatibility.yml",
-        ".github/workflows/protocol-oracle.yml",
         ".github/workflows/scale.yml"
       ]
     },
     {
       "id": "TEST-009",
       "implementation": [
-        "Makefile",
-        "release/compatibility-lock.json"
+        "internal/tools/releaseevidence/main.go",
+        "release/traceability.json"
       ],
       "tests": [
-        "test/architecture/architecture_test.go",
-        "test/contract/documentation_test.go",
-        "test/e2e/compatibility_test.go"
+        "internal/tools/releaseevidence/main_test.go",
+        "test/contract/documentation_test.go"
       ],
       "evidence": [
-        ".github/workflows/ci.yml",
-        ".github/workflows/compatibility.yml",
-        ".github/workflows/protocol-oracle.yml",
-        ".github/workflows/scale.yml"
+        ".github/workflows/release.yml"
       ]
     }
   ]

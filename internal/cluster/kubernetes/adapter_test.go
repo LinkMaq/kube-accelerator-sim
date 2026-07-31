@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -909,6 +910,62 @@ func TestAdapterStopsNodeStatusRetryWhenOwnershipChanges(t *testing.T) {
 	}
 }
 
+func TestAdapterStopsNodeStatusRetryWhenDesiredGenerationAdvances(t *testing.T) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 2)
+	node := ownedNode("synthetic-node", "node-uid", "10", scope)
+	kubernetesClient := kubernetesfake.NewSimpleClientset(&node)
+	statusPatches := 0
+	kubernetesClient.Fake.PrependReactor(
+		"patch",
+		"nodes",
+		func(action clienttesting.Action) (bool, runtime.Object, error) {
+			if action.GetSubresource() != "status" {
+				return false, nil, nil
+			}
+			statusPatches++
+			if statusPatches != 1 {
+				return false, nil, nil
+			}
+			newer := node.DeepCopy()
+			newer.ResourceVersion = "11"
+			newer.Labels[cluster.DesiredGenerationLabel] = "3"
+			if err := kubernetesClient.Tracker().Update(
+				corev1.SchemeGroupVersion.WithResource("nodes"),
+				newer,
+				"",
+			); err != nil {
+				t.Fatalf("advance desired generation during conflict: %v", err)
+			}
+			return true, nil, apierrors.NewConflict(
+				schema.GroupResource{Resource: "nodes"},
+				node.Name,
+				nil,
+			)
+		},
+	)
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+	change := ownedNodeStatusChange(t, node, "9")
+	changeSet, err := cluster.NewOwnedChangeSet(
+		scope,
+		cluster.ExecutionPersistent,
+		[]cluster.OwnedChange{change},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := adapter.Execute(
+		context.Background(),
+		changeSet,
+	); cluster.ErrorCodeOf(err) != cluster.ErrorResourceVersionConflict {
+		t.Fatalf("generation advance error = %v, want ResourceVersionConflict", err)
+	}
+	if statusPatches != 1 {
+		t.Fatalf("status patch attempts = %d, want 1 before generation rejection", statusPatches)
+	}
+}
+
 func TestAdapterRebasesOwnedNodeSpecAcrossStatusResourceVersionDrift(t *testing.T) {
 	t.Parallel()
 
@@ -1688,9 +1745,12 @@ func namedOwnershipScope(t *testing.T, value int64) cluster.OwnershipScope {
 
 func ownershipLabels(scope cluster.OwnershipScope) map[string]string {
 	return map[string]string{
-		cluster.ManagedByLabel:         cluster.ManagedByValue,
-		cluster.InstanceUIDLabel:       scope.InstanceUID().String(),
-		cluster.DesiredGenerationLabel: "3",
+		cluster.ManagedByLabel:   cluster.ManagedByValue,
+		cluster.InstanceUIDLabel: scope.InstanceUID().String(),
+		cluster.DesiredGenerationLabel: strconv.FormatUint(
+			scope.DesiredGeneration().Value(),
+			10,
+		),
 	}
 }
 

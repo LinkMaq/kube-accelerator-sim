@@ -20,12 +20,12 @@ Connected apply always names the existing target explicitly:
 
 | Scenario | File | Intended control-plane shape |
 | --- | --- | --- |
-| Single Node, single accelerator | [single-node-single-accelerator.yaml](../../examples/single-node-single-accelerator.yaml) | One Synthetic Node with one `nvidia.com/gpu` unit |
-| Single Node, multiple accelerators | [single-node-multi-accelerator.yaml](../../examples/single-node-multi-accelerator.yaml) | One Synthetic Node with eight units |
-| Multiple Nodes, multiple accelerators | [multi-node-multi-accelerator.yaml](../../examples/multi-node-multi-accelerator.yaml) | Four homogeneous Nodes with eight units each |
-| Heterogeneous cluster | [heterogeneous.yaml](../../examples/heterogeneous.yaml) | Separate NVIDIA H100 and Huawei Atlas A2 Node Groups |
+| Single Synthetic Node, single Accelerator | [single-node-single-accelerator.yaml](../../examples/single-node-single-accelerator.yaml) | One Synthetic Node with one `nvidia.com/gpu` unit |
+| Single Synthetic Node, multiple Accelerators | [single-node-multi-accelerator.yaml](../../examples/single-node-multi-accelerator.yaml) | One Synthetic Node with eight units |
+| Multiple Synthetic Nodes, multiple Accelerators | [multi-node-multi-accelerator.yaml](../../examples/multi-node-multi-accelerator.yaml) | Four homogeneous Synthetic Nodes with eight units each |
+| Heterogeneous Node Groups | [heterogeneous.yaml](../../examples/heterogeneous.yaml) | Separate NVIDIA H100 and Huawei Atlas A2 Node Groups |
 | Stable DRA control plane | [dra-control-plane.yaml](../../examples/dra-control-plane.yaml) | Deterministic `resource.k8s.io/v1` inventory on Kubernetes 1.34–1.36 |
-| Reference scale | [reference-scale.yaml](../../test/e2e/testdata/reference-scale.yaml) | Release gate with 1,000 Nodes and 8,000 units |
+| Reference scale | [reference-scale.yaml](../../test/e2e/testdata/reference-scale.yaml) | Release gate with 1,000 Synthetic Nodes and 8,000 units |
 
 The file stores exact profile revisions and digests. If catalog evidence is
 revised, select the new profile intentionally and review the resulting
@@ -70,7 +70,8 @@ shortcut.
 
 ## Health, capacity, and scale
 
-The example files set `count` (capacity) and `healthy` (allocatable) per Node.
+The example files set `count` (capacity) and `healthy` (allocatable) per
+Synthetic Node.
 A smaller `healthy` value represents partial health while remaining a valid
 Ready Scenario. The CLI `health` command revises only that typed field.
 

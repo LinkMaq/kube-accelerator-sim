@@ -13,7 +13,7 @@ mapping for reviewers. No v1 requirement is silently omitted or deferred.
 | Product boundary | CLI operates only on an explicit existing target; cluster lifecycle remains test infrastructure |
 | Fidelity | `scheduling` covers Kubernetes 1.30–1.36; stable DRA control-plane projection is bounded to 1.34–1.36 |
 | Catalog | Verified, provisional, custom, and catalog-only semantics are distinct; exact revisions/digests are compiled before writes |
-| Scenarios | Single/single, single/multi, multi/multi, heterogeneous, health, scale, and DRA paths have versioned executable examples |
+| Scenarios | Single/single, single/multi, multi/multi, heterogeneous, health, scale, DRA, and blocked-delete paths have versioned examples plus executable CLI/E2E contracts |
 | Lifecycle safety | UID/generation/target preconditions, exact ownership, real-Node protection, unowned-Pod blocking, and zero-owned-object cleanup are tested |
 | Operator workflow | Installation, apply, receipts, status, typed revisions, safe deletion, uninstall, upgrade, rollback, and troubleshooting are documented |
 | Evidence | CI, seven-minor scheduling, three-minor stable DRA, floor/ceiling protocol oracle, two-trial 1,000-Node scale, and release workflows produce source-revision-bound receipts |

@@ -2,15 +2,24 @@ package contract_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/LinkMaq/kube-accelerator-sim/internal/application"
+	"github.com/LinkMaq/kube-accelerator-sim/internal/catalog"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/cli"
+	"github.com/LinkMaq/kube-accelerator-sim/internal/cluster"
+	"github.com/LinkMaq/kube-accelerator-sim/internal/cluster/recording"
+	"github.com/LinkMaq/kube-accelerator-sim/internal/controlplane"
+	"github.com/LinkMaq/kube-accelerator-sim/internal/controlplane/memory"
+	"github.com/LinkMaq/kube-accelerator-sim/internal/domain"
 )
 
 type traceabilityDocument struct {
@@ -24,7 +33,6 @@ type traceabilityRequirement struct {
 	Implemented []string `json:"implementation"`
 	Tests       []string `json:"tests"`
 	Evidence    []string `json:"evidence"`
-	DeferralADR string   `json:"deferralADR,omitempty"`
 }
 
 func TestEveryNormativeRequirementHasReviewableTraceability(t *testing.T) {
@@ -57,27 +65,19 @@ func TestEveryNormativeRequirementHasReviewableTraceability(t *testing.T) {
 
 	got := make([]string, 0, len(document.Requirements))
 	seen := map[string]struct{}{}
+	byID := map[string]traceabilityRequirement{}
 	for _, requirement := range document.Requirements {
 		if _, duplicate := seen[requirement.ID]; duplicate {
 			t.Errorf("requirement %s appears more than once", requirement.ID)
 		}
 		seen[requirement.ID] = struct{}{}
+		byID[requirement.ID] = requirement
 		got = append(got, requirement.ID)
-		if requirement.DeferralADR != "" {
-			assertRepositoryPath(t, root, requirement.ID, requirement.DeferralADR)
-			if !strings.HasPrefix(requirement.DeferralADR, "docs/adr/") {
-				t.Errorf("%s deferral is not an accepted ADR: %s", requirement.ID, requirement.DeferralADR)
-			}
-			continue
-		}
 		if len(requirement.Implemented) == 0 || len(requirement.Tests) == 0 ||
 			len(requirement.Evidence) == 0 {
 			t.Errorf("%s must link implementation, tests, and release evidence", requirement.ID)
 		}
-		for _, path := range append(
-			append(append([]string{}, requirement.Implemented...), requirement.Tests...),
-			requirement.Evidence...,
-		) {
+		for _, path := range traceabilityPaths(requirement) {
 			assertRepositoryPath(t, root, requirement.ID, path)
 		}
 	}
@@ -85,6 +85,28 @@ func TestEveryNormativeRequirementHasReviewableTraceability(t *testing.T) {
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("traceability IDs do not exactly match the normative spec\nwant:\n%s\ngot:\n%s",
 			strings.Join(want, "\n"), strings.Join(got, "\n"))
+	}
+	for id, requiredPaths := range map[string][]string{
+		"REL-001":   {"go.mod"},
+		"SCOPE-008": {"test/e2e/compatibility_test.go"},
+		"TEST-005":  {"internal/projection/contract_test.go"},
+		"TEST-006":  {"internal/presentation/testdata/error-invocation.json.golden"},
+		"TEST-007":  {"test/e2e/compatibility_test.go"},
+		"TEST-009":  {"internal/tools/releaseevidence/main.go"},
+	} {
+		requirement, found := byID[id]
+		if !found {
+			t.Errorf("requirement-specific route %s is missing", id)
+			continue
+		}
+		for _, requiredPath := range requiredPaths {
+			if !containsDocumentationPath(
+				traceabilityPaths(requirement),
+				requiredPath,
+			) {
+				t.Errorf("%s does not link its specific contract %s", id, requiredPath)
+			}
+		}
 	}
 }
 
@@ -174,6 +196,71 @@ func TestDocumentedScenariosCompileThroughTheProductCLI(t *testing.T) {
 	}
 }
 
+func TestDocumentedConnectedLifecycleCommandsExecute(t *testing.T) {
+	t.Parallel()
+
+	root := repositoryRoot(t)
+	dependencies := connectedDocumentationDependencies(t)
+	created := runDocumentationCLI(t, dependencies, []string{
+		"apply",
+		"-f", filepath.Join(root, "examples/single-node-single-accelerator.yaml"),
+		"--async",
+		"--kubeconfig", "/explicit/config",
+		"--context", "test-context",
+		"-o", "json",
+	})
+	receipt := documentationReceipt(t, created)
+	instanceUID := receipt["instanceUID"].(string)
+	generation := jsonNumberString(t, receipt["desiredGeneration"])
+
+	runDocumentationCLI(t, dependencies, []string{
+		"status", "single-node-single-accelerator",
+		"--kubeconfig", "/explicit/config",
+		"--context", "test-context",
+		"-o", "json",
+	})
+	health := runDocumentationCLI(t, dependencies, []string{
+		"health", "single-node-single-accelerator",
+		"--group", "workers",
+		"--pool", "accelerator",
+		"--healthy", "0",
+		"--instance-uid", instanceUID,
+		"--expected-generation", generation,
+		"--async",
+		"--kubeconfig", "/explicit/config",
+		"--context", "test-context",
+		"-o", "json",
+	})
+	generation = jsonNumberString(
+		t,
+		documentationReceipt(t, health)["desiredGeneration"],
+	)
+	scaled := runDocumentationCLI(t, dependencies, []string{
+		"scale", "single-node-single-accelerator",
+		"--group", "workers",
+		"--replicas", "3",
+		"--instance-uid", instanceUID,
+		"--expected-generation", generation,
+		"--async",
+		"--kubeconfig", "/explicit/config",
+		"--context", "test-context",
+		"-o", "json",
+	})
+	generation = jsonNumberString(
+		t,
+		documentationReceipt(t, scaled)["desiredGeneration"],
+	)
+	runDocumentationCLI(t, dependencies, []string{
+		"delete", "single-node-single-accelerator",
+		"--instance-uid", instanceUID,
+		"--expected-generation", generation,
+		"--async",
+		"--kubeconfig", "/explicit/config",
+		"--context", "test-context",
+		"-o", "json",
+	})
+}
+
 func TestLocalMarkdownLinksResolve(t *testing.T) {
 	t.Parallel()
 
@@ -238,4 +325,107 @@ func assertRepositoryPath(t *testing.T, root, requirement, path string) {
 	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(path))); err != nil {
 		t.Errorf("%s links missing repository path %s: %v", requirement, path, err)
 	}
+}
+
+func containsDocumentationPath(paths []string, expected string) bool {
+	for _, path := range paths {
+		if path == expected {
+			return true
+		}
+	}
+	return false
+}
+
+func traceabilityPaths(requirement traceabilityRequirement) []string {
+	result := append([]string{}, requirement.Implemented...)
+	result = append(result, requirement.Tests...)
+	return append(result, requirement.Evidence...)
+}
+
+func connectedDocumentationDependencies(t *testing.T) cli.Dependencies {
+	t.Helper()
+	snapshot, err := catalog.LoadBundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fingerprint, err := domain.ParseDigest("sha256:" + strings.Repeat("1", 64))
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := controlplane.ExplicitTarget{
+		ContextName: "test-context",
+		Fingerprint: fingerprint,
+	}
+	connected := application.ConnectedTarget{
+		Receipt: cluster.ConnectionReceipt{
+			ContextName:             target.ContextName,
+			CanonicalKubeconfigPath: "/explicit/config",
+			APIServerURL:            "https://example.invalid",
+			TargetFingerprint:       fingerprint,
+			CADigest:                fingerprint,
+		},
+		Target:       target,
+		ControlPlane: memory.New(memory.Options{HistoryLimit: 8}),
+		Cluster: recording.New(recording.Options{
+			Capabilities: cluster.TargetCapabilities{
+				ServerVersion:   "v1.36.3",
+				KubernetesMinor: 36,
+			},
+		}),
+	}
+	return cli.Dependencies{
+		Catalog: snapshot,
+		Connect: func(
+			context.Context,
+			cluster.TargetSelection,
+		) (application.ConnectedTarget, error) {
+			return connected, nil
+		},
+	}
+}
+
+func runDocumentationCLI(
+	t *testing.T,
+	dependencies cli.Dependencies,
+	args []string,
+) string {
+	t.Helper()
+	var stdout, stderr bytes.Buffer
+	exit := cli.RunWithDependencies(
+		args,
+		strings.NewReader(""),
+		&stdout,
+		&stderr,
+		dependencies,
+	)
+	if exit != 0 {
+		t.Fatalf("%s exited %d: %s", strings.Join(args, " "), exit, stderr.String())
+	}
+	return stdout.String()
+}
+
+func documentationReceipt(t *testing.T, encoded string) map[string]any {
+	t.Helper()
+	var envelope map[string]any
+	if err := json.Unmarshal([]byte(encoded), &envelope); err != nil {
+		t.Fatalf("decode lifecycle envelope: %v\n%s", err, encoded)
+	}
+	result, ok := envelope["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("lifecycle result missing: %#v", envelope)
+	}
+	receipt, ok := result["receipt"].(map[string]any)
+	if !ok {
+		t.Fatalf("lifecycle receipt missing: %#v", result)
+	}
+	return receipt
+}
+
+func jsonNumberString(t *testing.T, value any) string {
+	t.Helper()
+	number, ok := value.(float64)
+	if !ok || number < 1 || number != float64(uint64(number)) {
+		t.Fatalf("unexpected positive generation %#v", value)
+	}
+	return strconv.FormatUint(uint64(number), 10)
 }

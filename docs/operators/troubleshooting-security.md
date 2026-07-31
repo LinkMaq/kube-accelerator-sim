@@ -23,6 +23,11 @@ acceptance is not equivalent to rejection.
 `CleanupBlocked`, copy the bounded blocker Node/Pod references from the status
 receipt and inspect that exact Node:
 
+The release compatibility harness contains the reproducible real-cluster
+[foreign-Pod setup and blocked-delete assertion](../../test/e2e/compatibility_test.go).
+The operator workflow below begins after that safety condition is observed; it
+does not create or remove a user workload on the operator's behalf.
+
 ```sh
 kubectl --kubeconfig ./target.kubeconfig --context target \
   get pods --all-namespaces \
