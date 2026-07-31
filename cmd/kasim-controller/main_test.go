@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"k8s.io/client-go/rest"
+
+	clusterkubernetes "github.com/LinkMaq/kube-accelerator-sim/internal/cluster/kubernetes"
 )
 
 func TestParseOptionsUsesSafeRuntimeDefaults(t *testing.T) {
@@ -79,7 +81,7 @@ func TestClusterClientConfigUsesBoundedScaleThroughput(t *testing.T) {
 		UserAgent: "manager-client",
 	}
 
-	config := clusterClientConfig(base)
+	config := clusterkubernetes.ClusterClientConfig(base)
 
 	if config == base {
 		t.Fatal("cluster client configuration aliases the manager configuration")

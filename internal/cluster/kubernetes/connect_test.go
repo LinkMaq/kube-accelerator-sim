@@ -13,6 +13,9 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/flowcontrol"
+
 	"github.com/LinkMaq/kube-accelerator-sim/internal/cluster"
 	clusterkubernetes "github.com/LinkMaq/kube-accelerator-sim/internal/cluster/kubernetes"
 )
@@ -31,6 +34,46 @@ func TestConnectRequiresAnExplicitKubeconfigAndContext(t *testing.T) {
 		); err == nil {
 			t.Fatalf("Connect(%#v) unexpectedly succeeded", selection)
 		}
+	}
+}
+
+func TestClusterClientConfigUsesBoundedScaleThroughput(t *testing.T) {
+	t.Parallel()
+
+	base := &rest.Config{
+		Host:        "https://cluster.example.test",
+		QPS:         5,
+		Burst:       10,
+		UserAgent:   "caller-client",
+		RateLimiter: flowcontrol.NewFakeAlwaysRateLimiter(),
+	}
+
+	config := clusterkubernetes.ClusterClientConfig(base)
+
+	if config == base {
+		t.Fatal("cluster client configuration aliases the caller configuration")
+	}
+	if config.QPS != 400 {
+		t.Errorf("cluster client QPS = %v, want 400", config.QPS)
+	}
+	if config.Burst != 800 {
+		t.Errorf("cluster client burst = %d, want 800", config.Burst)
+	}
+	if config.RateLimiter != nil {
+		t.Fatal("caller rate limiter overrides the cluster client budget")
+	}
+	if config.Host != base.Host || config.UserAgent != base.UserAgent {
+		t.Errorf("cluster client lost caller configuration: %#v", config)
+	}
+	if base.QPS != 5 || base.Burst != 10 {
+		t.Errorf(
+			"caller configuration mutated to QPS=%v burst=%d",
+			base.QPS,
+			base.Burst,
+		)
+	}
+	if base.RateLimiter == nil {
+		t.Fatal("caller rate limiter was mutated")
 	}
 }
 

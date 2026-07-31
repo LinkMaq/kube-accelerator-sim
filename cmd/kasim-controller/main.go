@@ -32,15 +32,7 @@ import (
 	"github.com/LinkMaq/kube-accelerator-sim/internal/version"
 )
 
-const (
-	leaderElectionID = "kasim-controller.simulation.kasim.io"
-
-	// One 1,000-node revision can require 2,000 independent ownership metadata
-	// writes. This explicit budget keeps the 32-worker Cluster adapter useful
-	// while request concurrency remains separately bounded.
-	clusterClientQPS   = 400
-	clusterClientBurst = 800
-)
+const leaderElectionID = "kasim-controller.simulation.kasim.io"
 
 type options struct {
 	metricsAddress          string
@@ -213,7 +205,9 @@ func start(options options, snapshot catalog.Snapshot) error {
 	if err != nil {
 		return fmt.Errorf("construct direct watch client: %w", err)
 	}
-	kubernetesClient, err := clientset.NewForConfig(clusterClientConfig(config))
+	kubernetesClient, err := clientset.NewForConfig(
+		clusterkubernetes.ClusterClientConfig(config),
+	)
 	if err != nil {
 		return fmt.Errorf("construct typed Kubernetes client: %w", err)
 	}
@@ -254,13 +248,6 @@ func start(options options, snapshot catalog.Snapshot) error {
 		return fmt.Errorf("run controller manager: %w", err)
 	}
 	return nil
-}
-
-func clusterClientConfig(base *rest.Config) *rest.Config {
-	config := rest.CopyConfig(base)
-	config.QPS = clusterClientQPS
-	config.Burst = clusterClientBurst
-	return config
 }
 
 type watchingClient struct {

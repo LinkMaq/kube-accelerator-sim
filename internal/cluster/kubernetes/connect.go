@@ -28,7 +28,15 @@ import (
 	"github.com/LinkMaq/kube-accelerator-sim/internal/domain"
 )
 
-const targetFingerprintDomain = "kasim.target-fingerprint.v1"
+const (
+	targetFingerprintDomain = "kasim.target-fingerprint.v1"
+
+	// One 1,000-node lifecycle operation can require thousands of exact-owned
+	// reads or writes. This explicit budget keeps the Adapter's bounded
+	// concurrency useful without inheriting client-go's interactive defaults.
+	clusterClientQPS   = 400
+	clusterClientBurst = 800
+)
 
 // Connection holds clients configured once for one explicit context. It
 // exposes only intention-level ports and redacted target identity.
@@ -115,7 +123,7 @@ func Connect(
 	}
 	restConfig.UserAgent = "kube-accelerator-sim/dev"
 
-	coreClient, err := clientset.NewForConfig(rest.CopyConfig(restConfig))
+	coreClient, err := clientset.NewForConfig(ClusterClientConfig(restConfig))
 	if err != nil {
 		return nil, cluster.NewError(
 			cluster.ErrorTargetUnavailable,
@@ -177,6 +185,16 @@ func Connect(
 		),
 		clusterPort: NewAdapter(coreClient),
 	}, nil
+}
+
+// ClusterClientConfig returns an isolated configuration for the typed Cluster
+// Adapter used by both the CLI safety preflight and the in-cluster controller.
+func ClusterClientConfig(base *rest.Config) *rest.Config {
+	config := rest.CopyConfig(base)
+	config.QPS = clusterClientQPS
+	config.Burst = clusterClientBurst
+	config.RateLimiter = nil
+	return config
 }
 
 // Receipt returns a copy containing no credentials or raw kubeconfig data.
