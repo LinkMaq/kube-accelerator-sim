@@ -52,9 +52,9 @@ func TestReconcileCreatesClosedSyntheticNodeBeforeOwnedLease(t *testing.T) {
 		t.Fatalf("first change = %T, want ApplySyntheticNode", changes[0])
 	}
 	if !node.Unschedulable() ||
-		node.Annotations()["kwok.x-k8s.io/node"] != "fake" ||
+		node.Annotations()["kwok.x-k8s.io/node"] != "disabled" ||
 		node.Labels()["simulation.kasim.io/node-group"] != "nodes" {
-		t.Fatalf("unexpected closed Synthetic Node intent: %#v", node)
+		t.Fatalf("unexpected closed unactivated Synthetic Node intent: %#v", node)
 	}
 	if changes[0].Key().Kind() != cluster.ObjectKindNode {
 		t.Fatalf("unexpected object mutation %s", changes[0].Key().Kind())
@@ -72,6 +72,9 @@ func TestReconcileCreatesLeaseOnlyAfterClosedNodeWasObserved(t *testing.T) {
 
 	observed := completeObservedGraph(t, true, nil)
 	observed.Objects = observed.Objects[1:]
+	observed.Objects[0].Node.Annotations = map[string]string{
+		"kwok.x-k8s.io/node": "disabled",
+	}
 	fixture := newFixture(t, recording.Options{
 		Capabilities: schedulingCapabilities(),
 		Observed:     observed,
@@ -114,8 +117,64 @@ func TestReconcileClosesExistingNodeBeforeRepairingMissingLease(t *testing.T) {
 	if len(changes) != 1 ||
 		!ok ||
 		!node.Unschedulable() ||
+		node.Annotations()["kwok.x-k8s.io/node"] != "disabled" ||
 		node.Key().Name() != syntheticNodeName(t) {
 		t.Fatalf("missing Lease repair did not close Node first: %#v", changes)
+	}
+}
+
+func TestReconcileDeactivatesClosedNodeBeforeRepairingMissingLease(t *testing.T) {
+	t.Parallel()
+
+	observed := completeObservedGraph(t, true, nil)
+	observed.Objects = observed.Objects[1:]
+	fixture := newFixture(t, recording.Options{
+		Capabilities: schedulingCapabilities(),
+		Observed:     observed,
+	})
+	result, err := fixture.reconciler.Reconcile(context.Background(), fixture.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Requeue() || result.Phase() != "Reconciling" {
+		t.Fatalf("closed Node Lease repair result = %#v", result)
+	}
+	changes := fixture.cluster.PersistentChangeSets()[0].Changes()
+	node, ok := changes[0].(cluster.ApplySyntheticNode)
+	if len(changes) != 1 ||
+		!ok ||
+		!node.Unschedulable() ||
+		node.Annotations()["kwok.x-k8s.io/node"] != "disabled" ||
+		node.Key().Name() != syntheticNodeName(t) {
+		t.Fatalf("closed active Node was not deactivated before Lease repair: %#v", changes)
+	}
+}
+
+func TestReconcileActivatesRuntimeOnlyAfterOwnedLeaseWasObserved(t *testing.T) {
+	t.Parallel()
+
+	observed := completeObservedGraph(t, true, nil)
+	observed.Objects[1].Node.Annotations = map[string]string{
+		"kwok.x-k8s.io/node": "disabled",
+	}
+	fixture := newFixture(t, recording.Options{
+		Capabilities: schedulingCapabilities(),
+		Observed:     observed,
+	})
+	result, err := fixture.reconciler.Reconcile(context.Background(), fixture.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Requeue() || result.Phase() != "Reconciling" {
+		t.Fatalf("runtime activation result = %#v", result)
+	}
+	changes := fixture.cluster.PersistentChangeSets()[0].Changes()
+	node, ok := changes[0].(cluster.ApplySyntheticNode)
+	if len(changes) != 1 ||
+		!ok ||
+		!node.Unschedulable() ||
+		node.Annotations()["kwok.x-k8s.io/node"] != "fake" {
+		t.Fatalf("runtime activated before owned Lease observation: %#v", changes)
 	}
 }
 

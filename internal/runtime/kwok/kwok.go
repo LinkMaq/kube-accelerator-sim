@@ -12,10 +12,11 @@ import (
 )
 
 const (
-	nodeAnnotationKey   = "kwok.x-k8s.io/node"
-	nodeAnnotationValue = "fake"
-	annotationSelector  = nodeAnnotationKey + "=" + nodeAnnotationValue
-	leaseDuration       = int32(40)
+	nodeAnnotationKey           = "kwok.x-k8s.io/node"
+	nodeAnnotationValue         = "fake"
+	nodeInactiveAnnotationValue = "disabled"
+	annotationSelector          = nodeAnnotationKey + "=" + nodeAnnotationValue
+	leaseDuration               = int32(40)
 )
 
 var requiredStages = []string{
@@ -175,6 +176,7 @@ func (report CapabilityReport) Issues() []string {
 // merged by the reconciler after projection rendering.
 type NodeContribution struct {
 	annotations          map[string]string
+	inactiveAnnotations  map[string]string
 	leaseDurationSeconds int32
 	requiresReady        bool
 	requiresLease        bool
@@ -185,6 +187,9 @@ func (Runtime) NodeContribution() NodeContribution {
 		annotations: map[string]string{
 			nodeAnnotationKey: nodeAnnotationValue,
 		},
+		inactiveAnnotations: map[string]string{
+			nodeAnnotationKey: nodeInactiveAnnotationValue,
+		},
 		leaseDurationSeconds: leaseDuration,
 		requiresReady:        true,
 		requiresLease:        true,
@@ -193,6 +198,10 @@ func (Runtime) NodeContribution() NodeContribution {
 
 func (contribution NodeContribution) Annotations() map[string]string {
 	return cloneStringMap(contribution.annotations)
+}
+
+func (contribution NodeContribution) InactiveAnnotations() map[string]string {
+	return cloneStringMap(contribution.inactiveAnnotations)
 }
 
 func (contribution NodeContribution) LeaseDurationSeconds() int32 {

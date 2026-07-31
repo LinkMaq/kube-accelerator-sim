@@ -1054,6 +1054,7 @@ func (reconciler *InstanceReconciler) missingIdentityChanges(
 		fragments[node.Name()] = node
 	}
 	contribution := reconciler.runtime.NodeContribution()
+	inactiveAnnotations := contribution.InactiveAnnotations()
 	nodeChanges := make([]cluster.OwnedChange, 0, len(graph.Nodes()))
 	leaseChanges := make([]cluster.OwnedChange, 0, len(graph.Nodes()))
 	now := reconciler.now().UTC()
@@ -1098,7 +1099,12 @@ func (reconciler *InstanceReconciler) missingIdentityChanges(
 					node.Name(),
 				)
 			}
-			if leaseFound || actualNode.Node.Unschedulable {
+			if leaseFound ||
+				(actualNode.Node.Unschedulable &&
+					containsStringMap(
+						actualNode.Node.Annotations,
+						inactiveAnnotations,
+					)) {
 				continue
 			}
 		}
@@ -1119,7 +1125,7 @@ func (reconciler *InstanceReconciler) missingIdentityChanges(
 			preconditions(actualNode),
 			cluster.SyntheticNodeInput{
 				Labels:        labels,
-				Annotations:   contribution.Annotations(),
+				Annotations:   inactiveAnnotations,
 				Taints:        taints,
 				Unschedulable: true,
 			},
@@ -1130,8 +1136,8 @@ func (reconciler *InstanceReconciler) missingIdentityChanges(
 		nodeChanges = append(nodeChanges, change)
 	}
 	if len(nodeChanges) != 0 {
-		// A later Reconcile must observe every closed Node before its Lease can
-		// enter the cluster.
+		// A later Reconcile must observe every closed, runtime-inactive Node
+		// before its Lease can enter the cluster.
 		return nodeChanges, nil
 	}
 	return leaseChanges, nil

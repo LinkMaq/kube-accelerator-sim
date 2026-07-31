@@ -1719,7 +1719,7 @@ func TestEnvtestServerDryRunApplyStatusAndDeleteHaveExactPersistence(t *testing.
 		cluster.ObjectPreconditions{},
 		cluster.SyntheticNodeInput{
 			Labels:        map[string]string{"workload.example.com/class": "training"},
-			Annotations:   map[string]string{"simulation.kasim.io/test": "envtest"},
+			Annotations:   map[string]string{"kwok.x-k8s.io/node": "fake"},
 			Taints:        []cluster.NodeTaint{{Key: "accelerator", Value: "simulated", Effect: "NoSchedule"}},
 			Unschedulable: true,
 		},
@@ -1750,6 +1750,34 @@ func TestEnvtestServerDryRunApplyStatusAndDeleteHaveExactPersistence(t *testing.
 		t.Fatalf("persisted Node lost owned intent: %#v", node)
 	}
 
+	nodeActivation, err := cluster.NewApplySyntheticNode(
+		nodeKey,
+		cluster.ObjectPreconditions{
+			UID:             string(node.UID),
+			ResourceVersion: node.ResourceVersion,
+		},
+		cluster.SyntheticNodeInput{
+			Labels:        map[string]string{"workload.example.com/class": "training"},
+			Annotations:   map[string]string{"kwok.x-k8s.io/node": "fake"},
+			Unschedulable: true,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executeSingle(t, adapter, scope, cluster.ExecutionPersistent, nodeActivation)
+	node, err = kubernetesClient.CoreV1().Nodes().Get(
+		context.Background(),
+		nodeKey.Name(),
+		metav1.GetOptions{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if node.Annotations["kwok.x-k8s.io/node"] != "fake" {
+		t.Fatalf("server-side apply did not own the runtime annotation: %#v", node.Annotations)
+	}
+
 	nodeUpdate, err := cluster.NewApplySyntheticNode(
 		nodeKey,
 		cluster.ObjectPreconditions{
@@ -1758,6 +1786,7 @@ func TestEnvtestServerDryRunApplyStatusAndDeleteHaveExactPersistence(t *testing.
 		},
 		cluster.SyntheticNodeInput{
 			Labels:        map[string]string{"workload.example.com/class": "updated"},
+			Annotations:   map[string]string{"kwok.x-k8s.io/node": "disabled"},
 			Unschedulable: true,
 		},
 	)
@@ -1775,6 +1804,12 @@ func TestEnvtestServerDryRunApplyStatusAndDeleteHaveExactPersistence(t *testing.
 	}
 	if node.Labels["workload.example.com/class"] != "updated" {
 		t.Fatalf("server-side apply did not update the owned Node: %#v", node.Labels)
+	}
+	if node.Annotations["kwok.x-k8s.io/node"] != "disabled" {
+		t.Fatalf(
+			"server-side apply did not persist explicit runtime deactivation: %#v",
+			node.Annotations,
+		)
 	}
 
 	statusKey, err := cluster.NewObjectKey(

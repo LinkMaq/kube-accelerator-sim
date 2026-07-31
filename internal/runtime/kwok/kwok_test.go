@@ -73,6 +73,12 @@ func TestPinnedRuntimeContributesPrivateLifecycleMetadataAndRecovery(t *testing.
 	if contribution.Annotations()["kwok.x-k8s.io/node"] != "fake" {
 		t.Fatalf("unexpected KWOK annotation: %v", contribution.Annotations())
 	}
+	if contribution.InactiveAnnotations()["kwok.x-k8s.io/node"] != "disabled" {
+		t.Fatalf(
+			"unexpected inactive KWOK annotation: %v",
+			contribution.InactiveAnnotations(),
+		)
+	}
 	if contribution.LeaseDurationSeconds() != 40 ||
 		!contribution.RequiresReady() ||
 		!contribution.RequiresLease() {
