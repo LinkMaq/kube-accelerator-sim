@@ -88,7 +88,23 @@ func (delivery *Delivery) Reconcile(
 		TargetFingerprint: fingerprint,
 		Name:              name,
 	})
+	return deliveryOutcome(result, err, delivery.progressRequeueAfter)
+}
+
+func deliveryOutcome(
+	result reconcile.Result,
+	err error,
+	progressRequeueAfter time.Duration,
+) (ctrl.Result, error) {
 	if err != nil {
+		// A status writer conflict means the Scenario Instance changed after
+		// the module read its snapshot. Discard the stale intent and retry from
+		// a fresh snapshot without surfacing a controller error.
+		if isStatusCommitConflict(err) {
+			return ctrl.Result{
+				RequeueAfter: progressRequeueAfter,
+			}, nil
+		}
 		if result.Requeue() || result.Phase() == "" {
 			return ctrl.Result{}, err
 		}
@@ -98,7 +114,7 @@ func (delivery *Delivery) Reconcile(
 	}
 	if result.Requeue() {
 		return ctrl.Result{
-			RequeueAfter: delivery.progressRequeueAfter,
+			RequeueAfter: progressRequeueAfter,
 		}, nil
 	}
 	return ctrl.Result{}, nil

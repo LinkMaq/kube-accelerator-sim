@@ -5,6 +5,7 @@ package kubernetes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 
@@ -19,6 +20,42 @@ import (
 )
 
 const InstanceFinalizer = "simulation.kasim.io/owned-resources"
+
+// statusCommitConflict marks only optimistic-concurrency failures from the
+// status persistence path. It preserves the Kubernetes API error for callers
+// that need standard conflict inspection without classifying unrelated
+// mutation conflicts as expected progress.
+type statusCommitConflict struct {
+	cause error
+}
+
+func newStatusCommitConflict(cause error) error {
+	if cause == nil {
+		return nil
+	}
+	return &statusCommitConflict{cause: cause}
+}
+
+func (conflict *statusCommitConflict) Error() string {
+	return conflict.cause.Error()
+}
+
+func (conflict *statusCommitConflict) Unwrap() error {
+	return conflict.cause
+}
+
+func isStatusCommitConflict(err error) bool {
+	var conflict *statusCommitConflict
+	return errors.As(err, &conflict)
+}
+
+func statusWriteError(operation string, err error) error {
+	wrapped := fmt.Errorf("%s: %w", operation, err)
+	if apierrors.IsConflict(err) {
+		return newStatusCommitConflict(wrapped)
+	}
+	return wrapped
+}
 
 // StatusWriter persists one bounded product status and its explicit ownership
 // finalization instruction.
@@ -57,27 +94,30 @@ func (writer *StatusWriter) Commit(
 	}
 	if intent.ResourceVersion != "" &&
 		current.ResourceVersion != intent.ResourceVersion {
-		return apierrors.NewConflict(
+		return newStatusCommitConflict(apierrors.NewConflict(
 			schema.GroupResource{
 				Group:    simulationv1alpha1.GroupVersion.Group,
 				Resource: "scenarioinstances",
 			},
 			current.Name,
 			fmt.Errorf("status intent resourceVersion precondition failed"),
-		)
+		))
 	}
 
 	if intent.Finalization != reconcile.FinalizationRemove &&
 		!slices.Contains(current.Finalizers, InstanceFinalizer) {
 		current.Finalizers = append(current.Finalizers, InstanceFinalizer)
 		if err := writer.client.Update(ctx, current); err != nil {
-			return fmt.Errorf("ensure Scenario Instance ownership finalizer: %w", err)
+			return statusWriteError(
+				"ensure Scenario Instance ownership finalizer",
+				err,
+			)
 		}
 	}
 
 	current.Status = transportStatus(intent)
 	if err := writer.client.Status().Update(ctx, current); err != nil {
-		return fmt.Errorf("update Scenario Instance status: %w", err)
+		return statusWriteError("update Scenario Instance status", err)
 	}
 
 	if intent.Finalization == reconcile.FinalizationRemove &&
@@ -94,7 +134,10 @@ func (writer *StatusWriter) Commit(
 			func(value string) bool { return value == InstanceFinalizer },
 		)
 		if err := writer.client.Update(ctx, latest); err != nil {
-			return fmt.Errorf("remove Scenario Instance ownership finalizer: %w", err)
+			return statusWriteError(
+				"remove Scenario Instance ownership finalizer",
+				err,
+			)
 		}
 	}
 	return nil

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -121,6 +122,23 @@ func TestStatusWriterRemovesFinalizerOnlyForExplicitCleanupProof(t *testing.T) {
 		"simulation.kasim.io/owned-resources",
 	) {
 		t.Fatalf("ownership finalizer was retained: %#v", current.Finalizers)
+	}
+}
+
+func TestStatusWriterReturnsConflictForStaleIntent(t *testing.T) {
+	t.Parallel()
+
+	kubernetesClient, instance := statusFixture(t, nil)
+	writer := reconcilekubernetes.NewStatusWriter(kubernetesClient)
+	err := writer.Commit(context.Background(), reconcile.StatusIntent{
+		Key: controlplane.InstanceKey{
+			Name: mustName(t, instance.Name),
+		},
+		ResourceVersion: "stale",
+		Finalization:    reconcile.FinalizationEnsure,
+	})
+	if !apierrors.IsConflict(err) {
+		t.Fatalf("stale status intent error = %v, want Conflict", err)
 	}
 }
 
