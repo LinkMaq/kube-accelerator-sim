@@ -1203,7 +1203,20 @@ func (reconciler *InstanceReconciler) metadataChanges(
 				Effect: taint.Effect(),
 			})
 		}
-		if actual.DesiredGeneration != graph.Generation() ||
+		capacity, allocatable := desiredNodeResources(
+			desired,
+			fragments[desired.Name()],
+		)
+		statusNeedsGenerationFence :=
+			actual.DesiredGeneration.Value() < graph.Generation().Value() &&
+				!nodeResourcesConverged(
+					actual.Node,
+					capacity,
+					allocatable,
+					reconciler.resourceKeys,
+				)
+		if actual.DesiredGeneration.Value() > graph.Generation().Value() ||
+			statusNeedsGenerationFence ||
 			!containsStringMap(actual.Node.Labels, labels) ||
 			hasStaleManagedKey(
 				actual.Node.Labels,
@@ -1243,7 +1256,7 @@ func (reconciler *InstanceReconciler) metadataChanges(
 				desired.Name(),
 			)
 		}
-		if lease.DesiredGeneration != graph.Generation() ||
+		if lease.DesiredGeneration.Value() > graph.Generation().Value() ||
 			lease.Lease.HolderIdentity != desired.Name() ||
 			lease.Lease.LeaseDurationSeconds != contribution.LeaseDurationSeconds() {
 			change, err := cluster.NewApplyLease(
@@ -1262,8 +1275,8 @@ func (reconciler *InstanceReconciler) metadataChanges(
 		}
 	}
 	if len(nodeChanges) != 0 {
-		// Preserve the replacement barrier: observe the closed Node at the new
-		// generation before publishing the matching Lease metadata.
+		// Preserve both barriers: observe a closed Node at the new generation
+		// before publishing Lease metadata or mutating that Node's status.
 		return nodeChanges, nil
 	}
 	return leaseChanges, nil
@@ -1366,18 +1379,12 @@ func (reconciler *InstanceReconciler) statusChanges(
 			desired,
 			fragments[desired.Name()],
 		)
-		if containsStringMap(actual.Node.Capacity, capacity) &&
-			containsStringMap(actual.Node.Allocatable, allocatable) &&
-			!hasStaleManagedResource(
-				actual.Node.Capacity,
-				capacity,
-				reconciler.resourceKeys,
-			) &&
-			!hasStaleManagedResource(
-				actual.Node.Allocatable,
-				allocatable,
-				reconciler.resourceKeys,
-			) {
+		if nodeResourcesConverged(
+			actual.Node,
+			capacity,
+			allocatable,
+			reconciler.resourceKeys,
+		) {
 			continue
 		}
 		statusKey, _ := cluster.NewObjectKey(
@@ -1614,6 +1621,19 @@ func desiredNodeResources(
 		allocatable[resourceName] = strconv.FormatUint(value, 10)
 	}
 	return capacity, allocatable
+}
+
+func nodeResourcesConverged(
+	actual *cluster.ObservedNodeState,
+	capacity,
+	allocatable map[string]string,
+	managed map[string]struct{},
+) bool {
+	return actual != nil &&
+		containsStringMap(actual.Capacity, capacity) &&
+		containsStringMap(actual.Allocatable, allocatable) &&
+		!hasStaleManagedResource(actual.Capacity, capacity, managed) &&
+		!hasStaleManagedResource(actual.Allocatable, allocatable, managed)
 }
 
 func hasStaleManagedResource(

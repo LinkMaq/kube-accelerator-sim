@@ -23,6 +23,69 @@ import (
 
 var fixedTime = time.Date(2026, 7, 30, 8, 0, 0, 0, time.UTC)
 
+const twoGroupScenarioDocument = `
+metadata:
+  name: training-lab
+spec:
+  fidelity: scheduling
+  acceptance:
+    provisionalProfiles: false
+  nodeGroups:
+    - name: baseline
+      replicas: 1
+      node:
+        capacity: {}
+        placement: {}
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: accelerator
+          profile:
+            id: nvidia
+            revision: 2026-07-30
+            digest: sha256:dfd6878266ba81287632d5a0cc9d5fe8856d2839ac735a460929ba5d7f519705
+          model: nvidia-h100
+          contract: device-plugin
+          resource: gpu
+          variant: {}
+          count: 8
+          healthy: 8
+    - name: health-sample
+      replicas: 1
+      node:
+        capacity: {}
+        placement: {}
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: accelerator
+          profile:
+            id: nvidia
+            revision: 2026-07-30
+            digest: sha256:dfd6878266ba81287632d5a0cc9d5fe8856d2839ac735a460929ba5d7f519705
+          model: nvidia-h100
+          contract: device-plugin
+          resource: gpu
+          variant: {}
+          count: 8
+          healthy: HEALTH_SAMPLE
+`
+
+func twoGroupScenarioInput(t *testing.T, sampleHealthy int) scenario.Input {
+	t.Helper()
+	encoded := strings.Replace(
+		twoGroupScenarioDocument,
+		"HEALTH_SAMPLE",
+		strconv.Itoa(sampleHealthy),
+		1,
+	)
+	input, err := scenario.Document([]byte(encoded))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return input
+}
+
 func TestReconcileCreatesOwnedLeaseBeforeActiveClosedSyntheticNode(t *testing.T) {
 	t.Parallel()
 
@@ -1336,16 +1399,16 @@ func TestReconcileOwnershipConflictNeverAdoptsDesiredNameObject(t *testing.T) {
 	}
 }
 
-func TestReconcileReplacementClosesOldGenerationBeforeUpdatingIdentity(t *testing.T) {
+func TestReconcileFutureNodeGenerationEntersClosedMetadataStage(t *testing.T) {
 	t.Parallel()
 
 	observed := completeObservedGraph(t, false, nil)
-	oldGeneration, err := domain.NewGeneration(2)
+	futureGeneration, err := domain.NewGeneration(2)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for index := range observed.Objects {
-		observed.Objects[index].DesiredGeneration = oldGeneration
+		observed.Objects[index].DesiredGeneration = futureGeneration
 		if observed.Objects[index].Node != nil {
 			observed.Objects[index].Node.Labels[cluster.DesiredGenerationLabel] = "2"
 		}
@@ -1360,27 +1423,27 @@ func TestReconcileReplacementClosesOldGenerationBeforeUpdatingIdentity(t *testin
 		t.Fatal(err)
 	}
 	if !result.Requeue() || result.Phase() != "Reconciling" {
-		t.Fatalf("replacement result = %#v", result)
+		t.Fatalf("future Node generation result = %#v", result)
 	}
 	changes := fixture.cluster.PersistentChangeSets()[0].Changes()
 	if len(changes) != 1 {
-		t.Fatalf("replacement changes = %d, want closed Node only", len(changes))
+		t.Fatalf("future generation changes = %d, want closed Node only", len(changes))
 	}
 	node, ok := changes[0].(cluster.ApplySyntheticNode)
 	if !ok || !node.Unschedulable() {
-		t.Fatalf("replacement did not close scheduling first: %#v", changes[0])
+		t.Fatalf("future Node generation bypassed closed metadata stage: %#v", changes[0])
 	}
 }
 
-func TestReconcileReplacementUpdatesLeaseAfterClosedNodeWasObserved(t *testing.T) {
+func TestReconcileFutureLeaseGenerationFollowsClosedNodeStage(t *testing.T) {
 	t.Parallel()
 
 	observed := completeObservedGraph(t, true, nil)
-	oldGeneration, err := domain.NewGeneration(2)
+	futureGeneration, err := domain.NewGeneration(2)
 	if err != nil {
 		t.Fatal(err)
 	}
-	observed.Objects[0].DesiredGeneration = oldGeneration
+	observed.Objects[0].DesiredGeneration = futureGeneration
 	fixture := newFixture(t, recording.Options{
 		Capabilities: schedulingCapabilities(),
 		Observed:     observed,
@@ -1391,13 +1454,88 @@ func TestReconcileReplacementUpdatesLeaseAfterClosedNodeWasObserved(t *testing.T
 		t.Fatal(err)
 	}
 	if !result.Requeue() || result.Phase() != "Reconciling" {
-		t.Fatalf("replacement Lease result = %#v", result)
+		t.Fatalf("future Lease generation result = %#v", result)
 	}
 	changes := fixture.cluster.PersistentChangeSets()[0].Changes()
+	if len(changes) != 1 {
+		t.Fatalf("future Lease generation changes = %d, want one Lease", len(changes))
+	}
 	lease, ok := changes[0].(cluster.ApplyLease)
-	if len(changes) != 1 || !ok ||
-		lease.Key().Name() != syntheticNodeName(t) {
-		t.Fatalf("replacement Lease did not follow observed closed Node: %#v", changes)
+	if !ok || lease.Key().Name() != syntheticNodeName(t) {
+		t.Fatalf("future Lease generation bypassed closed Node stage: %#v", changes)
+	}
+}
+
+func TestReconcileHealthRevisionFencesOnlyChangedNodeMetadata(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixtureWithInput(
+		t,
+		recording.Options{
+			Capabilities: schedulingCapabilities(),
+			Observed:     twoGroupObservedGraph(t, 1, false),
+		},
+		twoGroupScenarioInput(t, 8),
+		extended.New(),
+	)
+	advanceFixtureInput(t, fixture, twoGroupScenarioInput(t, 0))
+
+	result, err := fixture.reconciler.Reconcile(context.Background(), fixture.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Requeue() || result.Phase() != "Reconciling" {
+		t.Fatalf("health revision result = %#v", result)
+	}
+	changes := fixture.cluster.PersistentChangeSets()[0].Changes()
+	if len(changes) != 1 {
+		t.Fatalf("health fence changes = %d, want 1 changed Node", len(changes))
+	}
+	node, ok := changes[0].(cluster.ApplySyntheticNode)
+	if !ok ||
+		node.Key().Name() !=
+			syntheticNodeNameForGroup(t, "health-sample", 0) ||
+		!node.Unschedulable() {
+		t.Fatalf(
+			"health revision did not fence only its changed Node: %#v",
+			changes,
+		)
+	}
+}
+
+func TestReconcileHealthRevisionAppliesStatusAfterGenerationFenceObserved(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixtureWithInput(
+		t,
+		recording.Options{
+			Capabilities: schedulingCapabilities(),
+			Observed:     twoGroupObservedGraph(t, 2, true),
+		},
+		twoGroupScenarioInput(t, 8),
+		extended.New(),
+	)
+	advanceFixtureInput(t, fixture, twoGroupScenarioInput(t, 0))
+
+	result, err := fixture.reconciler.Reconcile(context.Background(), fixture.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Requeue() || result.Phase() != "Reconciling" {
+		t.Fatalf("health status result = %#v", result)
+	}
+	changes := fixture.cluster.PersistentChangeSets()[0].Changes()
+	if len(changes) != 1 {
+		t.Fatalf("health status changes = %d, want 1 Node status update", len(changes))
+	}
+	status, ok := changes[0].(cluster.UpdateSyntheticNodeStatus)
+	if !ok ||
+		status.Key().Name() !=
+			syntheticNodeNameForGroup(t, "health-sample", 0) {
+		t.Fatalf(
+			"health status bypassed observed generation fence: %#v",
+			changes,
+		)
 	}
 }
 
@@ -1519,6 +1657,119 @@ func requestFixtureDeletion(t *testing.T, fixture *fixture) {
 	}
 }
 
+func advanceFixtureScenario(
+	t *testing.T,
+	fixture *fixture,
+	count,
+	healthy,
+	nodes int64,
+) {
+	t.Helper()
+	record, err := fixture.controlPlane.Read(context.Background(), fixture.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	healthyCopy := healthy
+	input, err := scenario.Shortcut(scenario.ShortcutInput{
+		Name:                record.Name.String(),
+		ProfileID:           "nvidia",
+		ModelID:             "nvidia-h100",
+		Nodes:               nodes,
+		AcceleratorsPerNode: count,
+		HealthyPerNode:      &healthyCopy,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	advanceFixtureInput(t, fixture, input)
+}
+
+func advanceFixtureInput(
+	t *testing.T,
+	fixture *fixture,
+	input scenario.Input,
+) {
+	t.Helper()
+	record, err := fixture.controlPlane.Read(context.Background(), fixture.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := catalog.LoadBundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiled, compileReceipt, err := scenario.Compile(input, snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	generation, err := domain.NewGeneration(
+		int64(record.DesiredGeneration.Value() + 1),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	profiles := profileReceipts(t, compiled, compileReceipt)
+	_, err = fixture.controlPlane.Submit(
+		context.Background(),
+		controlplane.RevisionCommand{
+			Target:           record.Target,
+			Name:             record.Name,
+			CreationIdentity: record.CreationIdentity,
+			Fidelity:         record.Fidelity,
+			Preconditions: controlplane.Preconditions{
+				InstanceUID:        record.InstanceUID,
+				ExpectedGeneration: record.DesiredGeneration,
+				ResourceVersion:    record.ResourceVersion,
+			},
+			Revision: controlplane.ScenarioRevision{
+				Generation:        generation,
+				Digest:            compiled.Digest(),
+				CanonicalScenario: compiled.Bytes(),
+				Profiles:          profiles,
+			},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func profileReceipts(
+	t *testing.T,
+	compiled scenario.CanonicalScenario,
+	receipt scenario.CompileReceipt,
+) []controlplane.ProfileReceipt {
+	t.Helper()
+	resolutions := receipt.Resolutions()
+	profiles := make([]controlplane.ProfileReceipt, 0)
+	seen := make(map[string]struct{})
+	resolutionIndex := 0
+	for _, group := range compiled.Scenario().NodeGroups() {
+		for _, pool := range group.Pools() {
+			if resolutionIndex >= len(resolutions) {
+				t.Fatal("compile receipt has too few resolutions")
+			}
+			resolution := resolutions[resolutionIndex]
+			resolutionIndex++
+			profile := pool.Profile()
+			if _, found := seen[profile.ID().String()]; found {
+				continue
+			}
+			seen[profile.ID().String()] = struct{}{}
+			profiles = append(profiles, controlplane.ProfileReceipt{
+				ID:       profile.ID().String(),
+				Revision: profile.Revision(),
+				Digest:   resolution.ProfileDigest(),
+				Class:    resolution.ProfileClass(),
+			})
+		}
+	}
+	if resolutionIndex != len(resolutions) {
+		t.Fatal("compile receipt has too many resolutions")
+	}
+	return profiles
+}
+
 func newFixture(t *testing.T, clusterOptions recording.Options) *fixture {
 	t.Helper()
 	return newFixtureScenario(t, clusterOptions, 8, 8, 1)
@@ -1577,12 +1828,8 @@ func newFixtureWithProjection(
 	resourceProjection projection.ResourceProjection,
 ) *fixture {
 	t.Helper()
-	snapshot, err := catalog.LoadBundled()
-	if err != nil {
-		t.Fatal(err)
-	}
 	healthyCopy := healthy
-	compiledInput, err := scenario.Shortcut(scenario.ShortcutInput{
+	input, err := scenario.Shortcut(scenario.ShortcutInput{
 		Name:                "training-lab",
 		ProfileID:           "nvidia",
 		ModelID:             "nvidia-h100",
@@ -1596,7 +1843,26 @@ func newFixtureWithProjection(
 	if err != nil {
 		t.Fatal(err)
 	}
-	compiled, receipt, err := scenario.Compile(compiledInput, snapshot)
+	return newFixtureWithInput(
+		t,
+		clusterOptions,
+		input,
+		resourceProjection,
+	)
+}
+
+func newFixtureWithInput(
+	t *testing.T,
+	clusterOptions recording.Options,
+	input scenario.Input,
+	resourceProjection projection.ResourceProjection,
+) *fixture {
+	t.Helper()
+	snapshot, err := catalog.LoadBundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiled, receipt, err := scenario.Compile(input, snapshot)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1614,21 +1880,7 @@ func newFixtureWithProjection(
 	if err != nil {
 		t.Fatal(err)
 	}
-	profiles := make([]controlplane.ProfileReceipt, 0)
-	seenProfiles := make(map[string]struct{})
-	for _, resolution := range receipt.Resolutions() {
-		profile := compiled.Scenario().NodeGroups()[0].Pools()[0].Profile()
-		if _, seen := seenProfiles[profile.ID().String()]; seen {
-			continue
-		}
-		seenProfiles[profile.ID().String()] = struct{}{}
-		profiles = append(profiles, controlplane.ProfileReceipt{
-			ID:       profile.ID().String(),
-			Revision: profile.Revision(),
-			Digest:   resolution.ProfileDigest(),
-			Class:    resolution.ProfileClass(),
-		})
-	}
+	profiles := profileReceipts(t, compiled, receipt)
 	controlPlane := memory.New(memory.Options{})
 	target := controlplane.ExplicitTarget{
 		ContextName: "fixture",
@@ -1741,6 +1993,15 @@ func syntheticNodeName(t *testing.T) string {
 
 func syntheticNodeNameAt(t *testing.T, index uint64) string {
 	t.Helper()
+	return syntheticNodeNameForGroup(t, "nodes", index)
+}
+
+func syntheticNodeNameForGroup(
+	t *testing.T,
+	groupName string,
+	index uint64,
+) string {
+	t.Helper()
 	instanceName, err := domain.ParseName("training-lab")
 	if err != nil {
 		t.Fatal(err)
@@ -1749,7 +2010,7 @@ func syntheticNodeNameAt(t *testing.T, index uint64) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	group, err := domain.ParseName("nodes")
+	group, err := domain.ParseName(groupName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1818,7 +2079,16 @@ func staleObservedObjects(
 
 func observedLeaseAt(t *testing.T, index uint64) cluster.ObservedObject {
 	t.Helper()
-	name := syntheticNodeNameAt(t, index)
+	return observedLeaseForGroup(t, "nodes", index)
+}
+
+func observedLeaseForGroup(
+	t *testing.T,
+	groupName string,
+	index uint64,
+) cluster.ObservedObject {
+	t.Helper()
+	name := syntheticNodeNameForGroup(t, groupName, index)
 	generation, err := domain.NewGeneration(1)
 	if err != nil {
 		t.Fatal(err)
@@ -1851,7 +2121,24 @@ func observedNodeAt(
 	runtimeAnnotation string,
 ) cluster.ObservedObject {
 	t.Helper()
-	name := syntheticNodeNameAt(t, index)
+	return observedNodeForGroup(
+		t,
+		"nodes",
+		index,
+		unschedulable,
+		runtimeAnnotation,
+	)
+}
+
+func observedNodeForGroup(
+	t *testing.T,
+	groupName string,
+	index uint64,
+	unschedulable bool,
+	runtimeAnnotation string,
+) cluster.ObservedObject {
+	t.Helper()
+	name := syntheticNodeNameForGroup(t, groupName, index)
 	generation, err := domain.NewGeneration(1)
 	if err != nil {
 		t.Fatal(err)
@@ -1870,7 +2157,7 @@ func observedNodeAt(
 			Labels: map[string]string{
 				"kubernetes.io/hostname":            name,
 				"simulation.kasim.io/scenario":      "training-lab",
-				"simulation.kasim.io/node-group":    "nodes",
+				"simulation.kasim.io/node-group":    groupName,
 				"simulation.kasim.io/replica-index": replicaIndex,
 				cluster.ManagedByLabel:              cluster.ManagedByValue,
 				cluster.InstanceUIDLabel:            "memory-1",
@@ -1885,6 +2172,39 @@ func observedNodeAt(
 			Ready:         true,
 		},
 	}
+}
+
+func twoGroupObservedGraph(
+	t *testing.T,
+	sampleGeneration int64,
+	sampleUnschedulable bool,
+) cluster.ObservedGraph {
+	t.Helper()
+	baselineLease := observedLeaseForGroup(t, "baseline", 0)
+	baselineNode := observedNodeForGroup(t, "baseline", 0, false, "fake")
+	sampleLease := observedLeaseForGroup(t, "health-sample", 0)
+	sampleNode := observedNodeForGroup(
+		t,
+		"health-sample",
+		0,
+		sampleUnschedulable,
+		"fake",
+	)
+	if sampleGeneration != 1 {
+		generation, err := domain.NewGeneration(sampleGeneration)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sampleNode.DesiredGeneration = generation
+		sampleNode.Node.Labels[cluster.DesiredGenerationLabel] =
+			strconv.FormatInt(sampleGeneration, 10)
+	}
+	return cluster.ObservedGraph{Objects: []cluster.ObservedObject{
+		baselineLease,
+		baselineNode,
+		sampleLease,
+		sampleNode,
+	}}
 }
 
 func completeObservedGraph(

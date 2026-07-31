@@ -1225,6 +1225,50 @@ func TestAdapterStopsNodeStatusRetryWhenOwnershipChanges(t *testing.T) {
 	}
 }
 
+func TestAdapterRequiresExactGenerationFenceBeforeNodeStatusMutation(t *testing.T) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 2)
+	node := ownedNode(
+		"synthetic-node",
+		"node-uid",
+		"10",
+		ownershipScope(t, 1),
+	)
+	kubernetesClient := kubernetesfake.NewSimpleClientset(&node)
+	statusPatches := 0
+	kubernetesClient.Fake.PrependReactor(
+		"patch",
+		"nodes",
+		func(action clienttesting.Action) (bool, runtime.Object, error) {
+			if action.GetSubresource() != "status" {
+				return false, nil, nil
+			}
+			statusPatches++
+			return false, nil, nil
+		},
+	)
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+	change := ownedNodeStatusChange(t, node, "9")
+	changeSet, err := cluster.NewOwnedChangeSet(
+		scope,
+		cluster.ExecutionPersistent,
+		[]cluster.OwnedChange{change},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := adapter.Execute(
+		context.Background(),
+		changeSet,
+	); cluster.ErrorCodeOf(err) != cluster.ErrorResourceVersionConflict {
+		t.Fatalf("missing generation fence error = %v, want ResourceVersionConflict", err)
+	}
+	if statusPatches != 0 {
+		t.Fatalf("status patch attempts = %d, want zero before generation fence", statusPatches)
+	}
+}
+
 func TestAdapterStopsNodeStatusRetryWhenDesiredGenerationAdvances(t *testing.T) {
 	t.Parallel()
 

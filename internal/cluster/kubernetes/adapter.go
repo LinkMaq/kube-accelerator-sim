@@ -902,6 +902,13 @@ func (adapter *Adapter) updateSyntheticNodeStatus(
 			return adapter.getNodeMetadata(ctx, change.Key().Name())
 		},
 		func(current ownedObjectMetadata) error {
+			if err := validateExactGenerationFence(
+				change.Key(),
+				current.labels,
+				scope,
+			); err != nil {
+				return err
+			}
 			configuration := coreapplyv1.Node(change.Key().Name()).
 				WithUID(current.uid).
 				WithResourceVersion(current.resourceVersion).
@@ -1346,6 +1353,27 @@ func (adapter *Adapter) deleteOwned(
 		return classify("delete exact owned object", err)
 	}
 	return nil
+}
+
+func validateExactGenerationFence(
+	key cluster.ObjectKey,
+	objectLabels map[string]string,
+	scope cluster.OwnershipScope,
+) error {
+	expected := strconv.FormatUint(scope.DesiredGeneration().Value(), 10)
+	if objectLabels[cluster.DesiredGenerationLabel] == expected {
+		return nil
+	}
+	return cluster.NewError(
+		cluster.ErrorResourceVersionConflict,
+		fmt.Sprintf(
+			"%s %q has not observed desired generation %s",
+			key.Kind(),
+			key.Name(),
+			expected,
+		),
+		false,
+	)
 }
 
 func validateOwnedMetadata(

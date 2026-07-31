@@ -83,7 +83,17 @@ After acceptance, convergence is asynchronous and idempotent:
 5. Apply in-place health and capacity updates without touching bound Pods.
 6. For replacement or scale-down, close scheduling first, then remove only objects proven to belong to the instance.
 
-Every object carries the instance UID, desired generation, managed-by identity, and the strongest legal owner reference. Cleanup and stale-object detection use the exact UID plus an allowlist of object kinds; a name prefix or generic KWOK label is never sufficient.
+Every object carries the instance UID, the last desired generation that
+materially wrote that object, managed-by identity, and the strongest legal
+owner reference. An object's generation may lag the Scenario Instance during
+an in-place revision that does not change that object, but it must never lead
+the accepted desired generation. This preserves per-object traceability
+without rewriting unchanged Nodes and Leases for a status-only revision.
+Before mutating Node status, reconciliation closes only the affected Node,
+advances its generation fence, and observes that fence. A stale status retry
+then stops if a newer accepted generation has advanced the same Node.
+Cleanup and stale-object detection use the exact UID plus an allowlist of
+object kinds; a name prefix or generic KWOK label is never sufficient.
 
 An object with the desired name but a different or missing ownership UID produces `OwnershipConflict`. The simulator never adopts it, even if it otherwise looks synthetic. It never patches, labels, taints, changes status on, or deletes a pre-existing real Node.
 
