@@ -1466,14 +1466,45 @@ func TestReconcileFutureLeaseGenerationFollowsClosedNodeStage(t *testing.T) {
 	}
 }
 
+func TestReconcileDoesNotOverwriteRuntimeLeaseHeartbeat(t *testing.T) {
+	t.Parallel()
+
+	observed := completeObservedGraph(t, false, nil)
+	observed.Objects[0].Lease.HolderIdentity = "kwok-runtime"
+	observed.Objects[0].Lease.RenewTime = fixedTime.Add(10 * time.Second)
+	fixture := newFixture(t, recording.Options{
+		Capabilities: schedulingCapabilities(),
+		Observed:     observed,
+	})
+
+	result, err := fixture.reconciler.Reconcile(context.Background(), fixture.key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Requeue() || result.Phase() != "Ready" {
+		t.Fatalf("runtime heartbeat result = %#v", result)
+	}
+	if len(fixture.cluster.PersistentChangeSets()) != 0 {
+		t.Fatal("runtime-owned Lease heartbeat unexpectedly triggered a mutation")
+	}
+}
+
 func TestReconcileHealthRevisionWritesOnlyChangedNodeStatus(t *testing.T) {
 	t.Parallel()
 
+	observed := twoGroupObservedGraph(t)
+	for index := range observed.Objects {
+		if observed.Objects[index].Lease == nil {
+			continue
+		}
+		observed.Objects[index].Lease.HolderIdentity = "kwok-runtime"
+		observed.Objects[index].Lease.RenewTime = fixedTime.Add(10 * time.Second)
+	}
 	fixture := newFixtureWithInput(
 		t,
 		recording.Options{
 			Capabilities: schedulingCapabilities(),
-			Observed:     twoGroupObservedGraph(t),
+			Observed:     observed,
 		},
 		twoGroupScenarioInput(t, 8),
 		extended.New(),

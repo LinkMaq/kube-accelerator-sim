@@ -1244,7 +1244,6 @@ func (reconciler *InstanceReconciler) metadataChanges(
 			)
 		}
 		if lease.DesiredGeneration.Value() > graph.Generation().Value() ||
-			lease.Lease.HolderIdentity != desired.Name() ||
 			lease.Lease.LeaseDurationSeconds != contribution.LeaseDurationSeconds() {
 			change, err := cluster.NewApplyLease(
 				leaseKey,
