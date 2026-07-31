@@ -26,6 +26,8 @@ func TestReleasePipelineIsEvidenceGatedAndReproducible(t *testing.T) {
 		"sbom: true",
 		"provenance: mode=max",
 		"syft_1.50.0_linux_amd64.tar.gz",
+		"--exclude ./.git",
+		"--exclude ./release-staging",
 		"cosign-release: v3.1.2",
 		"subject-checksums:",
 		"oci://ghcr.io/linkmaq/charts",
@@ -41,6 +43,8 @@ func TestReleasePipelineIsEvidenceGatedAndReproducible(t *testing.T) {
 		"\n  push:",
 		"\n  schedule:",
 		"continue-on-error:",
+		"--exclude .git",
+		"--exclude release-staging",
 		"latest",
 	} {
 		if strings.Contains(workflow, forbidden) {

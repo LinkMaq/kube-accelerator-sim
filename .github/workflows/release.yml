@@ -202,8 +202,8 @@ jobs:
           RELEASE_VERSION: ${{ inputs.version }}
         run: |
           "${SYFT_BIN}" dir:. \
-            --exclude .git \
-            --exclude release-staging \
+            --exclude ./.git \
+            --exclude ./release-staging \
             --output "spdx-json=${RUNNER_TEMP}/kasim-${RELEASE_VERSION}-source.spdx.json"
           mv "${RUNNER_TEMP}/kasim-${RELEASE_VERSION}-source.spdx.json" release-staging/
           (
