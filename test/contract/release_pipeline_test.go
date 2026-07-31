@@ -16,6 +16,7 @@ func TestReleasePipelineIsEvidenceGatedAndReproducible(t *testing.T) {
 		"protocol_run_id:",
 		"scale_run_id:",
 		"publish:",
+		"recovery_run_id:",
 		"release-evidence",
 		"release-artifacts",
 		"ubuntu-24.04-arm",
@@ -34,6 +35,12 @@ func TestReleasePipelineIsEvidenceGatedAndReproducible(t *testing.T) {
 		"gh release",
 		"refs/tags/v",
 		"--notes-file",
+		"Authenticate Cosign to GHCR",
+		"chart_digest=",
+		"kube-accelerator-sim-controller:${RELEASE_VERSION}",
+		"kube-accelerator-sim-controller@${IMAGE_DIGEST}",
+		"kasim-runtime@${chart_digest}",
+		"Recover verified tag publication",
 	} {
 		if !strings.Contains(workflow, required) {
 			t.Errorf("release workflow is missing %q", required)
