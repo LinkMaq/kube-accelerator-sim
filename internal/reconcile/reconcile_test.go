@@ -1076,6 +1076,35 @@ func TestReconcileDeletionFailureAlwaysRetainsOwnershipFinalizer(t *testing.T) {
 	}
 }
 
+func TestReconcileDeletionResourceVersionConflictReobservesWithoutFailure(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	fixture := newFixture(t, recording.Options{
+		Capabilities: schedulingCapabilities(),
+		Observed:     completeObservedGraph(t, true, nil),
+		Errors: map[recording.Call]error{
+			recording.CallExecute: cluster.NewError(
+				cluster.ErrorStaleObservation,
+				"Node resourceVersion precondition failed",
+				true,
+			),
+		},
+	})
+	requestFixtureDeletion(t, fixture)
+
+	result, err := fixture.reconciler.Reconcile(context.Background(), fixture.key)
+	if err != nil ||
+		!result.Requeue() ||
+		result.Phase() != "Deleting" {
+		t.Fatalf("stale deletion result=%#v error=%v", result, err)
+	}
+	if len(fixture.commits) != 0 {
+		t.Fatalf("stale deletion wrote failure status: %#v", fixture.commits)
+	}
+}
+
 func TestReconcileDeletionBypassesProjectionAndRuntimeCapabilities(t *testing.T) {
 	t.Parallel()
 
@@ -1338,6 +1367,59 @@ func TestReconcileRetriesSameAcceptedRevisionWithoutIdentityDrift(t *testing.T) 
 				secondChanges[index],
 			)
 		}
+	}
+}
+
+func TestReconcileStaleScaleDownDeleteReobservesWithoutFailure(t *testing.T) {
+	t.Parallel()
+
+	observed := completeObservedGraph(t, false, nil)
+	_, staleLease := staleObservedObjects(t, true)
+	observed.Objects = append(observed.Objects, staleLease)
+	fixture := newFixture(t, recording.Options{
+		Capabilities: schedulingCapabilities(),
+		Observed:     observed,
+		Errors: map[recording.Call]error{
+			recording.CallExecute: cluster.NewError(
+				cluster.ErrorStaleObservation,
+				"Lease resourceVersion precondition failed",
+				true,
+			),
+		},
+	})
+	result, err := fixture.reconciler.Reconcile(context.Background(), fixture.key)
+	if err != nil ||
+		!result.Requeue() ||
+		result.Phase() != "Reconciling" {
+		t.Fatalf("stale convergence result=%#v error=%v", result, err)
+	}
+	if len(fixture.commits) != 0 {
+		t.Fatalf("stale convergence wrote failure status: %#v", fixture.commits)
+	}
+}
+
+func TestReconcileGenericResourceVersionConflictFailsClosed(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t, recording.Options{
+		Capabilities: schedulingCapabilities(),
+		Errors: map[recording.Call]error{
+			recording.CallExecute: cluster.NewError(
+				cluster.ErrorResourceVersionConflict,
+				"DRA server-side apply field ownership conflict",
+				false,
+			),
+		},
+	})
+	result, err := fixture.reconciler.Reconcile(context.Background(), fixture.key)
+	if err == nil ||
+		result.Requeue() ||
+		result.Phase() != "Failed" {
+		t.Fatalf("generic conflict result=%#v error=%v", result, err)
+	}
+	if len(fixture.commits) != 1 ||
+		fixture.commits[0].Status.Phase != "Failed" {
+		t.Fatalf("generic conflict did not fail closed: %#v", fixture.commits)
 	}
 }
 

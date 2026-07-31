@@ -977,6 +977,55 @@ func TestAdapterPersistsOnlyPortableStableDRAFields(t *testing.T) {
 	}
 }
 
+func TestAdapterDRAResourceVersionDriftRemainsFailClosed(t *testing.T) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 3)
+	class := &resourcev1.DeviceClass{ObjectMeta: metav1.ObjectMeta{
+		Name:            "kasim-class-a",
+		UID:             types.UID("device-class-uid"),
+		ResourceVersion: "10",
+		Labels:          ownershipLabels(scope),
+	}}
+	kubernetesClient := kubernetesfake.NewSimpleClientset(class)
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+	key, err := cluster.NewObjectKey(
+		cluster.ObjectKindDeviceClass,
+		"",
+		class.Name,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	change, err := cluster.NewApplyDeviceClass(
+		key,
+		cluster.ObjectPreconditions{
+			UID:             string(class.UID),
+			ResourceVersion: "9",
+		},
+		cluster.DeviceClassInput{
+			Selectors: []string{`device.driver == "gpu.nvidia.com"`},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changeSet, err := cluster.NewOwnedChangeSet(
+		scope,
+		cluster.ExecutionPersistent,
+		[]cluster.OwnedChange{change},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := adapter.Execute(
+		context.Background(),
+		changeSet,
+	); cluster.ErrorCodeOf(err) != cluster.ErrorResourceVersionConflict {
+		t.Fatalf("DRA snapshot drift error = %v, want ResourceVersionConflict", err)
+	}
+}
+
 func TestAdapterPaginatesOwnedObservationUntilTheServerCursorCloses(t *testing.T) {
 	t.Parallel()
 
@@ -1320,6 +1369,73 @@ func TestAdapterRevalidatesOwnershipAndHonorsServerDryRunDelete(t *testing.T) {
 	if _, err := adapter.Execute(context.Background(), persistent); cluster.ErrorCodeOf(err) !=
 		cluster.ErrorOwnershipConflict {
 		t.Fatalf("foreign object error = %v, want OwnershipConflict", err)
+	}
+}
+
+func TestAdapterClassifiesDeleteSnapshotDriftSeparately(t *testing.T) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 2)
+	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
+		Name:            "synthetic-node",
+		UID:             types.UID("node-uid"),
+		ResourceVersion: "10",
+		Labels:          ownershipLabels(scope),
+	}}
+	kubernetesClient := kubernetesfake.NewSimpleClientset(node)
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+	changeSet, err := cluster.NewOwnedChangeSet(
+		scope,
+		cluster.ExecutionPersistent,
+		[]cluster.OwnedChange{ownedNodeDeletion(t)},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := adapter.Execute(
+		context.Background(),
+		changeSet,
+	); cluster.ErrorCodeOf(err) != cluster.ErrorStaleObservation {
+		t.Fatalf("delete snapshot drift error = %v, want StaleObservation", err)
+	}
+}
+
+func TestAdapterClassifiesExactDeleteAPIRaceAsStaleObservation(t *testing.T) {
+	t.Parallel()
+
+	scope := ownershipScope(t, 2)
+	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{
+		Name:            "synthetic-node",
+		UID:             types.UID("node-uid"),
+		ResourceVersion: "9",
+		Labels:          ownershipLabels(scope),
+	}}
+	kubernetesClient := kubernetesfake.NewSimpleClientset(node)
+	kubernetesClient.Fake.PrependReactor(
+		"delete",
+		"nodes",
+		func(clienttesting.Action) (bool, runtime.Object, error) {
+			return true, nil, apierrors.NewConflict(
+				schema.GroupResource{Resource: "nodes"},
+				node.Name,
+				nil,
+			)
+		},
+	)
+	adapter := clusterkubernetes.NewAdapter(kubernetesClient)
+	changeSet, err := cluster.NewOwnedChangeSet(
+		scope,
+		cluster.ExecutionPersistent,
+		[]cluster.OwnedChange{ownedNodeDeletion(t)},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := adapter.Execute(
+		context.Background(),
+		changeSet,
+	); cluster.ErrorCodeOf(err) != cluster.ErrorStaleObservation {
+		t.Fatalf("exact delete API race error = %v, want StaleObservation", err)
 	}
 }
 

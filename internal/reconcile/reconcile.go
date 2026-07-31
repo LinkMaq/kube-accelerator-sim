@@ -841,6 +841,9 @@ func (reconciler *InstanceReconciler) executeDeletionStage(
 		return reconciler.fail(ctx, key, record, "ConvergenceFailed", err, false)
 	}
 	if _, err := reconciler.cluster.Execute(ctx, changeSet); err != nil {
+		if result, ok := staleObservationResult(err, "Deleting"); ok {
+			return result, nil
+		}
 		return reconciler.fail(
 			ctx,
 			key,
@@ -883,6 +886,9 @@ func (reconciler *InstanceReconciler) executeStage(
 		return reconciler.fail(ctx, key, record, "ConvergenceFailed", err, false)
 	}
 	if _, err := reconciler.cluster.Execute(ctx, changeSet); err != nil {
+		if result, ok := staleObservationResult(err, "Reconciling"); ok {
+			return result, nil
+		}
 		return reconciler.fail(
 			ctx,
 			key,
@@ -905,6 +911,16 @@ func (reconciler *InstanceReconciler) executeStage(
 		return Result{}, err
 	}
 	return Result{requeue: true, phase: "Reconciling"}, nil
+}
+
+func staleObservationResult(err error, phase string) (Result, bool) {
+	if cluster.ErrorCodeOf(err) != cluster.ErrorStaleObservation {
+		return Result{}, false
+	}
+	// A concurrent runtime or API mutation invalidated the exact snapshot used
+	// to build this change set. Re-observe before producing another intent;
+	// ownership and UID conflicts remain explicit failures.
+	return Result{requeue: true, phase: phase}, true
 }
 
 func (reconciler *InstanceReconciler) compileAndVerify(

@@ -1076,6 +1076,7 @@ const (
 	ErrorOwnershipConflict            ErrorCode = "OwnershipConflict"
 	ErrorUIDConflict                  ErrorCode = "UIDConflict"
 	ErrorResourceVersionConflict      ErrorCode = "ResourceVersionConflict"
+	ErrorStaleObservation             ErrorCode = "StaleObservation"
 	ErrorAdmissionRejected            ErrorCode = "AdmissionRejected"
 	ErrorRateLimited                  ErrorCode = "RateLimited"
 	ErrorTransient                    ErrorCode = "Transient"

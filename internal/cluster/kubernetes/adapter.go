@@ -1426,7 +1426,7 @@ func (adapter *Adapter) deleteOwned(
 			false,
 		)
 	}
-	if err := validateOwnedMetadata(
+	if err := validateOwnedDeleteMetadata(
 		key,
 		labels,
 		actualUID,
@@ -1468,6 +1468,13 @@ func (adapter *Adapter) deleteOwned(
 			Delete(ctx, key.Name(), options)
 	}
 	if err != nil {
+		if apierrors.IsConflict(err) {
+			return cluster.NewError(
+				cluster.ErrorStaleObservation,
+				"delete exact owned object: observed resourceVersion changed",
+				true,
+			)
+		}
 		return classify("delete exact owned object", err)
 	}
 	return nil
@@ -1501,6 +1508,39 @@ func validateOwnedMetadata(
 				key.Name(),
 			),
 			false,
+		)
+	}
+	return nil
+}
+
+func validateOwnedDeleteMetadata(
+	key cluster.ObjectKey,
+	objectLabels map[string]string,
+	actualUID types.UID,
+	resourceVersion string,
+	objectOwnerReferences []metav1.OwnerReference,
+	scope cluster.OwnershipScope,
+	preconditions cluster.ObjectPreconditions,
+) error {
+	if err := validateOwnedIdentity(
+		key,
+		objectLabels,
+		actualUID,
+		objectOwnerReferences,
+		scope,
+		preconditions,
+	); err != nil {
+		return err
+	}
+	if resourceVersion != preconditions.ResourceVersion {
+		return cluster.NewError(
+			cluster.ErrorStaleObservation,
+			fmt.Sprintf(
+				"%s %q resourceVersion precondition failed",
+				key.Kind(),
+				key.Name(),
+			),
+			true,
 		)
 	}
 	return nil
