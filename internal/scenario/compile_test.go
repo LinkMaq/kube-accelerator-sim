@@ -92,7 +92,7 @@ func TestCompileCanonicalGolden(t *testing.T) {
 	if !bytes.Equal(compiled.Bytes(), want) {
 		t.Fatalf("canonical golden drifted:\n%s\n%s", compiled.Bytes(), want)
 	}
-	const wantDigest = "sha256:6c8f5b14a00bd35ae4a922c6575fdf1911c8edd08465ef413ce77409c4f59cbe"
+	const wantDigest = "sha256:3b5cc90f218d720f5f0916f05b18c92805e7b88208ffaa32f7341e227e578972"
 	if compiled.Digest().String() != wantDigest {
 		t.Fatalf("digest = %s, want %s", compiled.Digest(), wantDigest)
 	}
@@ -411,20 +411,26 @@ spec:
 	}
 }
 
-func TestShortcutFailsClosedOnProvisionalAndAmbiguousCatalogChoices(t *testing.T) {
+func TestCompilationFailsClosedOnProvisionalAndAmbiguousCatalogChoices(t *testing.T) {
 	t.Parallel()
 
 	catalogSnapshot, err := catalog.LoadBundled()
 	if err != nil {
 		t.Fatal(err)
 	}
-	provisional, err := scenario.Shortcut(scenario.ShortcutInput{
-		Name:                "provisional",
-		ProfileID:           "metax",
-		ModelID:             "metax-c500",
-		Nodes:               1,
-		AcceleratorsPerNode: 1,
-	})
+	provisionalDocument := strings.NewReplacer(
+		"id: nvidia",
+		"id: kunlunxin-hami",
+		"digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de",
+		"digest: sha256:5c5b606b7b3b84e37a816201869fbb24e558f15b28ff1a9b291772153cfe5e10",
+		"model: nvidia-h100",
+		"model: kunlunxin-p800",
+		"contract: device-plugin",
+		"contract: hami-device",
+		"resource: gpu",
+		"resource: xpu",
+	).Replace(validScenarioDocument)
+	provisional, err := scenario.Document([]byte(provisionalDocument))
 	if err != nil {
 		t.Fatal(err)
 	}

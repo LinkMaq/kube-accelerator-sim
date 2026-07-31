@@ -314,23 +314,23 @@ func TestResolutionFailsClosedOnEvidenceClassAndModelResourceCompatibility(t *te
 		t.Fatal(err)
 	}
 
-	metax := catalog.ResolveRequest{
-		ProfileID:     "metax",
-		ModelID:       "metax-c500",
-		ContractID:    "device-plugin",
-		ResourceAlias: "gpu",
+	kunlunxin := catalog.ResolveRequest{
+		ProfileID:     "kunlunxin-hami",
+		ModelID:       "kunlunxin-p800",
+		ContractID:    "hami-device",
+		ResourceAlias: "xpu",
 		Fidelity:      scheduling,
 	}
-	if _, err := snapshot.Resolve(metax); err == nil {
-		t.Fatal("provisional MetaX profile resolved without explicit acceptance")
+	if _, err := snapshot.Resolve(kunlunxin); err == nil {
+		t.Fatal("provisional Kunlunxin HAMi profile resolved without explicit acceptance")
 	}
-	metax.AcceptProvisional = true
-	resolved, err := snapshot.Resolve(metax)
+	kunlunxin.AcceptProvisional = true
+	resolved, err := snapshot.Resolve(kunlunxin)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resolved.ResourceName() != "metax-tech.com/gpu" {
-		t.Fatalf("MetaX resource = %q", resolved.ResourceName())
+	if resolved.ResourceName() != "kunlunxin.com/xpu" {
+		t.Fatalf("Kunlunxin HAMi resource = %q", resolved.ResourceName())
 	}
 
 	if _, err := snapshot.Resolve(catalog.ResolveRequest{
