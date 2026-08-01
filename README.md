@@ -1,4 +1,10 @@
+<p align="center">
+  <img src="docs/assets/brand/kasim-logo.png" alt="Kasim logo" width="220">
+</p>
+
 # kube-accelerator-sim
+
+> **Simulate Capacity. Validate Scheduling.**
 
 `kube-accelerator-sim` (`kasim`) projects source-backed accelerator resource
 contracts into an explicitly selected, already-existing Kubernetes cluster.
