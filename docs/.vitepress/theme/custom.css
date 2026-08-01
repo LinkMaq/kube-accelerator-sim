@@ -1,0 +1,336 @@
+:root {
+  --kasim-ink: #07111f;
+  --kasim-blue: #2563eb;
+  --kasim-cyan: #22d3ee;
+  --kasim-indigo: #4f46e5;
+  --vp-c-brand-1: #2563eb;
+  --vp-c-brand-2: #1d4ed8;
+  --vp-c-brand-3: #1e40af;
+  --vp-c-brand-soft: rgba(37, 99, 235, 0.14);
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(
+    110deg,
+    #2563eb 8%,
+    #4f46e5 42%,
+    #06b6d4 88%
+  );
+  --vp-home-hero-image-background-image: radial-gradient(
+    circle,
+    rgba(34, 211, 238, 0.36) 0%,
+    rgba(37, 99, 235, 0.2) 42%,
+    transparent 72%
+  );
+  --vp-home-hero-image-filter: blur(42px);
+}
+
+.dark {
+  --vp-c-bg: #07111f;
+  --vp-c-bg-alt: #0a1728;
+  --vp-c-bg-elv: #0d1c30;
+  --vp-c-bg-soft: #0c192b;
+  --vp-c-divider: rgba(148, 163, 184, 0.16);
+  --vp-c-brand-1: #38bdf8;
+  --vp-c-brand-2: #22d3ee;
+  --vp-c-brand-3: #67e8f9;
+  --vp-c-brand-soft: rgba(34, 211, 238, 0.13);
+}
+
+body {
+  font-feature-settings: 'ss01' 1, 'cv11' 1;
+}
+
+.VPNavBarTitle .logo {
+  height: 32px;
+  width: 32px;
+}
+
+.VPHome {
+  position: relative;
+  overflow: hidden;
+}
+
+.VPHome::before {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: -1;
+  height: 700px;
+  content: '';
+  background-image:
+    linear-gradient(rgba(37, 99, 235, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37, 99, 235, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: linear-gradient(to bottom, black 20%, transparent 92%);
+}
+
+.VPHomeHero .name {
+  max-width: 760px;
+  letter-spacing: -0.045em;
+}
+
+.VPHomeHero .text {
+  max-width: 760px;
+  letter-spacing: -0.035em;
+}
+
+.VPHomeHero .tagline {
+  max-width: 680px;
+  line-height: 1.65;
+}
+
+.VPHomeHero .image-container {
+  transform: scale(0.92);
+}
+
+.VPHomeHero .image-src {
+  filter: drop-shadow(0 24px 48px rgba(37, 99, 235, 0.22));
+}
+
+.VPButton.brand {
+  border: 0;
+  background: linear-gradient(115deg, var(--kasim-blue), var(--kasim-indigo));
+  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.22);
+}
+
+.VPButton.brand:hover {
+  background: linear-gradient(115deg, #1d4ed8, #4338ca);
+  transform: translateY(-1px);
+}
+
+.VPFeature {
+  border-color: rgba(37, 99, 235, 0.12) !important;
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.82),
+    rgba(239, 246, 255, 0.72)
+  ) !important;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.VPFeature:hover {
+  border-color: rgba(37, 99, 235, 0.3) !important;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+  transform: translateY(-3px);
+}
+
+.dark .VPFeature {
+  border-color: rgba(34, 211, 238, 0.12) !important;
+  background: linear-gradient(
+    145deg,
+    rgba(13, 28, 48, 0.92),
+    rgba(10, 23, 40, 0.84)
+  ) !important;
+}
+
+.dark .VPFeature:hover {
+  border-color: rgba(34, 211, 238, 0.3) !important;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
+}
+
+.VPFeature .icon {
+  background: var(--vp-c-brand-soft);
+}
+
+.kasim-surface {
+  margin: 64px auto 20px;
+  max-width: 1152px;
+  padding: 0 24px;
+}
+
+.kasim-eyebrow {
+  margin: 0 0 12px;
+  color: var(--vp-c-brand-1);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.kasim-surface h2 {
+  max-width: 700px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  font-size: clamp(28px, 4vw, 42px);
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+}
+
+.kasim-lead {
+  max-width: 720px;
+  margin: 18px 0 0;
+  color: var(--vp-c-text-2);
+  font-size: 17px;
+  line-height: 1.75;
+}
+
+.kasim-flow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.kasim-flow-step {
+  position: relative;
+  min-height: 150px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 16px;
+  padding: 22px;
+  background: var(--vp-c-bg-soft);
+}
+
+.kasim-flow-step:not(:last-child)::after {
+  position: absolute;
+  top: 50%;
+  right: -10px;
+  z-index: 1;
+  width: 18px;
+  height: 18px;
+  border-top: 2px solid var(--vp-c-brand-1);
+  border-right: 2px solid var(--vp-c-brand-1);
+  content: '';
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.kasim-flow-step span {
+  display: block;
+  margin-bottom: 18px;
+  color: var(--vp-c-brand-1);
+  font-family: var(--vp-font-family-mono);
+  font-size: 12px;
+}
+
+.kasim-flow-step strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 17px;
+}
+
+.kasim-flow-step p {
+  margin: 0;
+  color: var(--vp-c-text-2);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.kasim-compat {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.kasim-version {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 999px;
+  padding: 8px 13px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-2);
+  font-family: var(--vp-font-family-mono);
+  font-size: 12px;
+}
+
+.kasim-version.active {
+  border-color: rgba(34, 211, 238, 0.35);
+  background: rgba(34, 211, 238, 0.1);
+  color: var(--vp-c-brand-1);
+}
+
+.kasim-boundary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 32px;
+}
+
+.kasim-boundary > div {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 18px;
+  padding: 24px;
+}
+
+.kasim-boundary .in {
+  border-color: rgba(34, 211, 238, 0.28);
+  background: rgba(34, 211, 238, 0.07);
+}
+
+.kasim-boundary .out {
+  background: var(--vp-c-bg-soft);
+}
+
+.kasim-boundary h3 {
+  margin: 0 0 14px;
+  font-size: 16px;
+}
+
+.kasim-boundary ul {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--vp-c-text-2);
+  line-height: 1.8;
+}
+
+@media (max-width: 860px) {
+  .kasim-flow {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .kasim-flow-step::after {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .VPHomeHero .name,
+  .VPHomeHero .text,
+  .VPHomeHero .tagline {
+    width: 100%;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .VPHomeHero .name {
+    font-size: 29px;
+    line-height: 1.25;
+  }
+
+  .VPHomeHero .text {
+    font-size: 31px;
+    line-height: 1.24;
+  }
+
+  .VPHomeHero .actions {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+    margin: 0;
+    padding-top: 26px;
+  }
+
+  .VPHomeHero .action {
+    width: 100%;
+    padding: 0;
+  }
+
+  .VPHomeHero .action .VPButton {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .VPHomeHero .image-container {
+    transform: scale(0.76);
+  }
+
+  .kasim-surface {
+    margin-top: 48px;
+  }
+
+  .kasim-flow,
+  .kasim-boundary {
+    grid-template-columns: 1fr;
+  }
+}

@@ -14,6 +14,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  documentation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install documentation dependencies
+        run: npm ci
+
+      - name: Require documentation for product changes
+        if: github.event_name == 'pull_request'
+        run: >-
+          npm run docs:check-impact --
+          --base "${{ github.event.pull_request.base.sha }}"
+          --head "${{ github.event.pull_request.head.sha }}"
+
+      - name: Build documentation
+        run: npm run docs:build
+
   verify:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
