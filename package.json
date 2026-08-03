@@ -1,0 +1,14 @@
+{
+  "name": "kube-accelerator-sim-docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "docs:dev": "vitepress dev docs --host 0.0.0.0",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
+    "docs:check-impact": "node tools/check-docs-impact.mjs"
+  },
+  "devDependencies": {
+    "vitepress": "1.6.4"
+  }
+}

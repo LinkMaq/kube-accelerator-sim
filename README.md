@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/brand/kasim-logo.png" alt="Kasim logo" width="220">
+  <img src="docs/public/kasim-logo.png" alt="Kasim logo" width="220">
 </p>
 
 # kube-accelerator-sim
@@ -10,6 +10,9 @@
 contracts into an explicitly selected, already-existing Kubernetes cluster.
 It is intended for platform scheduling, inventory, admission, and integration
 tests when physical accelerators are unavailable.
+
+Read the [online documentation](https://linkmaq.github.io/kube-accelerator-sim/)
+or continue with the repository quick start below.
 
 The product supports bounded Kubernetes versions 1.30–1.36. Scalar
 extended-resource scheduling is supported across that range; stable

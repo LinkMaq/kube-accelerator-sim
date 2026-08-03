@@ -1,6 +1,7 @@
 GO ?= go
 HELM ?= helm
 DOCKER ?= docker
+NPM ?= npm
 VERSION ?= dev
 SOURCE_REVISION ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null || printf unknown)
 BUILD_DATE ?= unknown
@@ -17,7 +18,7 @@ LDFLAGS := -X '$(VERSION_PACKAGE).productVersion=$(VERSION)' \
 
 .PHONY: architecture build chart-package chart-push chart-verify container-image \
 	container-image-local format format-check generate-check module-check \
-	release-artifacts test test-race traceability-check verify vet
+	docs-build docs-dev release-artifacts test test-race traceability-check verify vet
 
 architecture:
 	$(GO) run ./internal/tools/archcheck --root .
@@ -66,6 +67,12 @@ container-image-local:
 		--build-arg BUILD_DATE=$(BUILD_DATE) \
 		--tag $(CONTROLLER_IMAGE):$(VERSION) \
 		.
+
+docs-build:
+	$(NPM) run docs:build
+
+docs-dev:
+	$(NPM) run docs:dev
 
 format:
 	gofmt -w $$(find . -type f -name '*.go' -not -path './vendor/*')
