@@ -1,6 +1,6 @@
 # `kasim ui` Cluster Simulation Inventory proposal
 
-Status: **Proposed; not implemented in the current release.**
+Status: **Implemented for the next release.**
 
 This specification turns the [Wayfinder decision map](https://github.com/LinkMaq/kube-accelerator-sim/issues/34), the [Kubernetes inventory research](../research/kasim-ui-kubernetes-inventory.md), and the [accelerator and RDMA signal research](../research/kasim-ui-accelerator-rdma-signals.md) into an implementation-ready contract. It extends the product terminology in [`CONTEXT.md`](../../CONTEXT.md) and the decisions in [ADR 0008](../adr/0008-stream-cluster-simulation-inventory-snapshots.md), [ADR 0009](../adr/0009-model-auxiliary-device-pools.md), and [ADR 0010](../adr/0010-embed-authenticated-loopback-ui.md).
 

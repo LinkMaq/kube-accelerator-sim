@@ -18,7 +18,7 @@ Verify downloaded files from the release directory:
 
 ```sh
 sha256sum --check checksums.txt
-gh attestation verify kasim_0.1.0_linux_amd64.tar.gz \
+gh attestation verify kasim_0.2.0_linux_amd64.tar.gz \
   --repo LinkMaq/kube-accelerator-sim
 cosign verify-blob \
   --bundle checksums.txt.sigstore.json \
@@ -27,6 +27,17 @@ cosign verify-blob \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   checksums.txt
 ```
+
+The release receipt also records and enforces the embedded UI package budget
+for every CLI platform. Raw assets must stay below 256 KiB, their deterministic
+gzip representation below 96 KiB, and the compressed binary delta measured
+against the release-only `kasim_measure_no_ui` comparison build below 1 MiB:
+
+```sh
+jq '.uiPackageBudget' release-receipt.json
+```
+
+The comparison binary is measurement-only and is never packaged or published.
 
 Verify the published controller image and chart by immutable digest obtained
 from their registry manifests:
@@ -39,7 +50,7 @@ cosign verify \
   ghcr.io/linkmaq/kube-accelerator-sim-controller@sha256:REPLACE_WITH_DIGEST
 
 helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.1.0
+  --version 0.2.0
 ```
 
 `release-receipt.json` is the authoritative public-surface and compatibility

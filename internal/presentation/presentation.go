@@ -125,14 +125,17 @@ type IdentitySignalResult struct {
 
 // ContractResult is one complete offline Resource Contract view.
 type ContractResult struct {
-	ID              string                 `json:"id" yaml:"id"`
-	Kind            string                 `json:"kind" yaml:"kind"`
-	ProviderScope   string                 `json:"providerScope" yaml:"providerScope"`
-	FidelityModes   []string               `json:"fidelityModes" yaml:"fidelityModes"`
-	Resources       []ResourceResult       `json:"resources" yaml:"resources"`
-	IdentitySignals []IdentitySignalResult `json:"identitySignals" yaml:"identitySignals"`
-	Capabilities    map[string]string      `json:"capabilities" yaml:"capabilities"`
-	EvidenceRefs    []string               `json:"evidenceRefs" yaml:"evidenceRefs"`
+	ID                 string                 `json:"id" yaml:"id"`
+	Subject            string                 `json:"subject" yaml:"subject"`
+	AuxiliaryCategory  string                 `json:"auxiliaryCategory,omitempty" yaml:"auxiliaryCategory,omitempty"`
+	ResourceNamePolicy string                 `json:"resourceNamePolicy,omitempty" yaml:"resourceNamePolicy,omitempty"`
+	Kind               string                 `json:"kind" yaml:"kind"`
+	ProviderScope      string                 `json:"providerScope" yaml:"providerScope"`
+	FidelityModes      []string               `json:"fidelityModes" yaml:"fidelityModes"`
+	Resources          []ResourceResult       `json:"resources" yaml:"resources"`
+	IdentitySignals    []IdentitySignalResult `json:"identitySignals" yaml:"identitySignals"`
+	Capabilities       map[string]string      `json:"capabilities" yaml:"capabilities"`
+	EvidenceRefs       []string               `json:"evidenceRefs" yaml:"evidenceRefs"`
 }
 
 // ModelResult is one complete offline Accelerator Model view.
@@ -159,13 +162,16 @@ func (ProfileResult) presentationResult() {}
 
 // ResolutionResult is one exact catalog selection used for compilation.
 type ResolutionResult struct {
-	ProfileClass  string           `json:"profileClass" yaml:"profileClass"`
-	ProfileDigest string           `json:"profileDigest" yaml:"profileDigest"`
-	ModelID       string           `json:"modelID" yaml:"modelID"`
-	ContractID    string           `json:"contractID" yaml:"contractID"`
-	ResourceAlias string           `json:"resourceAlias" yaml:"resourceAlias"`
-	ResourceName  string           `json:"resourceName" yaml:"resourceName"`
-	Evidence      []EvidenceResult `json:"evidence" yaml:"evidence"`
+	ProfileClass       string           `json:"profileClass" yaml:"profileClass"`
+	ProfileDigest      string           `json:"profileDigest" yaml:"profileDigest"`
+	Subject            string           `json:"subject" yaml:"subject"`
+	AuxiliaryCategory  string           `json:"auxiliaryCategory,omitempty" yaml:"auxiliaryCategory,omitempty"`
+	ResourceNamePolicy string           `json:"resourceNamePolicy,omitempty" yaml:"resourceNamePolicy,omitempty"`
+	ModelID            string           `json:"modelID,omitempty" yaml:"modelID,omitempty"`
+	ContractID         string           `json:"contractID" yaml:"contractID"`
+	ResourceAlias      string           `json:"resourceAlias" yaml:"resourceAlias"`
+	ResourceName       string           `json:"resourceName" yaml:"resourceName"`
+	Evidence           []EvidenceResult `json:"evidence" yaml:"evidence"`
 }
 
 // ScenarioCompileResult is the complete client dry-run compile receipt.
@@ -209,6 +215,9 @@ type ProfileReceiptResult struct {
 type PoolResult struct {
 	Group            string `json:"group" yaml:"group"`
 	Pool             string `json:"pool" yaml:"pool"`
+	Role             string `json:"role,omitempty" yaml:"role,omitempty"`
+	Category         string `json:"category,omitempty" yaml:"category,omitempty"`
+	ResourceName     string `json:"resourceName,omitempty" yaml:"resourceName,omitempty"`
 	RequestedTotal   int64  `json:"requestedTotal" yaml:"requestedTotal"`
 	RequestedHealthy int64  `json:"requestedHealthy" yaml:"requestedHealthy"`
 	ObservedTotal    int64  `json:"observedTotal" yaml:"observedTotal"`
@@ -617,6 +626,9 @@ func redactEvidence(evidence *EvidenceResult) {
 
 func redactContract(contract *ContractResult) {
 	contract.ID = redactString(contract.ID)
+	contract.Subject = redactString(contract.Subject)
+	contract.AuxiliaryCategory = redactString(contract.AuxiliaryCategory)
+	contract.ResourceNamePolicy = redactString(contract.ResourceNamePolicy)
 	contract.Kind = redactString(contract.Kind)
 	contract.ProviderScope = redactString(contract.ProviderScope)
 	contract.FidelityModes = redactStrings(contract.FidelityModes)

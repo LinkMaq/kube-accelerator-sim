@@ -113,6 +113,18 @@ kubectl --kubeconfig "$KUBECONFIG_PATH" --context "$KUBE_CONTEXT" \
   get nodes -l simulation.kasim.io/scenario=SCENARIO_NAME -o wide
 ```
 
+Open the temporary read-only cluster inventory only on loopback:
+
+```sh
+"$KASIM_BIN" ui \
+  --kubeconfig "$KUBECONFIG_PATH" --context "$KUBE_CONTEXT" \
+  --port 8080 --open
+```
+
+Use a different free port when required. Never construct an `--address`
+argument, proxy the port, or publish the fragment capability. Stop the process
+with `Ctrl+C` after inspection.
+
 Immediately before each mutation, refresh status and extract the exact
 `instanceUID` and `desiredGeneration`. Then use one native typed revision:
 

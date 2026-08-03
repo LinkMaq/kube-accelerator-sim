@@ -6,9 +6,14 @@
     "docs:dev": "vitepress dev docs --host 0.0.0.0",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
-    "docs:check-impact": "node tools/check-docs-impact.mjs"
+    "docs:check-impact": "node tools/check-docs-impact.mjs",
+    "test:ui": "node test/browser/kasim-ui.mjs"
   },
   "devDependencies": {
+    "playwright": "1.62.1",
     "vitepress": "1.6.4"
+  },
+  "overrides": {
+    "vite": "6.4.3"
   }
 }

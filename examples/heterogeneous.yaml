@@ -20,7 +20,7 @@ spec:
         - name: h100
           profile:
             id: nvidia
-            revision: 2026-07-31
+            revision: 2026-08-03
             digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
           model: nvidia-h100
           contract: device-plugin
@@ -43,7 +43,7 @@ spec:
         - name: atlas-a2
           profile:
             id: huawei-ascend
-            revision: 2026-07-31
+            revision: 2026-08-03
             digest: sha256:d4fbba0cf3ddb9b57f98d3cb584010d601baecaa9b0500a108df32e94642629d
           model: huawei-atlas-a2
           contract: device-plugin

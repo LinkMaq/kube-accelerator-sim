@@ -69,13 +69,13 @@ jobs:
         run: |
           mkdir -p dist
           go build -trimpath \
-            -ldflags="-X github.com/LinkMaq/kube-accelerator-sim/internal/version.productVersion=0.1.0 -X github.com/LinkMaq/kube-accelerator-sim/internal/version.sourceRevision=${GITHUB_SHA} -X github.com/LinkMaq/kube-accelerator-sim/internal/version.buildDate=1970-01-01T00:00:00Z" \
+            -ldflags="-X github.com/LinkMaq/kube-accelerator-sim/internal/version.productVersion=0.2.0 -X github.com/LinkMaq/kube-accelerator-sim/internal/version.sourceRevision=${GITHUB_SHA} -X github.com/LinkMaq/kube-accelerator-sim/internal/version.buildDate=1970-01-01T00:00:00Z" \
             -o dist/kasim ./cmd/kasim
           docker build \
-            --build-arg VERSION=0.1.0 \
+            --build-arg VERSION=0.2.0 \
             --build-arg SOURCE_REVISION="${GITHUB_SHA}" \
             --build-arg BUILD_DATE=1970-01-01T00:00:00Z \
-            --tag kasim-controller:0.1.0 \
+            --tag kasim-controller:0.2.0 \
             .
 
       - name: Exercise two consecutive reference trials
@@ -85,7 +85,7 @@ jobs:
           KASIM_KUBERNETES_PATCH: "1.36.3"
           KASIM_KIND_NODE_IMAGE: ghcr.io/linkmaq/kube-accelerator-sim-kind-node:v1.36.3-kind-v0.32.0-amd64@sha256:91336f2737cf3ae7039c68945de957c66bad889e6db90bf5d3568293f1ab73db
           KASIM_NODE_IMAGE_CLASSIFICATION: project-built
-          KASIM_CONTROLLER_IMAGE: kasim-controller:0.1.0
+          KASIM_CONTROLLER_IMAGE: kasim-controller:0.2.0
           KASIM_CLI_BIN: ${{ github.workspace }}/dist/kasim
           KASIM_SCALE_RECEIPT_DIR: ${{ runner.temp }}/scale-receipts
         run: >-

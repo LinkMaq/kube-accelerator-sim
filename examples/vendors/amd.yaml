@@ -20,7 +20,7 @@ spec:
         - name: mi300x
           profile:
             id: amd
-            revision: 2026-07-31
+            revision: 2026-08-03
             digest: sha256:c165c4b0616a2f4064e6a1805e14d97ed76b66d632a9c050fda89cd8b15d2bea
           model: amd-mi300x
           contract: device-plugin

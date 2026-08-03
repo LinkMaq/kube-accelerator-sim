@@ -30,11 +30,12 @@ type ResourceProjection interface {
 // BuildInput binds one compiled Scenario to an accepted instance identity.
 // Resolutions must be the receipt returned by the same compiler invocation.
 type BuildInput struct {
-	InstanceName domain.Name
-	InstanceUID  domain.InstanceUID
-	Generation   domain.Generation
-	Scenario     domain.Scenario
-	Resolutions  []catalog.ResolvedSelection
+	InstanceName         domain.Name
+	InstanceUID          domain.InstanceUID
+	Generation           domain.Generation
+	Scenario             domain.Scenario
+	Resolutions          []catalog.ResolvedSelection
+	AuxiliaryResolutions []catalog.ResolvedSelection
 }
 
 // DesiredGraph is the immutable backend-neutral realization of every
@@ -58,6 +59,7 @@ type DesiredNode struct {
 	placement                 map[string]string
 	taints                    []domain.Taint
 	pools                     []DesiredPool
+	auxiliaryPools            []DesiredAuxiliaryPool
 	requiresReady             bool
 	requiresLease             bool
 	schedulingInitiallyClosed bool
@@ -73,6 +75,20 @@ type DesiredPool struct {
 	capacity        uint64
 	allocatable     uint64
 	identitySignals []IdentitySignal
+}
+
+// DesiredAuxiliaryPool is one exact scheduling signal associated with one or
+// more Accelerator Device Pools. Counts are resource tokens, not physical NIC
+// inventory or data-plane health.
+type DesiredAuxiliaryPool struct {
+	name                       string
+	profileID                  string
+	contractID                 string
+	category                   string
+	resourceName               string
+	capacity                   uint64
+	allocatable                uint64
+	associatedAcceleratorPools []string
 }
 
 // IdentitySignal preserves a source-backed key. A projection may emit a
@@ -103,8 +119,17 @@ func Build(input BuildInput) (DesiredGraph, error) {
 	}
 
 	poolCount := 0
+	auxiliaryPoolCount := 0
 	for _, group := range input.Scenario.NodeGroups() {
 		poolCount += len(group.Pools())
+		auxiliaryPoolCount += len(group.AuxiliaryPools())
+	}
+	if len(input.AuxiliaryResolutions) != auxiliaryPoolCount {
+		return DesiredGraph{}, fmt.Errorf(
+			"compile receipt has %d auxiliary resolutions for %d Auxiliary Device Pools",
+			len(input.AuxiliaryResolutions),
+			auxiliaryPoolCount,
+		)
 	}
 	if len(input.Resolutions) != poolCount {
 		return DesiredGraph{}, fmt.Errorf(
@@ -116,9 +141,18 @@ func Build(input BuildInput) (DesiredGraph, error) {
 
 	nodes := make([]DesiredNode, 0)
 	resolutionIndex := 0
+	auxiliaryResolutionIndex := 0
 	for _, group := range input.Scenario.NodeGroups() {
 		pools := make([]DesiredPool, 0, len(group.Pools()))
-		resourceOwners := make(map[string]string, len(group.Pools()))
+		auxiliaryPools := make(
+			[]DesiredAuxiliaryPool,
+			0,
+			len(group.AuxiliaryPools()),
+		)
+		resourceOwners := make(
+			map[string]string,
+			len(group.Pools())+len(group.AuxiliaryPools()),
+		)
 		for _, pool := range group.Pools() {
 			resolved := input.Resolutions[resolutionIndex]
 			resolutionIndex++
@@ -159,6 +193,42 @@ func Build(input BuildInput) (DesiredGraph, error) {
 				identitySignals: signals,
 			})
 		}
+		for _, pool := range group.AuxiliaryPools() {
+			resolved := input.AuxiliaryResolutions[auxiliaryResolutionIndex]
+			auxiliaryResolutionIndex++
+			if err := verifyAuxiliaryResolution(pool, resolved); err != nil {
+				return DesiredGraph{}, fmt.Errorf(
+					"Node Group %q Auxiliary Device Pool %q: %w",
+					group.Name(),
+					pool.Name(),
+					err,
+				)
+			}
+			if owner, collision := resourceOwners[resolved.ResourceName()]; collision {
+				return DesiredGraph{}, fmt.Errorf(
+					"Node Group %q resource %q collides between pools %q and %q",
+					group.Name(),
+					resolved.ResourceName(),
+					owner,
+					pool.Name(),
+				)
+			}
+			resourceOwners[resolved.ResourceName()] = pool.Name().String()
+			associations := make([]string, 0, len(pool.AssociatedAcceleratorPools()))
+			for _, association := range pool.AssociatedAcceleratorPools() {
+				associations = append(associations, association.String())
+			}
+			auxiliaryPools = append(auxiliaryPools, DesiredAuxiliaryPool{
+				name:                       pool.Name().String(),
+				profileID:                  pool.Profile().ID().String(),
+				contractID:                 pool.Contract(),
+				category:                   resolved.AuxiliaryCategory(),
+				resourceName:               resolved.ResourceName(),
+				capacity:                   pool.Counts().Total(),
+				allocatable:                pool.Counts().Available(),
+				associatedAcceleratorPools: associations,
+			})
+		}
 
 		for replica := uint64(0); replica < group.Replicas().Value(); replica++ {
 			name, err := domain.SyntheticNodeName(
@@ -190,6 +260,7 @@ func Build(input BuildInput) (DesiredGraph, error) {
 				placement:                 group.Node().Placement(),
 				taints:                    group.Node().Taints(),
 				pools:                     cloneDesiredPools(pools),
+				auxiliaryPools:            cloneDesiredAuxiliaryPools(auxiliaryPools),
 				requiresReady:             true,
 				requiresLease:             true,
 				schedulingInitiallyClosed: true,
@@ -223,6 +294,27 @@ func verifyResolution(
 		return fmt.Errorf("resource alias does not match compile receipt")
 	case resolved.ResourceName() == "":
 		return fmt.Errorf("compile receipt has no source-backed resource name")
+	}
+	return nil
+}
+
+func verifyAuxiliaryResolution(
+	pool domain.AuxiliaryDevicePool,
+	resolved catalog.ResolvedSelection,
+) error {
+	switch {
+	case resolved.Subject() != "auxiliary":
+		return fmt.Errorf("compile receipt is not an auxiliary selection")
+	case pool.Profile().Digest() != resolved.ProfileDigest():
+		return fmt.Errorf("profile digest does not match compile receipt")
+	case pool.Contract() != resolved.ContractID():
+		return fmt.Errorf("Resource Contract does not match compile receipt")
+	case pool.Resource() != resolved.ResourceAlias():
+		return fmt.Errorf("resource alias does not match compile receipt")
+	case pool.ResourceName() != resolved.ResourceName():
+		return fmt.Errorf("exact resource name does not match compile receipt")
+	case resolved.AuxiliaryCategory() == "":
+		return fmt.Errorf("compile receipt has no auxiliary category")
 	}
 	return nil
 }
@@ -279,6 +371,10 @@ func (node DesiredNode) Pools() []DesiredPool {
 	return cloneDesiredPools(node.pools)
 }
 
+func (node DesiredNode) AuxiliaryPools() []DesiredAuxiliaryPool {
+	return cloneDesiredAuxiliaryPools(node.auxiliaryPools)
+}
+
 func (node DesiredNode) RequiresReady() bool {
 	return node.requiresReady
 }
@@ -321,6 +417,19 @@ func (pool DesiredPool) Allocatable() uint64 {
 
 func (pool DesiredPool) IdentitySignals() []IdentitySignal {
 	return append([]IdentitySignal(nil), pool.identitySignals...)
+}
+
+func (pool DesiredAuxiliaryPool) Name() string       { return pool.name }
+func (pool DesiredAuxiliaryPool) ProfileID() string  { return pool.profileID }
+func (pool DesiredAuxiliaryPool) ContractID() string { return pool.contractID }
+func (pool DesiredAuxiliaryPool) Category() string   { return pool.category }
+func (pool DesiredAuxiliaryPool) ResourceName() string {
+	return pool.resourceName
+}
+func (pool DesiredAuxiliaryPool) Capacity() uint64    { return pool.capacity }
+func (pool DesiredAuxiliaryPool) Allocatable() uint64 { return pool.allocatable }
+func (pool DesiredAuxiliaryPool) AssociatedAcceleratorPools() []string {
+	return append([]string(nil), pool.associatedAcceleratorPools...)
 }
 
 // SupportIssue is one stable reason a projection cannot represent a graph.
@@ -1678,6 +1787,7 @@ func cloneDesiredNodes(values []DesiredNode) []DesiredNode {
 		value.placement = cloneStringMap(value.placement)
 		value.taints = append([]domain.Taint(nil), value.taints...)
 		value.pools = cloneDesiredPools(value.pools)
+		value.auxiliaryPools = cloneDesiredAuxiliaryPools(value.auxiliaryPools)
 		cloned = append(cloned, value)
 	}
 	return cloned
@@ -1687,6 +1797,20 @@ func cloneDesiredPools(values []DesiredPool) []DesiredPool {
 	cloned := make([]DesiredPool, 0, len(values))
 	for _, value := range values {
 		value.identitySignals = append([]IdentitySignal(nil), value.identitySignals...)
+		cloned = append(cloned, value)
+	}
+	return cloned
+}
+
+func cloneDesiredAuxiliaryPools(
+	values []DesiredAuxiliaryPool,
+) []DesiredAuxiliaryPool {
+	cloned := make([]DesiredAuxiliaryPool, 0, len(values))
+	for _, value := range values {
+		value.associatedAcceleratorPools = append(
+			[]string(nil),
+			value.associatedAcceleratorPools...,
+		)
 		cloned = append(cloned, value)
 	}
 	return cloned

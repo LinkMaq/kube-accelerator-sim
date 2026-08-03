@@ -14,7 +14,7 @@ Linux amd64/arm64，并带 BuildKit SBOM 与来源证明；同一个 Chart TGZ �
 
 ```sh
 sha256sum --check checksums.txt
-gh attestation verify kasim_0.1.0_linux_amd64.tar.gz \
+gh attestation verify kasim_0.2.0_linux_amd64.tar.gz \
   --repo LinkMaq/kube-accelerator-sim
 cosign verify-blob \
   --bundle checksums.txt.sigstore.json \
@@ -23,6 +23,16 @@ cosign verify-blob \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   checksums.txt
 ```
+
+发布收据还会按全部 CLI 平台记录并强制执行内嵌 UI 的包体预算：原始静态资源不得
+超过 256 KiB，确定性 gzip 结果不得超过 96 KiB；相对于仅用于发布测量的
+`kasim_measure_no_ui` 对照构建，压缩后二进制增量不得超过 1 MiB：
+
+```sh
+jq '.uiPackageBudget' release-receipt.json
+```
+
+对照二进制只用于测量，不会进入任何发布包。
 
 按 Registry manifest 中的不可变摘要验证控制器镜像，并拉取 Chart：
 
@@ -34,7 +44,7 @@ cosign verify \
   ghcr.io/linkmaq/kube-accelerator-sim-controller@sha256:REPLACE_WITH_DIGEST
 
 helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.1.0
+  --version 0.2.0
 ```
 
 `release-receipt.json` 是公开表面和兼容性的权威回执。支持范围只对应其中兼容性锁

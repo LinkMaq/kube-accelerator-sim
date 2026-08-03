@@ -45,14 +45,17 @@ type profileRecord struct {
 }
 
 type contractRecord struct {
-	ID              string            `json:"id"`
-	Kind            string            `json:"kind"`
-	ProviderScope   string            `json:"providerScope"`
-	FidelityModes   []string          `json:"fidelityModes"`
-	Resources       []resourceRecord  `json:"resources"`
-	IdentitySignals []identitySignal  `json:"identitySignals"`
-	Capabilities    map[string]string `json:"capabilities"`
-	EvidenceRefs    []string          `json:"evidenceRefs"`
+	ID                 string            `json:"id"`
+	Subject            string            `json:"subject,omitempty"`
+	AuxiliaryCategory  string            `json:"auxiliaryCategory,omitempty"`
+	ResourceNamePolicy string            `json:"resourceNamePolicy,omitempty"`
+	Kind               string            `json:"kind"`
+	ProviderScope      string            `json:"providerScope"`
+	FidelityModes      []string          `json:"fidelityModes"`
+	Resources          []resourceRecord  `json:"resources"`
+	IdentitySignals    []identitySignal  `json:"identitySignals"`
+	Capabilities       map[string]string `json:"capabilities"`
+	EvidenceRefs       []string          `json:"evidenceRefs"`
 }
 
 type resourceRecord struct {
@@ -134,14 +137,17 @@ type ModelSummary struct {
 
 // ContractSummary is the immutable offline view of one Resource Contract.
 type ContractSummary struct {
-	id              string
-	kind            string
-	providerScope   string
-	fidelityModes   []string
-	resources       []ResourceSummary
-	identitySignals []IdentitySignalSummary
-	capabilities    map[string]string
-	evidenceRefs    []string
+	id                 string
+	subject            string
+	auxiliaryCategory  string
+	resourceNamePolicy string
+	kind               string
+	providerScope      string
+	fidelityModes      []string
+	resources          []ResourceSummary
+	identitySignals    []IdentitySignalSummary
+	capabilities       map[string]string
+	evidenceRefs       []string
 }
 
 // ResourceSummary is one exact portable alias and Kubernetes-facing name.
@@ -167,17 +173,29 @@ type ResolveRequest struct {
 	AcceptProvisional bool
 }
 
+type ResolveAuxiliaryRequest struct {
+	ProfileID         string
+	ContractID        string
+	ResourceAlias     string
+	ResourceName      string
+	Fidelity          domain.FidelityMode
+	AcceptProvisional bool
+}
+
 // ResolvedSelection is the immutable evidence-bearing result consumed by the
 // Scenario Compiler.
 type ResolvedSelection struct {
-	profileClass  string
-	profileDigest domain.Digest
-	modelID       string
-	contractID    string
-	resourceAlias string
-	resourceName  string
-	identity      []ResolvedIdentitySignal
-	evidence      []EvidenceReceipt
+	profileClass       string
+	profileDigest      domain.Digest
+	subject            string
+	auxiliaryCategory  string
+	resourceNamePolicy string
+	modelID            string
+	contractID         string
+	resourceAlias      string
+	resourceName       string
+	identity           []ResolvedIdentitySignal
+	evidence           []EvidenceReceipt
 }
 
 // ResolvedIdentitySignal is one exact source-backed vendor identity key used
@@ -230,7 +248,7 @@ func load(reader io.Reader, digestInput []byte) (Snapshot, error) {
 	if err := decoder.Decode(&trailing); err != io.EOF {
 		return Snapshot{}, fmt.Errorf("catalog must contain exactly one JSON document")
 	}
-	if file.SchemaVersion != "v1alpha1" {
+	if file.SchemaVersion != "v1alpha1" && file.SchemaVersion != "v1alpha2" {
 		return Snapshot{}, fmt.Errorf("unsupported catalog schema %q", file.SchemaVersion)
 	}
 	if file.Revision == "" || len(file.Profiles) == 0 {
@@ -294,11 +312,12 @@ func validateProfile(profile profileRecord) error {
 		}
 		evidenceIDs[evidence.ID] = struct{}{}
 	}
-	if profile.Class == "verified" && (len(profile.Contracts) == 0 || len(profile.Models) == 0) {
-		return fmt.Errorf("verified profile %q requires contracts and models", profile.ID)
+	if profile.Class == "verified" && len(profile.Contracts) == 0 {
+		return fmt.Errorf("verified profile %q requires contracts", profile.ID)
 	}
 
 	contracts := make(map[string]contractRecord, len(profile.Contracts))
+	hasAcceleratorContract := false
 	for _, contract := range profile.Contracts {
 		if _, err := domain.ParseName(contract.ID); err != nil {
 			return fmt.Errorf("profile %q contract ID: %w", profile.ID, err)
@@ -309,7 +328,13 @@ func validateProfile(profile profileRecord) error {
 		if err := validateContract(profile.ID, contract, evidenceIDs); err != nil {
 			return err
 		}
+		if contractSubject(contract) == "accelerator" {
+			hasAcceleratorContract = true
+		}
 		contracts[contract.ID] = contract
+	}
+	if profile.Class == "verified" && hasAcceleratorContract && len(profile.Models) == 0 {
+		return fmt.Errorf("verified accelerator profile %q requires models", profile.ID)
 	}
 
 	modelIDs := make(map[string]struct{}, len(profile.Models))
@@ -360,6 +385,43 @@ func validateContract(
 	contract contractRecord,
 	evidenceIDs map[string]struct{},
 ) error {
+	subject := contractSubject(contract)
+	switch subject {
+	case "accelerator":
+		if contract.AuxiliaryCategory != "" || contract.ResourceNamePolicy != "" {
+			return fmt.Errorf(
+				"profile %q accelerator contract %q carries auxiliary fields",
+				profileID, contract.ID,
+			)
+		}
+	case "auxiliary":
+		if contract.AuxiliaryCategory == "" {
+			return fmt.Errorf(
+				"profile %q auxiliary contract %q requires a category",
+				profileID, contract.ID,
+			)
+		}
+		switch contract.ResourceNamePolicy {
+		case "fixed", "scenario-required":
+		default:
+			return fmt.Errorf(
+				"profile %q auxiliary contract %q has invalid resource-name policy %q",
+				profileID, contract.ID, contract.ResourceNamePolicy,
+			)
+		}
+		if contract.Kind != "extended-resource" ||
+			!slices.Equal(contract.FidelityModes, []string{"scheduling"}) {
+			return fmt.Errorf(
+				"profile %q auxiliary contract %q must be a scheduling-only extended resource",
+				profileID, contract.ID,
+			)
+		}
+	default:
+		return fmt.Errorf(
+			"profile %q contract %q has invalid subject %q",
+			profileID, contract.ID, subject,
+		)
+	}
 	switch contract.Kind {
 	case "extended-resource", "dra":
 	default:
@@ -400,7 +462,9 @@ func validateContract(
 		if resource.Unit == "" {
 			return fmt.Errorf("profile %q contract %q resource %q has no unit", profileID, contract.ID, resource.Alias)
 		}
-		if !validContractResourceName(contract.Kind, resource.Name) {
+		nameRequired := subject != "auxiliary" || contract.ResourceNamePolicy == "fixed"
+		if (nameRequired && !validContractResourceName(contract.Kind, resource.Name)) ||
+			(!nameRequired && resource.Name != "") {
 			return fmt.Errorf(
 				"profile %q contract %q has invalid resource name %q",
 				profileID,
@@ -416,7 +480,7 @@ func validateContract(
 				resource.Alias,
 			)
 		}
-		if _, duplicate := resourceNames[resource.Name]; duplicate {
+		if _, duplicate := resourceNames[resource.Name]; resource.Name != "" && duplicate {
 			return fmt.Errorf(
 				"profile %q contract %q has duplicate resource name %q",
 				profileID,
@@ -425,7 +489,9 @@ func validateContract(
 			)
 		}
 		resourceAliases[resource.Alias] = struct{}{}
-		resourceNames[resource.Name] = struct{}{}
+		if resource.Name != "" {
+			resourceNames[resource.Name] = struct{}{}
+		}
 	}
 	identitySignals := make(map[string]struct{}, len(contract.IdentitySignals))
 	for _, signal := range contract.IdentitySignals {
@@ -486,6 +552,13 @@ func validateContract(
 		}
 	}
 	return validateEvidenceReferences(profileID, "contract "+contract.ID, contract.EvidenceRefs, evidenceIDs)
+}
+
+func contractSubject(contract contractRecord) string {
+	if contract.Subject == "" {
+		return "accelerator"
+	}
+	return contract.Subject
 }
 
 func validQualifiedName(value string) bool {
@@ -659,7 +732,8 @@ func (snapshot Snapshot) Resolve(request ResolveRequest) (ResolvedSelection, err
 				break
 			}
 		}
-		if contract == nil || !slices.Contains(model.Contracts, contract.ID) {
+		if contract == nil || contractSubject(*contract) != "accelerator" ||
+			!slices.Contains(model.Contracts, contract.ID) {
 			return ResolvedSelection{}, fmt.Errorf(
 				"contract %q is not supported by model %q",
 				request.ContractID,
@@ -677,7 +751,8 @@ func (snapshot Snapshot) Resolve(request ResolveRequest) (ResolvedSelection, err
 		compatibleContracts := make([]*contractRecord, 0, len(profile.record.Contracts))
 		for index := range profile.record.Contracts {
 			candidate := &profile.record.Contracts[index]
-			if slices.Contains(model.Contracts, candidate.ID) &&
+			if contractSubject(*candidate) == "accelerator" &&
+				slices.Contains(model.Contracts, candidate.ID) &&
 				slices.Contains(candidate.FidelityModes, request.Fidelity.String()) {
 				compatibleContracts = append(compatibleContracts, candidate)
 			}
@@ -757,14 +832,92 @@ func (snapshot Snapshot) Resolve(request ResolveRequest) (ResolvedSelection, err
 		})
 	}
 	return ResolvedSelection{
-		profileClass:  profile.record.Class,
-		profileDigest: profile.digest,
-		modelID:       model.ID,
-		contractID:    contract.ID,
-		resourceAlias: resource.Alias,
-		resourceName:  resource.Name,
-		identity:      identity,
-		evidence:      evidence,
+		profileClass: profile.record.Class, profileDigest: profile.digest,
+		subject: "accelerator", modelID: model.ID, contractID: contract.ID,
+		resourceAlias: resource.Alias, resourceName: resource.Name,
+		identity: identity, evidence: evidence,
+	}, nil
+}
+
+// ResolveAuxiliary validates one source-backed Auxiliary Device Signal
+// contract without inventing an Accelerator Model or a configurable resource
+// name.
+func (snapshot Snapshot) ResolveAuxiliary(
+	request ResolveAuxiliaryRequest,
+) (ResolvedSelection, error) {
+	profile, found := snapshot.profiles[request.ProfileID]
+	if !found {
+		return ResolvedSelection{}, fmt.Errorf("unknown profile %q", request.ProfileID)
+	}
+	if profile.record.Class == "provisional" && !request.AcceptProvisional {
+		return ResolvedSelection{}, fmt.Errorf(
+			"provisional profile %q requires explicit acceptance", request.ProfileID,
+		)
+	}
+	var contract *contractRecord
+	for index := range profile.record.Contracts {
+		candidate := &profile.record.Contracts[index]
+		if candidate.ID == request.ContractID {
+			contract = candidate
+			break
+		}
+	}
+	if contract == nil || contractSubject(*contract) != "auxiliary" {
+		return ResolvedSelection{}, fmt.Errorf(
+			"auxiliary contract %q is not defined by profile %q",
+			request.ContractID, request.ProfileID,
+		)
+	}
+	if !slices.Contains(contract.FidelityModes, request.Fidelity.String()) {
+		return ResolvedSelection{}, fmt.Errorf(
+			"auxiliary contract %q does not support Fidelity Mode %q",
+			contract.ID, request.Fidelity,
+		)
+	}
+	var resource resourceRecord
+	found = false
+	for _, candidate := range contract.Resources {
+		if candidate.Alias == request.ResourceAlias {
+			resource = candidate
+			found = true
+			break
+		}
+	}
+	if !found {
+		return ResolvedSelection{}, fmt.Errorf(
+			"resource alias %q is not defined by auxiliary contract %q",
+			request.ResourceAlias, contract.ID,
+		)
+	}
+	resourceName := resource.Name
+	switch contract.ResourceNamePolicy {
+	case "fixed":
+		if request.ResourceName != "" && request.ResourceName != resource.Name {
+			return ResolvedSelection{}, fmt.Errorf(
+				"fixed auxiliary contract %q does not permit resource-name override",
+				contract.ID,
+			)
+		}
+	case "scenario-required":
+		if !validContractResourceName("extended-resource", request.ResourceName) {
+			return ResolvedSelection{}, fmt.Errorf(
+				"auxiliary contract %q requires an exact resource name",
+				contract.ID,
+			)
+		}
+		resourceName = request.ResourceName
+	}
+	identity := make([]ResolvedIdentitySignal, 0, len(contract.IdentitySignals))
+	for _, signal := range contract.IdentitySignals {
+		identity = append(identity, ResolvedIdentitySignal{kind: signal.Kind, key: signal.Key})
+	}
+	return ResolvedSelection{
+		profileClass: profile.record.Class, profileDigest: profile.digest,
+		subject: "auxiliary", auxiliaryCategory: contract.AuxiliaryCategory,
+		resourceNamePolicy: contract.ResourceNamePolicy,
+		contractID:         contract.ID, resourceAlias: resource.Alias,
+		resourceName: resourceName, identity: identity,
+		evidence: append([]EvidenceReceipt(nil), profile.record.Evidence...),
 	}, nil
 }
 
@@ -845,14 +998,17 @@ func (snapshot Snapshot) Show(profileID string) (ProfileView, error) {
 			return signals[left].key < signals[right].key
 		})
 		contracts = append(contracts, ContractSummary{
-			id:              contract.ID,
-			kind:            contract.Kind,
-			providerScope:   contract.ProviderScope,
-			fidelityModes:   append([]string(nil), contract.FidelityModes...),
-			resources:       resources,
-			identitySignals: signals,
-			capabilities:    cloneStringMap(contract.Capabilities),
-			evidenceRefs:    append([]string(nil), contract.EvidenceRefs...),
+			id:                 contract.ID,
+			subject:            contractSubject(contract),
+			auxiliaryCategory:  contract.AuxiliaryCategory,
+			resourceNamePolicy: contract.ResourceNamePolicy,
+			kind:               contract.Kind,
+			providerScope:      contract.ProviderScope,
+			fidelityModes:      append([]string(nil), contract.FidelityModes...),
+			resources:          resources,
+			identitySignals:    signals,
+			capabilities:       cloneStringMap(contract.Capabilities),
+			evidenceRefs:       append([]string(nil), contract.EvidenceRefs...),
 		})
 	}
 	sort.Slice(contracts, func(left, right int) bool {
@@ -1011,6 +1167,23 @@ func (contract ContractSummary) ID() string {
 	return contract.id
 }
 
+// Subject returns accelerator or auxiliary.
+func (contract ContractSummary) Subject() string {
+	return contract.subject
+}
+
+// AuxiliaryCategory returns the scheduling-signal category for auxiliary
+// contracts and an empty string for Accelerator Device Pool contracts.
+func (contract ContractSummary) AuxiliaryCategory() string {
+	return contract.auxiliaryCategory
+}
+
+// ResourceNamePolicy returns fixed or scenario-required for auxiliary
+// contracts and an empty string for Accelerator Device Pool contracts.
+func (contract ContractSummary) ResourceNamePolicy() string {
+	return contract.resourceNamePolicy
+}
+
 // Kind returns extended-resource or dra.
 func (contract ContractSummary) Kind() string {
 	return contract.kind
@@ -1079,6 +1252,23 @@ func (selection ResolvedSelection) ProfileClass() string {
 // ProfileDigest returns the immutable digest of the resolved profile record.
 func (selection ResolvedSelection) ProfileDigest() domain.Digest {
 	return selection.profileDigest
+}
+
+// Subject returns accelerator or auxiliary.
+func (selection ResolvedSelection) Subject() string {
+	return selection.subject
+}
+
+// AuxiliaryCategory returns the exact catalog category for an auxiliary
+// selection and an empty string for an accelerator selection.
+func (selection ResolvedSelection) AuxiliaryCategory() string {
+	return selection.auxiliaryCategory
+}
+
+// ResourceNamePolicy returns the catalog policy that governed an auxiliary
+// resource name and an empty string for an accelerator selection.
+func (selection ResolvedSelection) ResourceNamePolicy() string {
+	return selection.resourceNamePolicy
 }
 
 // ModelID returns the canonical model ID after alias resolution.

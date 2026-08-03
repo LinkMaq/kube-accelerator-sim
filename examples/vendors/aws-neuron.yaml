@@ -20,7 +20,7 @@ spec:
         - name: trainium2
           profile:
             id: aws-neuron
-            revision: 2026-07-31
+            revision: 2026-08-03
             digest: sha256:91d50953e6d1dc76ddd602b08a215938062cdad7fa2b4414e8b2766447575756
           model: aws-trainium2
           contract: device-plugin

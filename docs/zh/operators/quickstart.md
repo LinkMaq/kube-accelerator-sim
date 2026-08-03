@@ -19,8 +19,8 @@ go build -trimpath -o ./dist/kasim ./cmd/kasim
 Helm Chart 发布在 GitHub Packages：
 
 ```sh
-docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.1.0
-helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.1.0
+docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.2.0
+helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.2.0
 ```
 
 ## 2. 离线检查并编译
@@ -58,7 +58,7 @@ helm upgrade --install kasim-runtime ./charts/kasim-runtime \
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.1.0 \
+  --version 0.2.0 \
   --kubeconfig ./target.kubeconfig \
   --kube-context target \
   --namespace kasim-system \
@@ -106,6 +106,17 @@ kubectl --kubeconfig ./target.kubeconfig --context target \
 
 状态回执是 readiness、期望/观察修订、实例 UID、解析后的档案、保真表面、诊断和
 对象数量的权威依据。
+
+需要快速查看 Kasim 与真实节点上的设备信号时，启动本地只读清单：
+
+```sh
+./dist/kasim ui \
+  --kubeconfig ./target.kubeconfig \
+  --context target \
+  --open
+```
+
+临时访问能力、证据规则、筛选和部分数据源行为见[集群清单 UI 指南](cluster-inventory-ui.md)。
 
 ## 5. 修改健康数量和副本数
 

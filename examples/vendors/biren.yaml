@@ -20,7 +20,7 @@ spec:
         - name: br100
           profile:
             id: biren
-            revision: 2026-07-31
+            revision: 2026-08-03
             digest: sha256:2a069bb0b61a92b47cce38d9213c091c0c76e92136cc097ee2e14aff0520fe4a
           model: biren-br100
           contract: device-plugin

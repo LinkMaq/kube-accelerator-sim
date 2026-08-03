@@ -108,8 +108,9 @@ func (compiled CanonicalScenario) Digest() domain.Digest {
 // CompileReceipt records the exact catalog snapshot and profile resolutions
 // used by deterministic compilation.
 type CompileReceipt struct {
-	catalogDigest domain.Digest
-	resolutions   []catalog.ResolvedSelection
+	catalogDigest        domain.Digest
+	resolutions          []catalog.ResolvedSelection
+	auxiliaryResolutions []catalog.ResolvedSelection
 }
 
 // CatalogDigest returns the immutable catalog snapshot digest.
@@ -120,6 +121,15 @@ func (receipt CompileReceipt) CatalogDigest() domain.Digest {
 // Resolutions returns a copy of the source-backed selections.
 func (receipt CompileReceipt) Resolutions() []catalog.ResolvedSelection {
 	return append([]catalog.ResolvedSelection(nil), receipt.resolutions...)
+}
+
+// AuxiliaryResolutions returns source-backed selections for Auxiliary Device
+// Pools in the same canonical Node Group and pool order as the Scenario.
+func (receipt CompileReceipt) AuxiliaryResolutions() []catalog.ResolvedSelection {
+	return append(
+		[]catalog.ResolvedSelection(nil),
+		receipt.auxiliaryResolutions...,
+	)
 }
 
 // TypedRevisionChange is the sealed set of declarative Scenario field
@@ -188,10 +198,11 @@ type rawAcceptance struct {
 }
 
 type rawNodeGroup struct {
-	Name             string               `yaml:"name"`
-	Replicas         int64                `yaml:"replicas"`
-	Node             rawNode              `yaml:"node"`
-	AcceleratorPools []rawAcceleratorPool `yaml:"acceleratorPools"`
+	Name                 string                   `yaml:"name"`
+	Replicas             int64                    `yaml:"replicas"`
+	Node                 rawNode                  `yaml:"node"`
+	AcceleratorPools     []rawAcceleratorPool     `yaml:"acceleratorPools"`
+	AuxiliaryDevicePools []rawAuxiliaryDevicePool `yaml:"auxiliaryDevicePools"`
 }
 
 type rawNode struct {
@@ -216,6 +227,17 @@ type rawAcceleratorPool struct {
 	Variant  map[string]string `yaml:"variant"`
 	Count    int64             `yaml:"count"`
 	Healthy  *int64            `yaml:"healthy"`
+}
+
+type rawAuxiliaryDevicePool struct {
+	Name                       string     `yaml:"name"`
+	Profile                    rawProfile `yaml:"profile"`
+	Contract                   string     `yaml:"contract"`
+	Resource                   string     `yaml:"resource"`
+	ResourceName               string     `yaml:"resourceName"`
+	Count                      int64      `yaml:"count"`
+	Available                  *int64     `yaml:"available"`
+	AssociatedAcceleratorPools []string   `yaml:"associatedAcceleratorPools"`
 }
 
 type rawProfile struct {
@@ -244,10 +266,11 @@ type canonicalAcceptance struct {
 }
 
 type canonicalNodeGroup struct {
-	Name             string                     `json:"name"`
-	Replicas         uint64                     `json:"replicas"`
-	Node             canonicalNode              `json:"node"`
-	AcceleratorPools []canonicalAcceleratorPool `json:"acceleratorPools"`
+	Name                 string                         `json:"name"`
+	Replicas             uint64                         `json:"replicas"`
+	Node                 canonicalNode                  `json:"node"`
+	AcceleratorPools     []canonicalAcceleratorPool     `json:"acceleratorPools"`
+	AuxiliaryDevicePools []canonicalAuxiliaryDevicePool `json:"auxiliaryDevicePools,omitempty"`
 }
 
 type canonicalNode struct {
@@ -272,6 +295,17 @@ type canonicalAcceleratorPool struct {
 	Variant  map[string]string `json:"variant"`
 	Count    uint64            `json:"count"`
 	Healthy  uint64            `json:"healthy"`
+}
+
+type canonicalAuxiliaryDevicePool struct {
+	Name                       string           `json:"name"`
+	Profile                    canonicalProfile `json:"profile"`
+	Contract                   string           `json:"contract"`
+	Resource                   string           `json:"resource"`
+	ResourceName               string           `json:"resourceName"`
+	Count                      uint64           `json:"count"`
+	Available                  uint64           `json:"available"`
+	AssociatedAcceleratorPools []string         `json:"associatedAcceleratorPools"`
 }
 
 type canonicalProfile struct {
@@ -494,8 +528,9 @@ func compileRaw(raw rawScenario, catalogSnapshot catalog.Snapshot) (
 	groups := make([]domain.NodeGroup, 0, len(rawGroups))
 	canonicalGroups := make([]canonicalNodeGroup, 0, len(rawGroups))
 	resolutions := make([]catalog.ResolvedSelection, 0)
+	auxiliaryResolutions := make([]catalog.ResolvedSelection, 0)
 	for _, rawGroup := range rawGroups {
-		group, canonicalGroup, groupResolutions, err := compileGroup(
+		group, canonicalGroup, groupResolutions, groupAuxiliaryResolutions, err := compileGroup(
 			rawGroup,
 			fidelity,
 			raw.Spec.Acceptance.ProvisionalProfiles,
@@ -508,6 +543,7 @@ func compileRaw(raw rawScenario, catalogSnapshot catalog.Snapshot) (
 		groups = append(groups, group)
 		canonicalGroups = append(canonicalGroups, canonicalGroup)
 		resolutions = append(resolutions, groupResolutions...)
+		auxiliaryResolutions = append(auxiliaryResolutions, groupAuxiliaryResolutions...)
 	}
 
 	aggregate, err := domain.NewScenario(domain.ScenarioInput{
@@ -542,8 +578,9 @@ func compileRaw(raw rawScenario, catalogSnapshot catalog.Snapshot) (
 			encoded:  encoded,
 			digest:   digest,
 		}, CompileReceipt{
-			catalogDigest: catalogSnapshot.Digest(),
-			resolutions:   resolutions,
+			catalogDigest:        catalogSnapshot.Digest(),
+			resolutions:          resolutions,
+			auxiliaryResolutions: auxiliaryResolutions,
 		}, nil
 }
 
@@ -553,21 +590,27 @@ func compileGroup(
 	acceptsProvisional bool,
 	catalogSnapshot catalog.Snapshot,
 	profileSummaries map[string]catalog.ProfileSummary,
-) (domain.NodeGroup, canonicalNodeGroup, []catalog.ResolvedSelection, error) {
+) (
+	domain.NodeGroup,
+	canonicalNodeGroup,
+	[]catalog.ResolvedSelection,
+	[]catalog.ResolvedSelection,
+	error,
+) {
 	name, err := domain.ParseName(raw.Name)
 	if err != nil {
-		return domain.NodeGroup{}, canonicalNodeGroup{}, nil, fmt.Errorf("Node Group name: %w", err)
+		return domain.NodeGroup{}, canonicalNodeGroup{}, nil, nil, fmt.Errorf("Node Group name: %w", err)
 	}
 	replicas, err := domain.NewReplicaCount(raw.Replicas)
 	if err != nil {
-		return domain.NodeGroup{}, canonicalNodeGroup{}, nil, err
+		return domain.NodeGroup{}, canonicalNodeGroup{}, nil, nil, err
 	}
 	node, canonicalNode, err := compileNode(raw.Node)
 	if err != nil {
-		return domain.NodeGroup{}, canonicalNodeGroup{}, nil, err
+		return domain.NodeGroup{}, canonicalNodeGroup{}, nil, nil, err
 	}
 	if len(raw.AcceleratorPools) == 0 {
-		return domain.NodeGroup{}, canonicalNodeGroup{}, nil, fmt.Errorf(
+		return domain.NodeGroup{}, canonicalNodeGroup{}, nil, nil, fmt.Errorf(
 			"Node Group %q requires Accelerator Pools",
 			raw.Name,
 		)
@@ -578,7 +621,7 @@ func compileGroup(
 	})
 	for index := 1; index < len(rawPools); index++ {
 		if rawPools[index-1].Name == rawPools[index].Name {
-			return domain.NodeGroup{}, canonicalNodeGroup{}, nil, fmt.Errorf(
+			return domain.NodeGroup{}, canonicalNodeGroup{}, nil, nil, fmt.Errorf(
 				"duplicate Accelerator Pool name %q",
 				rawPools[index].Name,
 			)
@@ -602,11 +645,11 @@ func compileGroup(
 			profileSummaries,
 		)
 		if err != nil {
-			return domain.NodeGroup{}, canonicalNodeGroup{}, nil, err
+			return domain.NodeGroup{}, canonicalNodeGroup{}, nil, nil, err
 		}
 		if fidelity.String() == "scheduling" {
 			if owner, conflict := scalarResources[resolved.ResourceName()]; conflict {
-				return domain.NodeGroup{}, canonicalNodeGroup{}, nil, fmt.Errorf(
+				return domain.NodeGroup{}, canonicalNodeGroup{}, nil, nil, fmt.Errorf(
 					"Node Group %q scalar resource %q conflicts between Accelerator Pools %q and %q",
 					raw.Name,
 					resolved.ResourceName(),
@@ -624,7 +667,7 @@ func compileGroup(
 				if signal.Kind() == "dra-attribute" {
 					signalKind = "DRA"
 				}
-				return domain.NodeGroup{}, canonicalNodeGroup{}, nil, fmt.Errorf(
+				return domain.NodeGroup{}, canonicalNodeGroup{}, nil, nil, fmt.Errorf(
 					"Node Group %q %s identity signal %q conflicts between models %q and %q in Accelerator Pools %q and %q",
 					raw.Name,
 					signalKind,
@@ -641,7 +684,7 @@ func compileGroup(
 			}
 			if signal.Kind() == "node-label" {
 				if _, claimed := raw.Node.Labels[signal.Key()]; claimed {
-					return domain.NodeGroup{}, canonicalNodeGroup{}, nil, fmt.Errorf(
+					return domain.NodeGroup{}, canonicalNodeGroup{}, nil, nil, fmt.Errorf(
 						"Node label %q conflicts with vendor identity owned by Accelerator Pool %q",
 						signal.Key(),
 						rawPool.Name,
@@ -653,21 +696,75 @@ func compileGroup(
 		canonicalPools = append(canonicalPools, canonicalPool)
 		resolutions = append(resolutions, resolved)
 	}
+
+	rawAuxiliaryPools := append(
+		[]rawAuxiliaryDevicePool(nil),
+		raw.AuxiliaryDevicePools...,
+	)
+	slices.SortFunc(rawAuxiliaryPools, func(left, right rawAuxiliaryDevicePool) int {
+		return strings.Compare(left.Name, right.Name)
+	})
+	for index := 1; index < len(rawAuxiliaryPools); index++ {
+		if rawAuxiliaryPools[index-1].Name == rawAuxiliaryPools[index].Name {
+			return domain.NodeGroup{}, canonicalNodeGroup{}, nil, nil, fmt.Errorf(
+				"duplicate Auxiliary Device Pool name %q",
+				rawAuxiliaryPools[index].Name,
+			)
+		}
+	}
+	auxiliaryPools := make([]domain.AuxiliaryDevicePool, 0, len(rawAuxiliaryPools))
+	canonicalAuxiliaryPools := make(
+		[]canonicalAuxiliaryDevicePool,
+		0,
+		len(rawAuxiliaryPools),
+	)
+	auxiliaryResolutions := make(
+		[]catalog.ResolvedSelection,
+		0,
+		len(rawAuxiliaryPools),
+	)
+	for _, rawPool := range rawAuxiliaryPools {
+		pool, canonicalPool, resolved, err := compileAuxiliaryPool(
+			rawPool,
+			fidelity,
+			acceptsProvisional,
+			catalogSnapshot,
+			profileSummaries,
+		)
+		if err != nil {
+			return domain.NodeGroup{}, canonicalNodeGroup{}, nil, nil, err
+		}
+		if owner, conflict := scalarResources[resolved.ResourceName()]; conflict {
+			return domain.NodeGroup{}, canonicalNodeGroup{}, nil, nil, fmt.Errorf(
+				"Node Group %q scalar resource %q conflicts between pool %q and Auxiliary Device Pool %q",
+				raw.Name,
+				resolved.ResourceName(),
+				owner,
+				rawPool.Name,
+			)
+		}
+		scalarResources[resolved.ResourceName()] = rawPool.Name
+		auxiliaryPools = append(auxiliaryPools, pool)
+		canonicalAuxiliaryPools = append(canonicalAuxiliaryPools, canonicalPool)
+		auxiliaryResolutions = append(auxiliaryResolutions, resolved)
+	}
 	group, err := domain.NewNodeGroup(domain.NodeGroupInput{
-		Name:     name,
-		Replicas: replicas,
-		Node:     node,
-		Pools:    pools,
+		Name:           name,
+		Replicas:       replicas,
+		Node:           node,
+		Pools:          pools,
+		AuxiliaryPools: auxiliaryPools,
 	})
 	if err != nil {
-		return domain.NodeGroup{}, canonicalNodeGroup{}, nil, err
+		return domain.NodeGroup{}, canonicalNodeGroup{}, nil, nil, err
 	}
 	return group, canonicalNodeGroup{
-		Name:             name.String(),
-		Replicas:         replicas.Value(),
-		Node:             canonicalNode,
-		AcceleratorPools: canonicalPools,
-	}, resolutions, nil
+		Name:                 name.String(),
+		Replicas:             replicas.Value(),
+		Node:                 canonicalNode,
+		AcceleratorPools:     canonicalPools,
+		AuxiliaryDevicePools: canonicalAuxiliaryPools,
+	}, resolutions, auxiliaryResolutions, nil
 }
 
 func compileNode(raw rawNode) (domain.NodeTemplate, canonicalNode, error) {
@@ -861,6 +958,113 @@ func compilePool(
 		Variant:  nonNilMap(raw.Variant),
 		Count:    counts.Total(),
 		Healthy:  counts.Healthy(),
+	}, resolved, nil
+}
+
+func compileAuxiliaryPool(
+	raw rawAuxiliaryDevicePool,
+	fidelity domain.FidelityMode,
+	acceptsProvisional bool,
+	catalogSnapshot catalog.Snapshot,
+	profileSummaries map[string]catalog.ProfileSummary,
+) (
+	domain.AuxiliaryDevicePool,
+	canonicalAuxiliaryDevicePool,
+	catalog.ResolvedSelection,
+	error,
+) {
+	emptyPool := domain.AuxiliaryDevicePool{}
+	emptyCanonical := canonicalAuxiliaryDevicePool{}
+	emptyResolution := catalog.ResolvedSelection{}
+	name, err := domain.ParseName(raw.Name)
+	if err != nil {
+		return emptyPool, emptyCanonical, emptyResolution, err
+	}
+	profileID, err := domain.ParseName(raw.Profile.ID)
+	if err != nil {
+		return emptyPool, emptyCanonical, emptyResolution, err
+	}
+	profileDigest, err := domain.ParseDigest(raw.Profile.Digest)
+	if err != nil {
+		return emptyPool, emptyCanonical, emptyResolution, err
+	}
+	profileSummary, found := profileSummaries[raw.Profile.ID]
+	if !found {
+		return emptyPool, emptyCanonical, emptyResolution, fmt.Errorf(
+			"unknown auxiliary profile %q", raw.Profile.ID,
+		)
+	}
+	if raw.Profile.Revision != profileSummary.Revision() ||
+		profileDigest != profileSummary.Digest() {
+		return emptyPool, emptyCanonical, emptyResolution, fmt.Errorf(
+			"auxiliary profile %q revision or digest does not match the catalog snapshot",
+			raw.Profile.ID,
+		)
+	}
+	resolved, err := catalogSnapshot.ResolveAuxiliary(catalog.ResolveAuxiliaryRequest{
+		ProfileID:         raw.Profile.ID,
+		ContractID:        raw.Contract,
+		ResourceAlias:     raw.Resource,
+		ResourceName:      raw.ResourceName,
+		Fidelity:          fidelity,
+		AcceptProvisional: acceptsProvisional,
+	})
+	if err != nil {
+		return emptyPool, emptyCanonical, emptyResolution, err
+	}
+	profile, err := domain.NewProfileReference(
+		profileID,
+		profileSummary.Revision(),
+		profileSummary.Digest(),
+	)
+	if err != nil {
+		return emptyPool, emptyCanonical, emptyResolution, err
+	}
+	available := raw.Count
+	if raw.Available != nil {
+		available = *raw.Available
+	}
+	counts, err := domain.NewAuxiliaryCounts(raw.Count, available)
+	if err != nil {
+		return emptyPool, emptyCanonical, emptyResolution, err
+	}
+	associationNames := append([]string(nil), raw.AssociatedAcceleratorPools...)
+	slices.Sort(associationNames)
+	associations := make([]domain.Name, 0, len(associationNames))
+	for _, association := range associationNames {
+		parsed, err := domain.ParseName(association)
+		if err != nil {
+			return emptyPool, emptyCanonical, emptyResolution, fmt.Errorf(
+				"Auxiliary Device Pool %q association: %w", raw.Name, err,
+			)
+		}
+		associations = append(associations, parsed)
+	}
+	pool, err := domain.NewAuxiliaryDevicePool(domain.AuxiliaryDevicePoolInput{
+		Name:                       name,
+		Profile:                    profile,
+		Contract:                   resolved.ContractID(),
+		Resource:                   resolved.ResourceAlias(),
+		ResourceName:               resolved.ResourceName(),
+		Counts:                     counts,
+		AssociatedAcceleratorPools: associations,
+	})
+	if err != nil {
+		return emptyPool, emptyCanonical, emptyResolution, err
+	}
+	return pool, canonicalAuxiliaryDevicePool{
+		Name: name.String(),
+		Profile: canonicalProfile{
+			ID:       profileID.String(),
+			Revision: profileSummary.Revision(),
+			Digest:   profileSummary.Digest().String(),
+		},
+		Contract:                   resolved.ContractID(),
+		Resource:                   resolved.ResourceAlias(),
+		ResourceName:               resolved.ResourceName(),
+		Count:                      counts.Total(),
+		Available:                  counts.Available(),
+		AssociatedAcceleratorPools: associationNames,
 	}, resolved, nil
 }
 

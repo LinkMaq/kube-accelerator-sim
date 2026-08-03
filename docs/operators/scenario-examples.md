@@ -27,6 +27,7 @@ Connected apply always names the existing target explicitly:
 | Per-vendor presets | [examples/vendors](../../examples/vendors) | One directly applicable Scenario for each of 17 selectable vendor ecosystems |
 | Extended-resource variants | [extended-resource-variants.yaml](../../examples/signals/extended-resource-variants.yaml) | Alternate, partitioned, shared, virtual, memory, and core resource signals |
 | Stable DRA control plane | [dra-control-plane.yaml](../../examples/dra-control-plane.yaml) | NVIDIA, AMD, and AWS Neuron `resource.k8s.io/v1` inventory on Kubernetes 1.34–1.36 |
+| Auxiliary RDMA and SR-IOV signals | [auxiliary-rdma-sriov.yaml](../../examples/signals/auxiliary-rdma-sriov.yaml) | H100 plus configurable RDMA tokens and MI300X plus configurable SR-IOV virtual-function tokens |
 | Reference scale | [reference-scale.yaml](../../test/e2e/testdata/reference-scale.yaml) | Release gate with 1,000 Synthetic Nodes and 8,000 units |
 
 The complete vendor/resource matrix, including exact resource names and
@@ -39,6 +40,10 @@ evidence-driven omissions, is documented in the
   -o json
 
 ./dist/kasim apply -f ./examples/signals/extended-resource-variants.yaml \
+  --dry-run=client \
+  -o json
+
+./dist/kasim apply -f ./examples/signals/auxiliary-rdma-sriov.yaml \
   --dry-run=client \
   -o json
 ```

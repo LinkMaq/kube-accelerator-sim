@@ -2,11 +2,63 @@ package catalog_test
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/LinkMaq/kube-accelerator-sim/internal/catalog"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/domain"
 )
+
+func TestAuxiliaryContractRequiresExactScenarioResourceName(t *testing.T) {
+	t.Parallel()
+
+	snapshot, err := catalog.LoadCustom(strings.NewReader(`{
+  "schemaVersion":"v1alpha2",
+  "revision":"2026-08-03",
+  "profiles":[{
+    "id":"rdma-shared-device-plugin",
+    "displayName":"RDMA Shared Device Plugin",
+    "class":"custom",
+    "evidence":[{"id":"upstream","grade":"A","source":"https://github.com/Mellanox/k8s-rdma-shared-dev-plugin","revision":"v1.5.3","checkedAt":"2026-08-03"}],
+    "contracts":[{
+      "id":"shared-hca","subject":"auxiliary","auxiliaryCategory":"rdma",
+      "resourceNamePolicy":"scenario-required","kind":"extended-resource",
+      "providerScope":"upstream-configurable","fidelityModes":["scheduling"],
+      "resources":[{"alias":"shared-token","name":"","unit":"shared-token"}],
+      "identitySignals":[],
+      "capabilities":{"health":"not-public","topology":"verified","sharing":"verified","partitioning":"not-applicable"},
+      "evidenceRefs":["upstream"]
+    }],
+    "models":[]
+  }]
+}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fidelity, err := domain.ParseFidelityMode("scheduling")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := snapshot.ResolveAuxiliary(catalog.ResolveAuxiliaryRequest{
+		ProfileID: "rdma-shared-device-plugin", ContractID: "shared-hca",
+		ResourceAlias: "shared-token", ResourceName: "rdma/rdma_shared_device_a",
+		Fidelity: fidelity,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.Subject() != "auxiliary" || resolved.AuxiliaryCategory() != "rdma" ||
+		resolved.ResourceName() != "rdma/rdma_shared_device_a" {
+		t.Fatalf("resolved auxiliary contract = %#v", resolved)
+	}
+	_, err = snapshot.ResolveAuxiliary(catalog.ResolveAuxiliaryRequest{
+		ProfileID: "rdma-shared-device-plugin", ContractID: "shared-hca",
+		ResourceAlias: "shared-token", Fidelity: fidelity,
+	})
+	if err == nil || !strings.Contains(err.Error(), "requires an exact resource name") {
+		t.Fatalf("missing resource-name error = %v", err)
+	}
+}
 
 func TestBundledCatalogResolvesNVIDIAH100WithoutDerivingAResourceName(t *testing.T) {
 	t.Parallel()
@@ -265,7 +317,7 @@ func TestProfileViewExposesImmutableOfflineContractEvidence(t *testing.T) {
 	if profile.ID() != "nvidia" ||
 		profile.DisplayName() != "NVIDIA" ||
 		profile.Class() != "verified" ||
-		profile.Revision() != "2026-07-31" ||
+		profile.Revision() != "2026-08-03" ||
 		profile.Digest().String() == "" {
 		t.Fatalf("incomplete profile identity: %#v", profile)
 	}

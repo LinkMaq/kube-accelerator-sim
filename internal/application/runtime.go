@@ -112,6 +112,9 @@ type ProfileSnapshot struct {
 type PoolSnapshot struct {
 	Group            string
 	Pool             string
+	Role             string
+	Category         string
+	ResourceName     string
 	RequestedTotal   int64
 	RequestedHealthy int64
 	ObservedTotal    int64
@@ -594,9 +597,12 @@ func profileReceipts(
 	receipt scenario.CompileReceipt,
 ) ([]controlplane.ProfileReceipt, error) {
 	resolutions := receipt.Resolutions()
+	auxiliaryResolutions := receipt.AuxiliaryResolutions()
 	expectedResolutions := 0
+	expectedAuxiliaryResolutions := 0
 	for _, group := range compiled.Scenario().NodeGroups() {
 		expectedResolutions += len(group.Pools())
+		expectedAuxiliaryResolutions += len(group.AuxiliaryPools())
 	}
 	if len(resolutions) != expectedResolutions {
 		return nil, controlplane.NewError(
@@ -605,24 +611,47 @@ func profileReceipts(
 			"",
 		)
 	}
-	profiles := make([]controlplane.ProfileReceipt, 0, len(resolutions))
-	seen := make(map[string]struct{}, len(resolutions))
+	if len(auxiliaryResolutions) != expectedAuxiliaryResolutions {
+		return nil, controlplane.NewError(
+			controlplane.ErrorInvalidCommand,
+			"compiler receipt does not cover every Auxiliary Device Pool",
+			"",
+		)
+	}
+	profiles := make(
+		[]controlplane.ProfileReceipt,
+		0,
+		len(resolutions)+len(auxiliaryResolutions),
+	)
+	seen := make(map[string]struct{}, len(resolutions)+len(auxiliaryResolutions))
+	appendProfile := func(
+		profile domain.ProfileReference,
+		resolution catalog.ResolvedSelection,
+	) {
+		profileID := profile.ID().String()
+		if _, found := seen[profileID]; found {
+			return
+		}
+		seen[profileID] = struct{}{}
+		profiles = append(profiles, controlplane.ProfileReceipt{
+			ID:       profileID,
+			Revision: profile.Revision(),
+			Digest:   resolution.ProfileDigest(),
+			Class:    resolution.ProfileClass(),
+		})
+	}
 	resolutionIndex := 0
+	auxiliaryResolutionIndex := 0
 	for _, group := range compiled.Scenario().NodeGroups() {
 		for _, pool := range group.Pools() {
 			resolution := resolutions[resolutionIndex]
 			resolutionIndex++
-			profileID := pool.Profile().ID().String()
-			if _, found := seen[profileID]; found {
-				continue
-			}
-			seen[profileID] = struct{}{}
-			profiles = append(profiles, controlplane.ProfileReceipt{
-				ID:       profileID,
-				Revision: pool.Profile().Revision(),
-				Digest:   resolution.ProfileDigest(),
-				Class:    resolution.ProfileClass(),
-			})
+			appendProfile(pool.Profile(), resolution)
+		}
+		for _, pool := range group.AuxiliaryPools() {
+			resolution := auxiliaryResolutions[auxiliaryResolutionIndex]
+			auxiliaryResolutionIndex++
+			appendProfile(pool.Profile(), resolution)
 		}
 	}
 	return profiles, nil
@@ -1346,6 +1375,9 @@ func snapshotOf(record controlplane.InstanceRecord) Snapshot {
 		pools = append(pools, PoolSnapshot{
 			Group:            pool.Group,
 			Pool:             pool.Pool,
+			Role:             pool.Role,
+			Category:         pool.Category,
+			ResourceName:     pool.ResourceName,
 			RequestedTotal:   pool.RequestedTotal,
 			RequestedHealthy: pool.RequestedHealthy,
 			ObservedTotal:    pool.ObservedTotal,

@@ -188,6 +188,19 @@ spec:
                         type: string
                         minLength: 1
                         maxLength: 63
+                      role:
+                        type: string
+                        enum:
+                          - accelerator
+                          - auxiliary
+                      category:
+                        type: string
+                        minLength: 1
+                        maxLength: 63
+                      resourceName:
+                        type: string
+                        minLength: 1
+                        maxLength: 317
                       requestedTotal:
                         type: integer
                         format: int64

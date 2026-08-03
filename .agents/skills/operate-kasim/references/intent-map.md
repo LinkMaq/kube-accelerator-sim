@@ -11,6 +11,8 @@ lifecycle.
 | “部署多厂商/混合卡集群” | Compile and apply a Scenario YAML | groups, profiles, models, topology |
 | “列出支持的厂家/型号” | `profile list` and selected `profile show` | none; offline |
 | “看看有哪些卡/节点” | `status` plus scenario-labeled Node inventory | Scenario name, target |
+| “打开 UI/查看整个集群的卡和 RDMA” | `kasim ui` read-only loopback inventory | kubeconfig, context, optional local port |
+| “给加速卡加 RDMA/SR-IOV 信号” | Scenario YAML with an Auxiliary Device Pool | exact full resource name, local Accelerator Pool association, counts |
 | “模拟坏卡/恢复卡” | `health` typed revision | Scenario, group, pool, healthy count |
 | “扩到/缩到 N 台” | `scale` typed revision | Scenario, group, replicas |
 | “更新这个场景文件” | File-based revision | fresh UID/generation and revised file |
@@ -45,6 +47,9 @@ lifecycle.
   two-Node/eight-unit `demo`, server dry-run, apply, and watch status.
 - “同时模拟英伟达、昇腾和海光” → start from the corresponding files in
   `examples/vendors/`, produce one heterogeneous Scenario, then compile it.
+- “给 H100 节点加 16 个 RDMA 资源” → start from
+  `examples/signals/auxiliary-rdma-sriov.yaml`, keep the H100 pool association,
+  require the exact configurable extended-resource name, then compile it.
 - “把 nvidia-workers 扩到四台” → fetch fresh status, extract UID/generation,
   run `scale`, and watch the new revision.
 - “让一台卡坏掉” is ambiguous because health is per Node Group/Pool; ask for

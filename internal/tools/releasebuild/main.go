@@ -6,6 +6,7 @@ package main
 import (
 	"archive/tar"
 	"archive/zip"
+	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
@@ -29,6 +30,9 @@ import (
 const (
 	releaseReceiptSchema    = "kasim.io/release-receipt/v1alpha1"
 	releaseDependencySchema = "kasim.io/release-dependencies/v1alpha1"
+	maxUIAssetRawBytes      = 256 << 10
+	maxUIAssetGzipBytes     = 96 << 10
+	maxUIBinaryDeltaBytes   = 1 << 20
 )
 
 var (
@@ -50,6 +54,23 @@ type buildOptions struct {
 type target struct {
 	OS   string `json:"os"`
 	Arch string `json:"arch"`
+}
+
+type uiPlatformMeasurement struct {
+	OS                         string `json:"os"`
+	Arch                       string `json:"arch"`
+	ReleasedCompressedBytes    int64  `json:"releasedCompressedBytes"`
+	WithoutUICompressedBytes   int64  `json:"withoutUICompressedBytes"`
+	CompressedBinaryDeltaBytes int64  `json:"compressedBinaryDeltaBytes"`
+}
+
+type uiPackageBudget struct {
+	AssetRawBytes              int64                   `json:"assetRawBytes"`
+	AssetGzipBytes             int64                   `json:"assetGzipBytes"`
+	AssetRawLimitBytes         int64                   `json:"assetRawLimitBytes"`
+	AssetGzipLimitBytes        int64                   `json:"assetGzipLimitBytes"`
+	CompressedBinaryDeltaLimit int64                   `json:"compressedBinaryDeltaLimitBytes"`
+	PlatformMeasurements       []uiPlatformMeasurement `json:"platforms"`
 }
 
 func (target target) archiveName(version string) string {
@@ -154,18 +175,27 @@ func run(arguments []string) error {
 		return err
 	}
 	defer os.RemoveAll(temporary)
+	budget, err := measureUIAssets()
+	if err != nil {
+		return err
+	}
 
 	artifacts := make([]string, 0, len(releaseTargets)+2)
 	for _, buildTarget := range releaseTargets {
 		name := buildTarget.archiveName(options.Version)
-		if err := buildCLIArchive(
+		measurement, err := buildCLIArchive(
 			options,
 			buildTarget,
 			filepath.Join(temporary, buildTarget.OS+"-"+buildTarget.Arch),
 			filepath.Join(options.OutputDirectory, name),
-		); err != nil {
+		)
+		if err != nil {
 			return err
 		}
+		budget.PlatformMeasurements = append(
+			budget.PlatformMeasurements,
+			measurement,
+		)
 		artifacts = append(artifacts, name)
 	}
 	chartName := "kasim-runtime-" + options.Version + ".tgz"
@@ -194,7 +224,7 @@ func run(arguments []string) error {
 	if err := writeDependencyLock(options, inputs); err != nil {
 		return err
 	}
-	return writeReleaseReceipt(options, inputs, artifacts)
+	return writeReleaseReceipt(options, inputs, artifacts, budget)
 }
 
 func requireEmptyDirectory(path string) error {
@@ -265,15 +295,19 @@ func buildCLIArchive(
 	buildTarget target,
 	stagingDirectory,
 	archivePath string,
-) error {
+) (uiPlatformMeasurement, error) {
 	if err := os.MkdirAll(stagingDirectory, 0o755); err != nil {
-		return err
+		return uiPlatformMeasurement{}, err
 	}
 	binaryName := "kasim"
 	if buildTarget.OS == "windows" {
 		binaryName += ".exe"
 	}
 	binaryPath := filepath.Join(stagingDirectory, binaryName)
+	measurementPath := filepath.Join(
+		stagingDirectory,
+		"kasim-measure-without-ui"+filepath.Ext(binaryName),
+	)
 	versionPackage := "github.com/LinkMaq/kube-accelerator-sim/internal/version"
 	linkerFlags := strings.Join([]string{
 		"-s",
@@ -283,15 +317,82 @@ func buildCLIArchive(
 		"-X", versionPackage + ".sourceRevision=" + options.Revision,
 		"-X", versionPackage + ".buildDate=" + options.BuildDate,
 	}, " ")
-	command := exec.Command(
-		"go",
+	if err := buildCLI(
+		options,
+		buildTarget,
+		linkerFlags,
+		binaryPath,
+		"",
+	); err != nil {
+		return uiPlatformMeasurement{}, err
+	}
+	if err := buildCLI(
+		options,
+		buildTarget,
+		linkerFlags,
+		measurementPath,
+		"kasim_measure_no_ui",
+	); err != nil {
+		return uiPlatformMeasurement{}, err
+	}
+	releasedCompressed, err := compressedFileSize(binaryPath)
+	if err != nil {
+		return uiPlatformMeasurement{}, err
+	}
+	withoutUICompressed, err := compressedFileSize(measurementPath)
+	if err != nil {
+		return uiPlatformMeasurement{}, err
+	}
+	delta := releasedCompressed - withoutUICompressed
+	if delta > maxUIBinaryDeltaBytes {
+		return uiPlatformMeasurement{}, fmt.Errorf(
+			"%s/%s compressed UI binary delta %d exceeds %d bytes",
+			buildTarget.OS,
+			buildTarget.Arch,
+			delta,
+			maxUIBinaryDeltaBytes,
+		)
+	}
+	measurement := uiPlatformMeasurement{
+		OS:                         buildTarget.OS,
+		Arch:                       buildTarget.Arch,
+		ReleasedCompressedBytes:    releasedCompressed,
+		WithoutUICompressedBytes:   withoutUICompressed,
+		CompressedBinaryDeltaBytes: delta,
+	}
+	if buildTarget.OS == "windows" {
+		return measurement, archiveZIP(
+			binaryPath,
+			binaryName,
+			archivePath,
+			options.SourceDateEpoch,
+		)
+	}
+	return measurement, archiveSingleFile(
+		binaryPath,
+		binaryName,
+		archivePath,
+		options.SourceDateEpoch,
+	)
+}
+
+func buildCLI(
+	options buildOptions,
+	buildTarget target,
+	linkerFlags,
+	outputPath,
+	buildTags string,
+) error {
+	arguments := []string{
 		"build",
 		"-trimpath",
-		"-ldflags="+linkerFlags,
-		"-o",
-		binaryPath,
-		"./cmd/kasim",
-	)
+		"-ldflags=" + linkerFlags,
+	}
+	if buildTags != "" {
+		arguments = append(arguments, "-tags="+buildTags)
+	}
+	arguments = append(arguments, "-o", outputPath, "./cmd/kasim")
+	command := exec.Command("go", arguments...)
 	command.Env = append(
 		os.Environ(),
 		"CGO_ENABLED=0",
@@ -300,27 +401,105 @@ func buildCLIArchive(
 	)
 	if output, err := command.CombinedOutput(); err != nil {
 		return fmt.Errorf(
-			"build %s/%s CLI: %w\n%s",
+			"build %s/%s CLI (tags %q): %w\n%s",
 			buildTarget.OS,
 			buildTarget.Arch,
+			buildTags,
 			err,
 			output,
 		)
 	}
-	if buildTarget.OS == "windows" {
-		return archiveZIP(
-			binaryPath,
-			binaryName,
-			archivePath,
-			options.SourceDateEpoch,
+	return nil
+}
+
+func measureUIAssets() (uiPackageBudget, error) {
+	paths := []string{
+		"internal/ui/static/app.css",
+		"internal/ui/static/app.js",
+		"internal/ui/static/index.html",
+	}
+	var raw bytes.Buffer
+	for _, path := range paths {
+		encoded, err := os.ReadFile(path)
+		if err != nil {
+			return uiPackageBudget{}, err
+		}
+		raw.WriteString(path)
+		raw.WriteByte(0)
+		raw.Write(encoded)
+	}
+	compressed, err := compressedBytesSize(raw.Bytes())
+	if err != nil {
+		return uiPackageBudget{}, err
+	}
+	budget := uiPackageBudget{
+		AssetRawBytes:              int64(raw.Len()),
+		AssetGzipBytes:             compressed,
+		AssetRawLimitBytes:         maxUIAssetRawBytes,
+		AssetGzipLimitBytes:        maxUIAssetGzipBytes,
+		CompressedBinaryDeltaLimit: maxUIBinaryDeltaBytes,
+	}
+	if budget.AssetRawBytes > maxUIAssetRawBytes {
+		return uiPackageBudget{}, fmt.Errorf(
+			"embedded UI raw bytes %d exceed %d",
+			budget.AssetRawBytes,
+			maxUIAssetRawBytes,
 		)
 	}
-	return archiveSingleFile(
-		binaryPath,
-		binaryName,
-		archivePath,
-		options.SourceDateEpoch,
-	)
+	if budget.AssetGzipBytes > maxUIAssetGzipBytes {
+		return uiPackageBudget{}, fmt.Errorf(
+			"embedded UI gzip bytes %d exceed %d",
+			budget.AssetGzipBytes,
+			maxUIAssetGzipBytes,
+		)
+	}
+	return budget, nil
+}
+
+type countingWriter struct{ bytes int64 }
+
+func (writer *countingWriter) Write(encoded []byte) (int, error) {
+	writer.bytes += int64(len(encoded))
+	return len(encoded), nil
+}
+
+func compressedBytesSize(encoded []byte) (int64, error) {
+	counter := &countingWriter{}
+	compressor, err := gzip.NewWriterLevel(counter, gzip.BestCompression)
+	if err != nil {
+		return 0, err
+	}
+	compressor.Header.ModTime = time.Unix(0, 0).UTC()
+	compressor.Header.OS = 255
+	if _, err := compressor.Write(encoded); err != nil {
+		return 0, err
+	}
+	if err := compressor.Close(); err != nil {
+		return 0, err
+	}
+	return counter.bytes, nil
+}
+
+func compressedFileSize(path string) (int64, error) {
+	input, err := os.Open(path)
+	if err != nil {
+		return 0, err
+	}
+	defer input.Close()
+	counter := &countingWriter{}
+	compressor, err := gzip.NewWriterLevel(counter, gzip.BestCompression)
+	if err != nil {
+		return 0, err
+	}
+	compressor.Header.ModTime = time.Unix(0, 0).UTC()
+	compressor.Header.OS = 255
+	if _, err := io.Copy(compressor, input); err != nil {
+		return 0, err
+	}
+	if err := compressor.Close(); err != nil {
+		return 0, err
+	}
+	return counter.bytes, nil
 }
 
 func archiveSingleFile(source, name, target string, epoch time.Time) error {
@@ -538,24 +717,26 @@ func writeReleaseReceipt(
 	options buildOptions,
 	inputs releaseInputs,
 	artifacts []string,
+	uiBudget uiPackageBudget,
 ) error {
 	cliArchives := make([]string, 0, len(releaseTargets))
 	for _, buildTarget := range releaseTargets {
 		cliArchives = append(cliArchives, buildTarget.archiveName(options.Version))
 	}
 	document := map[string]any{
-		"schemaVersion":  releaseReceiptSchema,
-		"productVersion": options.Version,
-		"sourceRevision": options.Revision,
-		"buildDate":      options.BuildDate,
-		"publicSurfaces": inputs.PublicSurfaces,
-		"catalog":        inputs.Catalog,
-		"catalogSchema":  inputs.CatalogSchema,
-		"productCRD":     inputs.ProductCRD,
-		"compatibility":  inputs.Compatibility,
-		"kwok":           inputs.KWOK,
-		"cliArchives":    cliArchives,
-		"artifacts":      artifacts,
+		"schemaVersion":   releaseReceiptSchema,
+		"productVersion":  options.Version,
+		"sourceRevision":  options.Revision,
+		"buildDate":       options.BuildDate,
+		"publicSurfaces":  inputs.PublicSurfaces,
+		"catalog":         inputs.Catalog,
+		"catalogSchema":   inputs.CatalogSchema,
+		"productCRD":      inputs.ProductCRD,
+		"compatibility":   inputs.Compatibility,
+		"kwok":            inputs.KWOK,
+		"cliArchives":     cliArchives,
+		"artifacts":       artifacts,
+		"uiPackageBudget": uiBudget,
 		"controllerImage": map[string]any{
 			"reference": "ghcr.io/linkmaq/kube-accelerator-sim-controller:" + options.Version,
 			"platforms": inputs.ControllerImage.Platforms,

@@ -20,7 +20,7 @@ spec:
         - name: bi-v150s
           profile:
             id: iluvatar
-            revision: 2026-07-31
+            revision: 2026-08-03
             digest: sha256:f19beef220644dc7bc093f75b91a387867cdaa727e99b5c577d515e9252dbaeb
           model: iluvatar-bi-v150s
           contract: device-plugin

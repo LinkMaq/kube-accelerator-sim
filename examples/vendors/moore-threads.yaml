@@ -20,7 +20,7 @@ spec:
         - name: mtt-s3000
           profile:
             id: moore-threads
-            revision: 2026-07-31
+            revision: 2026-08-03
             digest: sha256:fa8bb573c8e6c7eeb89d8ae8503d97b2b389598674d31e69ec79117519f08a30
           model: moore-threads-mtt-s3000
           contract: device-plugin

@@ -27,7 +27,7 @@ func TestPublishedCatalogSchemaIsStrictValidJSON(t *testing.T) {
 	if schema.AdditionalProperties {
 		t.Fatal("published profile schema permits unknown top-level fields")
 	}
-	if schema.Properties.SchemaVersion.Constant != "v1alpha1" {
+	if schema.Properties.SchemaVersion.Constant != "v1alpha2" {
 		t.Fatalf(
 			"schema version = %q",
 			schema.Properties.SchemaVersion.Constant,

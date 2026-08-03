@@ -2,6 +2,7 @@ package scenario_test
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -9,6 +10,82 @@ import (
 	"github.com/LinkMaq/kube-accelerator-sim/internal/catalog"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/scenario"
 )
+
+func TestCompileAuxiliaryDevicePoolPreservesExactSignalAndAssociations(t *testing.T) {
+	t.Parallel()
+
+	snapshot, err := catalog.LoadBundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile, err := snapshot.Show("rdma-shared-device-plugin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	document := fmt.Sprintf(`
+metadata:
+  name: rdma-lab
+spec:
+  fidelity: scheduling
+  acceptance:
+    provisionalProfiles: false
+  nodeGroups:
+    - name: workers
+      replicas: 2
+      node:
+        capacity: {}
+        placement: {}
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: training
+          profile:
+            id: nvidia
+            revision: 2026-08-03
+            digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
+          model: nvidia-h100
+          contract: device-plugin
+          resource: gpu
+          variant: {}
+          count: 8
+          healthy: 8
+      auxiliaryDevicePools:
+        - name: rdma-a
+          profile:
+            id: rdma-shared-device-plugin
+            revision: %s
+            digest: %s
+          contract: shared-hca
+          resource: shared-token
+          resourceName: rdma/rdma_shared_device_a
+          count: 16
+          available: 12
+          associatedAcceleratorPools: [training]
+`, profile.Revision(), profile.Digest())
+	input, err := scenario.Document([]byte(document))
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiled, receipt, err := scenario.Compile(input, snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	groups := compiled.Scenario().NodeGroups()
+	if len(groups) != 1 || len(groups[0].AuxiliaryPools()) != 1 {
+		t.Fatalf("auxiliary pools = %#v", groups)
+	}
+	pool := groups[0].AuxiliaryPools()[0]
+	if pool.ResourceName() != "rdma/rdma_shared_device_a" ||
+		pool.Counts().Total() != 16 || pool.Counts().Available() != 12 ||
+		pool.AssociatedAcceleratorPools()[0].String() != "training" {
+		t.Fatalf("compiled auxiliary pool = %#v", pool)
+	}
+	auxiliary := receipt.AuxiliaryResolutions()
+	if len(auxiliary) != 1 || auxiliary[0].AuxiliaryCategory() != "rdma" ||
+		auxiliary[0].ResourceName() != "rdma/rdma_shared_device_a" {
+		t.Fatalf("auxiliary receipt = %#v", auxiliary)
+	}
+}
 
 const validScenarioDocument = `
 metadata:
@@ -34,7 +111,7 @@ spec:
         - name: training
           profile:
             id: nvidia
-            revision: 2026-07-31
+            revision: 2026-08-03
             digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
           model: nvidia-h100
           contract: device-plugin
@@ -92,7 +169,7 @@ func TestCompileCanonicalGolden(t *testing.T) {
 	if !bytes.Equal(compiled.Bytes(), want) {
 		t.Fatalf("canonical golden drifted:\n%s\n%s", compiled.Bytes(), want)
 	}
-	const wantDigest = "sha256:3b5cc90f218d720f5f0916f05b18c92805e7b88208ffaa32f7341e227e578972"
+	const wantDigest = "sha256:0a16dfb938531b644337c0c44c3c9c2f7d5753708f250e9d7517c5f14cd0f9ea"
 	if compiled.Digest().String() != wantDigest {
 		t.Fatalf("digest = %s, want %s", compiled.Digest(), wantDigest)
 	}
@@ -250,7 +327,7 @@ func TestCompileRejectsScalarResourceCollisionOnOneNode(t *testing.T) {
         - name: inference
           profile:
             id: nvidia
-            revision: 2026-07-31
+            revision: 2026-08-03
             digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
           model: nvidia-h200
           contract: device-plugin
@@ -324,7 +401,7 @@ func TestCompileRejectsConflictingDRAIdentitySignalsOnOneNode(t *testing.T) {
         - name: inference
           profile:
             id: nvidia
-            revision: 2026-07-31
+            revision: 2026-08-03
             digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
           model: nvidia-h200
           contract: dra
@@ -389,7 +466,7 @@ spec:
         - name: accelerators
           profile:
             id: nvidia
-            revision: 2026-07-31
+            revision: 2026-08-03
             digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
           model: nvidia-h100
           contract: device-plugin

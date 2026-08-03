@@ -20,7 +20,7 @@ spec:
         - name: gaudi3
           profile:
             id: intel-gaudi
-            revision: 2026-07-31
+            revision: 2026-08-03
             digest: sha256:0a18136f17f936d0036842a7c16051492b894a31c1215246581a9f1c149a06e5
           model: intel-gaudi3
           contract: device-plugin

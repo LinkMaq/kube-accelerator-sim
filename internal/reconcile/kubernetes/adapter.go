@@ -152,6 +152,9 @@ func transportStatus(
 		transportPools = append(transportPools, simulationv1alpha1.PoolStatus{
 			Group:            pool.Group,
 			Pool:             pool.Pool,
+			Role:             pool.Role,
+			Category:         pool.Category,
+			ResourceName:     pool.ResourceName,
 			RequestedTotal:   pool.RequestedTotal,
 			RequestedHealthy: pool.RequestedHealthy,
 			ObservedTotal:    pool.ObservedTotal,

@@ -20,7 +20,7 @@ spec:
         - name: mlu590
           profile:
             id: cambricon
-            revision: 2026-07-31
+            revision: 2026-08-03
             digest: sha256:3c68ef76743e2cee037d4072f6be5d67b361138e6e00cd658d9e024507c93edf
           model: cambricon-mlu590
           contract: device-plugin

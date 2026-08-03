@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "revision", "profiles"],
   "properties": {
-    "schemaVersion": {"const": "v1alpha1"},
+    "schemaVersion": {"const": "v1alpha2"},
     "revision": {"type": "string", "minLength": 1, "maxLength": 128},
     "profiles": {
       "type": "array",
@@ -37,7 +37,7 @@
           "pattern": "^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$",
           "maxLength": 63
         },
-        "name": {"type": "string", "minLength": 1, "maxLength": 317},
+        "name": {"type": "string", "maxLength": 317},
         "unit": {"type": "string", "minLength": 1, "maxLength": 64}
       }
     },
@@ -83,6 +83,9 @@
           "pattern": "^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$",
           "maxLength": 63
         },
+        "subject": {"enum": ["accelerator", "auxiliary"]},
+        "auxiliaryCategory": {"type": "string", "minLength": 1, "maxLength": 63},
+        "resourceNamePolicy": {"enum": ["fixed", "scenario-required"]},
         "kind": {"enum": ["extended-resource", "dra"]},
         "providerScope": {"type": "string", "minLength": 1, "maxLength": 128},
         "fidelityModes": {
@@ -200,7 +203,7 @@
           "then": {
             "properties": {
               "contracts": {"minItems": 1},
-              "models": {"minItems": 1}
+              "models": {"type": "array"}
             }
           }
         }

@@ -29,6 +29,9 @@ features:
   - icon: ↻
     title: Receipt-driven lifecycle
     details: Ready snapshots, immutable revisions, optimistic preconditions, bounded ownership, and safe cleanup.
+  - icon: ◫
+    title: Read-only local inventory
+    details: One loopback command shows Kasim and non-Kasim Nodes, exact accelerator and auxiliary signals, native DRA identities, and evidence gaps.
 ---
 
 <section class="kasim-surface">
