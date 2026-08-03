@@ -1,4 +1,4 @@
-# Keep documentation in sync
+# Keep English and Chinese documentation in sync
 
 The online documentation is built directly from the repository's canonical
 Markdown under `docs/`. Do not create a second copy of product documentation
@@ -20,6 +20,13 @@ Update `CONTEXT.md` or an ADR when the domain language or an architectural
 decision changes. Update `docs/.vitepress/config.mts` when a new durable page
 needs to appear in navigation.
 
+English specifications and ADRs are the normative design records. Public
+operator pages must keep the English source under `docs/operators/` and its
+Chinese counterpart under `docs/zh/operators/` aligned in the same change.
+When a deep design record remains English-only, the Chinese navigation must
+label it as English and provide a Chinese architecture summary instead of
+silently presenting it as translated content.
+
 ## Local workflow
 
 Install the pinned documentation dependency and build the site:
@@ -35,9 +42,9 @@ For local authoring with hot reload:
 npm run docs:dev
 ```
 
-The production site uses the repository base path
-`/kube-accelerator-sim/`. Test the production build before relying on a link
-that works only in the development server.
+The production site uses `/kube-accelerator-sim/` for English and
+`/kube-accelerator-sim/zh/` for Chinese. Test the production build before
+relying on a link that works only in the development server.
 
 ## Pull-request gate
 
@@ -49,7 +56,8 @@ release notes.
 
 Test-only, workflow-only, and Agent-only changes do not trigger the gate unless
 they also change a product surface. Passing the gate means documentation was
-included; reviewers still verify that it accurately describes the behavior.
+included; reviewers still verify that it accurately describes the behavior
+and that affected English and Chinese operator pages remain aligned.
 
 After a change reaches `main`, the GitHub Pages workflow rebuilds and deploys
 the site automatically.

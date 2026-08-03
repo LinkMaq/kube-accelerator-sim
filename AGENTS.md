@@ -23,4 +23,6 @@ devices, inspect a Scenario Instance, or safely remove simulator resources.
 Every product-facing feature or behavior change must update its canonical
 documentation in the same change. Read `docs/contributing/documentation.md`,
 add new durable pages to `docs/.vitepress/config.mts`, and run
-`npm run docs:build`. Do not duplicate product documentation outside `docs/`.
+`npm run docs:build`. Public operator behavior must be updated in both English
+under `docs/operators/` and Chinese under `docs/zh/operators/`. Do not
+duplicate product documentation outside `docs/`.
