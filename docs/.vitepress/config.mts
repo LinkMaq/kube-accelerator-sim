@@ -46,6 +46,7 @@ const zhSidebar = [
       { text: '设备档案契约（英文）', link: '/adr/0002-vendor-profile-and-model-contract' },
       { text: '场景生命周期（英文）', link: '/adr/0003-revisioned-scenario-instance-contract' },
       { text: '扩展边界（英文）', link: '/adr/0007-deep-modules-and-extension-seams' },
+      { text: 'Kasim UI 提案', link: '/zh/spec/kasim-ui' },
     ],
   },
   {
@@ -261,6 +262,7 @@ export default defineConfig({
           { text: 'Revisioned lifecycle', link: '/adr/0003-revisioned-scenario-instance-contract' },
           { text: 'Explicit targets and receipts', link: '/adr/0005-explicit-target-receipt-driven-cli' },
           { text: 'Extension seams', link: '/adr/0007-deep-modules-and-extension-seams' },
+          { text: 'Kasim UI proposal', link: '/spec/kasim-ui' },
         ],
       },
       {
