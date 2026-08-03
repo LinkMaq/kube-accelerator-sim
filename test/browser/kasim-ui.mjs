@@ -32,17 +32,28 @@ async function startFixture(port) {
   child.stdout.on('data', chunk => { stdout += chunk })
   child.stderr.on('data', chunk => { stderr += chunk })
   const accessURL = await new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(`fixture startup timed out: ${stderr}`)), 30_000)
+    let settled = false
+    const fail = error => {
+      if (settled) return
+      settled = true
+      child.kill('SIGTERM')
+      reject(error)
+    }
+    const timeout = setTimeout(
+      () => fail(new Error(`fixture startup timed out: ${stderr}`)),
+      120_000,
+    )
     const inspect = () => {
       const match = stdout.match(/http:\/\/127\.0\.0\.1:\d+\/#token=[A-Za-z0-9_-]+/)
-      if (!match) return
+      if (!match || settled) return
+      settled = true
       clearTimeout(timeout)
       resolve(match[0])
     }
     child.stdout.on('data', inspect)
     child.once('exit', code => {
       clearTimeout(timeout)
-      reject(new Error(`fixture exited ${code}: ${stderr}`))
+      fail(new Error(`fixture exited ${code}: ${stderr}`))
     })
   })
   return {
