@@ -16,6 +16,10 @@ _Avoid_: Hardware emulation, compute emulation
 An existing Kubernetes cluster, selected explicitly by the user, to which the CLI submits an accelerator simulation scenario. The cluster lifecycle is owned outside the product CLI.
 _Avoid_: Managed cluster, embedded cluster
 
+**Cluster Simulation Inventory（集群模拟清单）**:
+A read-only, target-scoped view of the Nodes, Scenario Instances, accelerator signals, device evidence, auxiliary signals, and scheduling usage observable in one Simulation Target. It includes both Synthetic Nodes and pre-existing non-Kasim Nodes, while making Kasim ownership and evidence provenance visually explicit.
+_Avoid_: Management console, Kasim-only node list, inferred hardware inventory
+
 **Synthetic Node（模拟节点）**:
 A Kubernetes Node created for a Scenario Instance and owned entirely by it, used to expose simulated accelerator capacity without mutating pre-existing real Nodes in the Simulation Target.
 _Avoid_: Patched real node, unowned fake node
@@ -59,6 +63,14 @@ _Avoid_: Display-only model, invented per-model resource name
 **Resource Contract（资源契约）**:
 One source-backed Kubernetes scheduling surface within a Vendor Profile, expressed either through scalar extended resources or DRA. It preserves exact resource names, labels, attributes, variants, provider scope, and evidence without deriving them from an Accelerator Model name.
 _Avoid_: Guessed resource mapping, backend configuration
+
+**Auxiliary Device Signal（辅助设备信号）**:
+A source-backed Kubernetes-visible resource, label, or DRA device associated with an accelerator scheduling environment, such as an RDMA resource signal. Simulation of an Auxiliary Device Signal promises only the declared Kubernetes scheduling surface, not a physical network interface, driver, CNI path, or working data plane.
+_Avoid_: Real RDMA device, inferred network capability, accelerator pool
+
+**Auxiliary Device Pool（辅助设备池）**:
+A named homogeneous set of Auxiliary Device Signals repeated on every Synthetic Node in a Node Group, with one source-backed Resource Contract, explicit Accelerator Pool associations, total quantity, and schedulable availability. It shares the Node Group lifecycle but remains distinct from Accelerator capacity and physical device inventory.
+_Avoid_: Accelerator Pool, arbitrary resource map, physical NIC inventory
 
 **Profile Class（档案等级）**:
 The trust and distribution class of a Vendor Profile: verified, provisional, or custom. It describes the evidence behind emitted Kubernetes contracts, independently of whether an Accelerator Model is current, older-but-supported, or merely cataloged.
