@@ -9,6 +9,7 @@
 ## Documentation impact
 
 - [ ] I updated the canonical product documentation for every changed behavior.
+- [ ] I kept affected English and Chinese operator documentation aligned.
 - [ ] I added new durable pages to `docs/.vitepress/config.mts` navigation.
 - [ ] I updated `CONTEXT.md` or an ADR if domain language or architecture changed.
 - [ ] This change has no product-facing documentation impact, and I explained why above.

@@ -64,6 +64,12 @@ function isDocumentationContent(file) {
 
 const productChanges = files.filter(isProductChange)
 const documentationChanges = files.filter(isDocumentationContent)
+const englishDocumentationChanges = documentationChanges.filter(
+  (file) => !file.startsWith('docs/zh/'),
+)
+const chineseDocumentationChanges = documentationChanges.filter((file) =>
+  file.startsWith('docs/zh/'),
+)
 
 console.log(`Changed files: ${files.length}`)
 console.log(`Product-facing files: ${productChanges.length}`)
@@ -76,6 +82,23 @@ if (productChanges.length > 0 && documentationChanges.length === 0) {
   }
   console.error(
     '\nUpdate canonical Markdown in the same pull request. See docs/contributing/documentation.md.',
+  )
+  process.exit(1)
+}
+
+if (
+  productChanges.length > 0 &&
+  (englishDocumentationChanges.length === 0 ||
+    chineseDocumentationChanges.length === 0)
+) {
+  console.error(
+    '\nProduct behavior changed without aligned English and Chinese documentation:',
+  )
+  for (const file of productChanges) {
+    console.error(`  - ${file}`)
+  }
+  console.error(
+    '\nUpdate an English canonical document and the affected Chinese operator documentation in the same pull request.',
   )
   process.exit(1)
 }
