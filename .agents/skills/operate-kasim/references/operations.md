@@ -113,7 +113,7 @@ kubectl --kubeconfig "$KUBECONFIG_PATH" --context "$KUBE_CONTEXT" \
   get nodes -l simulation.kasim.io/scenario=SCENARIO_NAME -o wide
 ```
 
-Open the temporary read-only cluster inventory only on loopback:
+Open the temporary read-only cluster inventory on its default loopback host:
 
 ```sh
 "$KASIM_BIN" ui --port 8080 --open
@@ -131,9 +131,20 @@ the intended target, override either default or both explicitly:
 
 Verify the resolved context printed before the URL.
 
-Use a different free port when required. Never construct an `--address`
-argument, proxy the port, or publish the fragment capability. Stop the process
-with `Ctrl+C` after inspection.
+Use a different free port when required. Only when the user explicitly asks
+for network access, select one temporary listen host without a port:
+
+```sh
+"$KASIM_BIN" ui --host 192.168.0.2 --port 8080
+"$KASIM_BIN" ui --host 0.0.0.0 --port 8080
+```
+
+For non-loopback listeners, report the unencrypted-HTTP warning, require
+restricted network access, and protect the complete capability URL. With a
+wildcard host, replace `0.0.0.0` in the printed URL with one reachable IP.
+Never create a proxy or persistent service, or publish the fragment
+capability, unless the user separately requests that infrastructure. Stop the
+process with `Ctrl+C` after inspection.
 
 Immediately before each mutation, refresh status and extract the exact
 `instanceUID` and `desiredGeneration`. Then use one native typed revision:

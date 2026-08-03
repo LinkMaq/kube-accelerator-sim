@@ -14,14 +14,15 @@
 ```sh
 go build -trimpath -o ./dist/kasim ./cmd/kasim
 ./dist/kasim version -o json
+./dist/kasim --help
 ```
 
 使用发布制品时，请先按[发布验证](release-verification.md)校验归档。控制器镜像和
 Helm Chart 发布在 GitHub Packages：
 
 ```sh
-docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.2.0
-helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.2.0
+docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.3.0
+helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.3.0
 ```
 
 ## 2. 离线检查并编译
@@ -59,7 +60,7 @@ helm upgrade --install kasim-runtime ./charts/kasim-runtime \
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.2.0 \
+  --version 0.3.0 \
   --kubeconfig ./target.kubeconfig \
   --kube-context target \
   --namespace kasim-system \
@@ -112,6 +113,7 @@ kubectl --kubeconfig ./target.kubeconfig --context target \
 
 ```sh
 ./dist/kasim ui --open
+./dist/kasim ui --help
 ```
 
 临时访问能力、证据规则、筛选和部分数据源行为见[集群清单 UI 指南](cluster-inventory-ui.md)。

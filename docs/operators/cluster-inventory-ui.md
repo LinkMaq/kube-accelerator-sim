@@ -26,8 +26,19 @@ explicit `--kubeconfig` plus `--context` contract.
 
 The command supports Kubernetes 1.30–1.36 and never owns cluster lifecycle.
 `--open` is optional; a browser-open failure leaves the printed URL usable.
-The listener is always `127.0.0.1`, and there is deliberately no `--address`
-flag.
+The listener defaults to `127.0.0.1`. Use `--host` with an IP address or
+hostname, without a port, only when the UI must be reachable beyond the local
+machine:
+
+```sh
+./dist/kasim ui --host 192.168.0.2 --port 8080
+./dist/kasim ui --host 0.0.0.0 --port 8080
+```
+
+A non-loopback listener uses unencrypted HTTP and prints a warning. Restrict
+network access and protect the complete capability URL. When using a wildcard
+host, replace `0.0.0.0` in the printed URL with one reachable IP address; DNS
+Host values are deliberately rejected for wildcard listeners.
 
 ## What the home page shows
 
@@ -54,7 +65,15 @@ restores the view. The capability remains in the fragment and is never copied
 into those filter parameters. English and Simplified Chinese are embedded in
 the same binary.
 
-## Local security
+The header theme control switches between light and dark palettes. With no
+`theme` query parameter, the page follows the operating-system preference and
+updates when that preference changes. An explicit selection writes only
+`theme=light` or `theme=dark` to the query string, so reload and browser
+back/forward restore it without storing the capability or any cluster data.
+Both palettes preserve the same evidence hierarchy, visible focus treatment,
+status labels, and 44 px primary controls on desktop and mobile.
+
+## Listener security
 
 Each launch generates a new 256-bit capability. The CLI prints a URL such as:
 
@@ -64,13 +83,14 @@ http://127.0.0.1:8080/#token=<ephemeral-capability>
 
 The fragment is not sent in the initial HTTP request. The frontend keeps it
 in memory and attaches it as a bearer credential to inventory requests. The
-server accepts only `GET` and `HEAD`, validates the exact loopback Host, has no
-mutation route or permissive CORS, disables caching, and serves only embedded
-HTML, CSS, and JavaScript. Stop it with `Ctrl+C`; shutdown cancels watches and
-finishes within five seconds.
+server accepts only `GET` and `HEAD`, validates the selected Host and port, has
+no mutation route or permissive CORS, disables caching, and serves only
+embedded HTML, CSS, and JavaScript. A wildcard listener accepts IP-literal
+Host values only. Stop it with `Ctrl+C`; shutdown cancels watches and finishes
+within five seconds.
 
-Treat the printed URL as a temporary secret. Anyone able to use it from the
-same machine can read the same cluster metadata until the process stops.
+Treat the printed URL as a temporary secret. Anyone able to reach the listener
+and use that URL can read the same cluster metadata until the process stops.
 
 ## Read-only RBAC and partial views
 
@@ -109,9 +129,10 @@ See [Scenario examples](scenario-examples.md) for the full topology.
 
 The release test uses pinned Playwright Chromium against a deterministic
 1,001-Node fixture. It verifies desktop and 390 px layouts, English and
-Chinese, URL history, keyboard/focus behavior, partial data, same-origin
-requests, fragment-token isolation, no-JavaScript fallback, and the 100-row
-DOM bound. Three screenshots are retained as CI visual evidence:
+Chinese, system and explicit light/dark themes, URL history, keyboard/focus
+behavior, partial data, same-origin requests, fragment-token isolation,
+no-JavaScript fallback, and the 100-row DOM bound. Four screenshots are
+retained as CI visual evidence:
 
 ```sh
 npm ci

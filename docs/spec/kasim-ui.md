@@ -22,6 +22,7 @@ The UI never creates, changes, scales, heals, or deletes a Scenario. It never ow
 kasim ui \
   [--kubeconfig /absolute/path/to/config] \
   [--context exact-context-name] \
+  [--host 127.0.0.1] \
   [--port 8080] \
   [--open]
 ```
@@ -36,8 +37,12 @@ kasim ui \
 - The resolved context and client configuration are frozen at startup. There
   is no in-cluster fallback, and lifecycle/mutation commands still require
   both target flags explicitly.
-- The only listen address is `127.0.0.1`; there is no `--address` flag.
+- `--host` accepts one IP address or hostname without a port and defaults to
+  `127.0.0.1`. Non-loopback and wildcard values are explicit opt-ins.
 - The default port is `8080`; `--port` accepts `1..65535`.
+- A wildcard listener accepts only an IP-literal HTTP Host on the selected
+  port. A non-loopback listener prints an unencrypted-HTTP and capability-URL
+  warning before the access URL.
 - The command prints the target context, redacted fingerprint, freshness state, and access URL.
 - `--open` opens the browser only after the listener and target identity are ready. Failure to open the browser is a warning because the printed URL remains usable.
 - A bind conflict, invalid target, failed DNS/TLS/authentication, unsupported Kubernetes release, or target mismatch returns a stable startup diagnostic and closes the listener.
@@ -46,7 +51,7 @@ kasim ui \
 
 The command follows the release's bounded Kubernetes matrix, currently 1.30 through 1.36. The 1.30 floor is not an open-ended compatibility promise above the validated ceiling.
 
-## Local security contract
+## Listener security contract
 
 Every process launch generates at least 256 bits of random capability material. The URL contains the token in its fragment, for example:
 
@@ -56,9 +61,10 @@ http://127.0.0.1:8080/#token=<base64url-capability>
 
 Fragments are not sent in HTTP requests, server logs, or referrers. The frontend keeps the token in memory and sends it as `Authorization: Bearer` on every data request. It does not write the token to local storage, cookies, logs, or page content.
 
-The local server:
+The server:
 
-- validates the exact loopback Host;
+- validates the selected Host and port; wildcard listeners accept IP-literal
+  Hosts only;
 - serves no cluster data without the capability;
 - accepts only `GET` and `HEAD` and has no mutation route;
 - emits no permissive CORS header;
@@ -66,6 +72,11 @@ The local server:
 - sends `Cache-Control: no-store` for HTML and data;
 - has no analytics, service worker, remote font, CDN, or third-party request;
 - exposes a versioned JSON/fetch-stream transport that is private to the same `kasim` version, not a public remote API.
+
+Loopback remains the safe default. A non-loopback listener carries the same
+ephemeral bearer protection but uses unencrypted HTTP; operators must use a
+trusted network or provide a protected transport outside Kasim and must treat
+the complete printed URL as a temporary secret.
 
 Authenticated fetch streaming is preferred because the browser can attach the bearer token. Bounded authenticated polling is the fallback; a query-string token, WebSocket-only contract, and cookie login flow are rejected.
 
@@ -94,7 +105,7 @@ The ledger keeps these fields visible without hover:
 - Profile/Resource Contract or Kubernetes source;
 - Auxiliary Device Pool association and scheduling-only caveat.
 
-Search, origin, Scenario, vendor, model, signal role, representation, health, and source-state filters are URL-backed. Default browser back/forward behavior restores the same view. The capability remains in the fragment and is not copied into query parameters.
+Search, origin, Scenario, vendor, model, signal role, representation, health, source-state filters, and an explicit light/dark theme selection are URL-backed. Default browser back/forward behavior restores the same view. Without a `theme` parameter the page follows the operating-system preference, including live preference changes. The capability remains in the fragment and is not copied into query parameters or browser storage.
 
 English and Simplified Chinese are bundled. Browser language chooses the first locale and a page control changes it. Kubernetes field names, exact resource names, object names, driver IDs, and vendor identifiers remain unchanged.
 
@@ -111,9 +122,9 @@ Color roles are redundant with text and shape:
 - amber plus `Unknown`, `Partial`, or `Unsupported` text;
 - red plus `Stale`, `Offline`, or terminal diagnostic text.
 
-Keyboard users can reach filters, rows, the detail drawer, locale selection, and close/reset controls. Focus is visible, the drawer returns focus to its invoking row, and Escape closes it. No essential value is hover-only. Status updates use a restrained live region and do not announce every watch event.
+Keyboard users can reach filters, rows, the detail drawer, theme and locale selection, and close/reset controls. The theme button exposes its pressed state, current palette, and switch action without color alone. Focus is visible, the drawer and theme toggle preserve focus after rerender, and Escape closes the drawer. No essential value is hover-only. Status updates use a restrained live region and do not announce every watch event.
 
-At 360–430 CSS pixels, the exact signal/device ledger precedes the summary band, table rows become labelled records, filters collapse without hiding active values, and the detail drawer becomes a full-width sheet. Primary controls target at least 44 CSS pixels. Reduced-motion users lose no information because production requires no meaningful animation.
+At 360–430 CSS pixels, the exact signal/device ledger precedes the summary band, table rows become labelled records, filters collapse without hiding active values, the theme control remains visible, and the detail drawer becomes a full-width sheet. Primary controls target at least 44 CSS pixels. Reduced-motion users lose no information because theme transitions carry no state and are removed by the existing motion preference.
 
 If JavaScript is disabled or fails to load, the static page exposes no cluster data and explains that the local live inventory requires JavaScript. The CLI remains the recovery path.
 
@@ -278,7 +289,7 @@ Denied Pods remove requested quantities, not capacity. Denied Claims remove allo
 
 ## Production frontend and package budget
 
-The production rewrite uses standards-based semantic HTML, CSS, and JavaScript modules embedded with Go `embed`. It has no frontend framework, chart library, remote asset, runtime Node.js dependency, or external static directory. Build-time minification is optional and reproducible; source remains inspectable.
+The production rewrite uses standards-based semantic HTML, CSS, and JavaScript modules embedded with Go `embed`. It has no frontend framework, chart library, remote asset, runtime Node.js dependency, or external static directory. A same-origin pre-paint bootstrap applies the system or URL-selected light/dark palette before CSS renders, without reading the capability fragment or browser storage. Build-time minification is optional and reproducible; source remains inspectable.
 
 Release gates:
 
@@ -297,9 +308,9 @@ The throwaway prototype uses 33,721 uncompressed bytes of HTML, JavaScript, and 
 | Domain/unit | Fact states; known zero; unit-safe totals; exact Kasim ownership; no vendor/health inference; Pod request calculation; DRA identity; auxiliary count/availability and association validation. |
 | Module Interface | Loading first snapshot; immutable full replacements; monotonic revision; slow-consumer coalescing; source partial/stale states; terminal target mismatch; idempotent clean shutdown. |
 | Kubernetes Adapter | Discovery; paginated list/watch; bookmarks; disconnect; `410 Gone`; list-only polling; 403; unsupported GVR/schema; stable DRA v1 conversion; no raw object leakage. |
-| HTTP/security | Loopback-only bind; exact Host; token absent/invalid/valid; no token in logs/referrer/cache; GET/HEAD only; no CORS; CSP and framing headers; graceful signal shutdown. |
-| Browser/component | English/Chinese; URL filters; keyboard/focus/drawer; no hover-only values; 390 px and desktop layouts; partial/stale/offline/empty states; screen-reader names; no-JavaScript fallback. |
-| Visual regression | Evidence-first desktop; Chinese partial-data mobile; detail drawer; long resource/driver names; unknown health; mixed Kasim and Non-Kasim Nodes. |
+| HTTP/security | Default loopback and explicit Host binds; exact or wildcard-safe Host validation; token absent/invalid/valid; no token in logs/referrer/cache; GET/HEAD only; no CORS; CSP and framing headers; graceful signal shutdown. |
+| Browser/component | English/Chinese; system and explicit URL-backed light/dark themes; URL filters; keyboard/focus/drawer; no hover-only values; 390 px and desktop layouts; partial/stale/offline/empty states; screen-reader names; no-JavaScript fallback. |
+| Visual regression | Dark and light evidence-first desktop; light Chinese partial-data mobile; dark detail drawer; long resource/driver names; unknown health; mixed Kasim and Non-Kasim Nodes. |
 | E2E scheduling | Kubernetes 1.30 floor and validated ceiling; multiple Vendor Profiles; scalar signals; Pod scheduling and requests; real/non-Kasim Node present; reconnect and partial RBAC. |
 | E2E DRA | Every validated stable-DRA minor; complete/incomplete multi-slice pools; native IDs; claim allocation/reservation/Pod join; runtime-use unknown; old schema unsupported. |
 | Auxiliary E2E | Two Synthetic Nodes with accelerator and configurable RDMA token pools; exact resources on Node status; explicit association; no physical-network claim; scale, revision, status, and cleanup. |

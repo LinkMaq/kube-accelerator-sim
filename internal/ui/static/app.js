@@ -1,6 +1,7 @@
 const app = document.querySelector('#app')
 const fragment = new URLSearchParams(location.hash.slice(1))
 const token = fragment.get('token') ?? ''
+const themeMedia = matchMedia('(prefers-color-scheme: light)')
 
 const copy = {
   en: {
@@ -18,6 +19,7 @@ const copy = {
     noOwnership: 'No Kasim ownership', signalsCount: 'signals', identity: 'Identity', category: 'Category', associations: 'Associated accelerator pools',
     attributes: 'Observed attributes', pool: 'Scenario pool', truth: 'Truth boundary',
     showing: 'Showing', of: 'of', rows: 'rows',
+    lightTheme: 'Light', darkTheme: 'Dark', switchToLight: 'Switch to light theme', switchToDark: 'Switch to dark theme',
     scalarBoundary: 'Scalar scheduling quantity only; no device ID is invented.',
     draBoundary: 'Native DRA identity. Allocation phases are API-server evidence; runtime use remains unknown.',
     auxBoundary: 'Auxiliary capacity is a scheduling token. It does not prove a NIC, link, CNI, fabric, or data path.',
@@ -36,6 +38,7 @@ const copy = {
     noOwnership: '无 Kasim 所有权', signalsCount: '个信号', identity: '标识', category: '类别', associations: '关联的加速卡池',
     attributes: '观测属性', pool: '场景资源池', truth: '真实性边界',
     showing: '当前显示', of: '/', rows: '行',
+    lightTheme: '浅色', darkTheme: '深色', switchToLight: '切换到浅色主题', switchToDark: '切换到深色主题',
     scalarBoundary: '仅表示标量调度数量，不会虚构单设备 ID。',
     draBoundary: '保留原生 DRA 标识。分配阶段仅来自 API Server 证据，运行时使用情况仍未知。',
     auxBoundary: '辅助容量只是调度令牌，不证明网卡、链路、CNI、网络或数据通路可用。',
@@ -43,27 +46,54 @@ const copy = {
 }
 
 const defaults = {origin: 'all', scenario: 'all', vendor: 'all', model: 'all', role: 'all', representation: 'all', health: 'all', source: 'all'}
-let state = {lang: 'en', query: '', ...defaults, snapshot: null, error: token ? '' : 'noToken', detail: null, focusDetail: null}
+let state = {lang: 'en', query: '', theme: document.documentElement.dataset.theme === 'light' ? 'light' : 'dark', themeExplicit: false, ...defaults, snapshot: null, error: token ? '' : 'noToken', detail: null, focusDetail: null}
 
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, character => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'})[character])
 const t = key => copy[state.lang][key] ?? key
 const known = factValue => factValue?.state === 'known'
 const fact = (factValue, fallback = '—') => known(factValue) ? String(factValue.value ?? 0) : fallback
+const systemTheme = () => themeMedia.matches ? 'light' : 'dark'
+
+function applyTheme() {
+  document.documentElement.dataset.theme = state.theme
+  document.documentElement.style.colorScheme = state.theme
+}
 
 function readURL() {
   const params = new URLSearchParams(location.search)
   state.lang = params.get('lang') === 'zh' || (!params.has('lang') && navigator.language.startsWith('zh')) ? 'zh' : 'en'
   state.query = params.get('q') ?? ''
+  const requestedTheme = params.get('theme')
+  state.themeExplicit = requestedTheme === 'light' || requestedTheme === 'dark'
+  state.theme = state.themeExplicit ? requestedTheme : systemTheme()
   for (const key of Object.keys(defaults)) state[key] = params.get(key) ?? defaults[key]
+  applyTheme()
 }
 
 function setURL(mode = 'replace') {
   const next = new URLSearchParams()
   if (state.lang === 'zh') next.set('lang', 'zh')
   if (state.query) next.set('q', state.query)
+  if (state.themeExplicit) next.set('theme', state.theme)
   for (const [key, fallback] of Object.entries(defaults)) if (state[key] !== fallback) next.set(key, state[key])
   const method = mode === 'push' ? 'pushState' : 'replaceState'
   history[method](null, '', `${location.pathname}${next.size ? `?${next}` : ''}${location.hash}`)
+}
+
+function themeToggle() {
+  const light = state.theme === 'light'
+  const label = t(light ? 'lightTheme' : 'darkTheme')
+  const action = t(light ? 'switchToDark' : 'switchToLight')
+  return `<button id="theme" class="theme-toggle" aria-pressed="${state.theme === 'dark'}" aria-label="${esc(action)}" title="${esc(action)}"><span class="theme-icon" aria-hidden="true">${light ? '☀' : '☾'}</span><span>${esc(label)}</span></button>`
+}
+
+function toggleTheme() {
+  state.theme = state.theme === 'dark' ? 'light' : 'dark'
+  state.themeExplicit = true
+  applyTheme()
+  setURL('push')
+  render()
+  document.querySelector('#theme')?.focus()
 }
 
 function status(snapshot) {
@@ -184,7 +214,7 @@ function render() {
   const rows = flattenedSignals()
   app.innerHTML = `<header class="app-header"><div class="brand"><span aria-hidden="true">K</span><div><strong>Kasim</strong><small>${esc(t('title'))}</small></div></div>
     <div class="target"><strong>${esc(snapshot?.target?.contextName ?? t('loading'))}</strong><small>${esc(snapshot?.target?.kubernetesVersion ?? '')}</small></div>
-    <div class="actions"><span class="status ${statusClass}" aria-live="polite"><i></i>${esc(statusText)}</span><button id="language">${esc(t('language'))}</button></div></header>
+    <div class="actions"><span class="status ${statusClass}" aria-live="polite"><i></i>${esc(statusText)}</span>${themeToggle()}<button id="language">${esc(t('language'))}</button></div></header>
     <main id="main"><section class="intro"><div><p class="eyebrow">Evidence-first inventory</p><h1>${esc(t('title'))}</h1><p>${esc(t('intro'))}</p></div>${diagnostics(snapshot)}</section>
     <section class="summary" aria-label="Inventory summary">${metric(t('nodes'), summary.nodes)}${metric(t('kasim'), summary.kasimNodes)}${metric(t('other'), summary.nonKasimNodes)}${metric(t('scalar'), summary.scalarSignals)}${metric(t('dra'), summary.draDevices)}</section>
     <section class="inventory"><div class="section-title"><div><p class="eyebrow">${esc(t('home'))}</p><h2>${esc(t('signals'))}</h2></div></div>${filters()}${ledger(rows)}</section>
@@ -202,6 +232,7 @@ function closeDetail() {
 function openDetail(index, focusSelector) { state.detail = index; state.focusDetail = focusSelector; render(); document.querySelector('#close-detail')?.focus() }
 
 function bind() {
+  document.querySelector('#theme')?.addEventListener('click', toggleTheme)
   document.querySelector('#language')?.addEventListener('click', () => { state.lang = state.lang === 'en' ? 'zh' : 'en'; setURL('push'); render() })
   document.querySelector('#search')?.addEventListener('input', event => { state.query = event.target.value; setURL(); render() })
   document.querySelectorAll('[data-filter]').forEach(select => select.addEventListener('change', () => { state[select.dataset.filter] = select.value; setURL('push'); render() }))
@@ -235,5 +266,6 @@ async function poll() {
 
 window.addEventListener('keydown', event => { if (event.key === 'Escape' && state.detail !== null) closeDetail() })
 window.addEventListener('popstate', () => { readURL(); state.detail = null; render() })
+themeMedia.addEventListener('change', () => { if (!state.themeExplicit) { state.theme = systemTheme(); applyTheme(); render() } })
 readURL(); render()
 if (token) consumeStream().catch(() => { poll(); setInterval(poll, 30000) })

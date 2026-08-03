@@ -72,6 +72,10 @@ func TestLoopbackServerProtectsInventoryWithoutLeakingCapability(t *testing.T) {
 	if strings.Contains(string(rootBody), "lab") || strings.Contains(string(rootBody), token) {
 		t.Fatal("static root leaked target data or capability")
 	}
+	if !strings.Contains(string(rootBody), `/assets/theme.js`) ||
+		!strings.Contains(string(rootBody), `content="dark light"`) {
+		t.Fatal("static root lacks the pre-paint theme bootstrap")
+	}
 	assertSecurityHeaders(t, root.Header)
 
 	javascript := request(t, http.MethodGet, requestURL+"/assets/app.js", "", "")
@@ -91,6 +95,26 @@ func TestLoopbackServerProtectsInventoryWithoutLeakingCapability(t *testing.T) {
 	} {
 		if !strings.Contains(javascriptText, required) {
 			t.Fatalf("embedded JavaScript lacks %q behavior", required)
+		}
+	}
+
+	themeScript := request(t, http.MethodGet, requestURL+"/assets/theme.js", "", "")
+	themeBody, _ := io.ReadAll(themeScript.Body)
+	themeScript.Body.Close()
+	if themeScript.StatusCode != http.StatusOK || len(themeBody) > 4<<10 {
+		t.Fatalf("theme bootstrap status=%d size=%d", themeScript.StatusCode, len(themeBody))
+	}
+	themeText := string(themeBody)
+	for _, required := range []string{
+		"prefers-color-scheme", "URLSearchParams", "document.documentElement.dataset.theme",
+	} {
+		if !strings.Contains(themeText, required) {
+			t.Errorf("theme bootstrap lacks %q", required)
+		}
+	}
+	for _, forbidden := range []string{"token", "localStorage", "sessionStorage", "http://", "https://"} {
+		if strings.Contains(themeText, forbidden) {
+			t.Errorf("theme bootstrap contains forbidden value %q", forbidden)
 		}
 	}
 
@@ -148,6 +172,74 @@ func TestLoopbackServerProtectsInventoryWithoutLeakingCapability(t *testing.T) {
 		t.Fatalf("bad Host status = %d", badHost.StatusCode)
 	}
 	badHost.Body.Close()
+}
+
+func TestWildcardListenerAcceptsIPLiteralHostAndRejectsDNSHost(t *testing.T) {
+	t.Parallel()
+
+	port := freePort(t)
+	server, err := ui.NewServer(context.Background(), ui.Options{
+		Module: inventory.New(memory.New()),
+		Target: cluster.TargetSelection{
+			KubeconfigPath: "/explicit/config",
+			ContextName:    "lab",
+		},
+		Host: "0.0.0.0",
+		Port: port,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if server.IsLoopback() {
+		t.Fatal("wildcard listener was reported as loopback")
+	}
+	if !strings.HasPrefix(
+		server.AccessURL(),
+		"http://0.0.0.0:"+strconv.Itoa(port)+"/#token=",
+	) {
+		t.Fatalf("access URL = %q", server.AccessURL())
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- server.Serve(ctx) }()
+	t.Cleanup(func() {
+		cancel()
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Errorf("Serve() shutdown: %v", err)
+			}
+		case <-time.After(7 * time.Second):
+			t.Error("Serve() did not shut down")
+		}
+	})
+
+	requestURL := "http://127.0.0.1:" + strconv.Itoa(port) + "/"
+	allowed := request(t, http.MethodGet, requestURL, "", "")
+	if allowed.StatusCode != http.StatusOK {
+		t.Fatalf("IP literal Host status = %d", allowed.StatusCode)
+	}
+	allowed.Body.Close()
+
+	for _, host := range []string{
+		"inventory.example:" + strconv.Itoa(port),
+		"127.0.0.1:" + strconv.Itoa(port+1),
+	} {
+		badRequest, err := http.NewRequest(http.MethodGet, requestURL, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		badRequest.Host = host
+		response, err := http.DefaultClient.Do(badRequest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if response.StatusCode != http.StatusMisdirectedRequest {
+			t.Errorf("Host %q status = %d", host, response.StatusCode)
+		}
+		response.Body.Close()
+	}
 }
 
 func request(

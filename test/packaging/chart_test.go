@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	productVersion = "0.2.0"
+	productVersion = "0.3.0"
 	chartPath      = "../../charts/kasim-runtime"
 )
 

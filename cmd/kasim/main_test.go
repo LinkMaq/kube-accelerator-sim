@@ -49,6 +49,21 @@ func TestBuiltCLISeparatesSuccessfulOutputAndFailureDiagnostics(t *testing.T) {
 			exitCode:   0,
 			wantStdout: `"kind": "Version"`,
 		},
+		"short help": {
+			args:       []string{"-h"},
+			exitCode:   0,
+			wantStdout: "kasim <command> [flags]",
+		},
+		"long help": {
+			args:       []string{"--help"},
+			exitCode:   0,
+			wantStdout: "Kasim simulates Kubernetes-visible accelerator capacity",
+		},
+		"UI help": {
+			args:       []string{"ui", "--help"},
+			exitCode:   0,
+			wantStdout: "--host string",
+		},
 		"profile list": {
 			args:       []string{"profile", "list"},
 			exitCode:   0,

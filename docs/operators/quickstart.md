@@ -15,6 +15,7 @@ From a source checkout:
 ```sh
 go build -trimpath -o ./dist/kasim ./cmd/kasim
 ./dist/kasim version -o json
+./dist/kasim --help
 ```
 
 For a published release, verify the archive before unpacking it as described
@@ -24,8 +25,8 @@ The matching controller image and Helm chart are published through GitHub
 Packages:
 
 ```sh
-docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.2.0
-helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.2.0
+docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.3.0
+helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.3.0
 ```
 
 ## 2. Inspect and compile offline
@@ -66,7 +67,7 @@ package and pin its version:
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.2.0 \
+  --version 0.3.0 \
   --kubeconfig ./target.kubeconfig \
   --kube-context target \
   --namespace kasim-system \
@@ -124,6 +125,7 @@ both Kasim and non-Kasim Nodes:
 
 ```sh
 ./dist/kasim ui --open
+./dist/kasim ui --help
 ```
 
 See the [cluster inventory UI guide](cluster-inventory-ui.md) for its

@@ -93,9 +93,12 @@ reviewed the evidence and explicitly accepts them.
 7. When the user asks to see the whole cluster or open the UI, run `kasim ui`
    with no target flags when kubectl's current kubeconfig/context is the
    intended target; otherwise override it with `--kubeconfig` and/or
-   `--context`. Verify the context printed before the URL. Do not add a remote
-   bind, proxy, tunnel, or persistent service. Treat its fragment URL as a
-   temporary read capability.
+   `--context`. Verify the context printed before the URL. Keep the default
+   loopback listener unless the user explicitly requests another listen host;
+   then pass `--host` for that temporary process, surface the unencrypted-HTTP
+   warning, and require restricted network access. Do not add a proxy, tunnel,
+   or persistent service unless separately requested. Treat the complete
+   fragment URL as a temporary read capability and never publish it.
 8. Report the context, target fingerprint, Scenario UID and generation,
    resolved profiles, requested/observed pool totals, fidelity surfaces,
    diagnostics, and receipt paths.

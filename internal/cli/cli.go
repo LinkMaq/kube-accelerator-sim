@@ -6,6 +6,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -33,6 +34,41 @@ import (
 
 const maximumScenarioBytes = 1 << 20
 const creationIdentity = "kasim-cli/v1"
+
+const rootHelpText = `Kasim simulates Kubernetes-visible accelerator capacity.
+
+Usage:
+  kasim <command> [flags]
+
+Commands:
+  version   Print CLI and catalog version information
+  profile   List or inspect accelerator Vendor Profiles
+  apply     Compile or submit a Scenario
+  status    Inspect a Scenario Instance
+  health    Change simulated accelerator health
+  scale     Change a Scenario Instance Node Group size
+  delete    Delete a Scenario Instance safely
+  ui        Open the read-only Cluster Simulation Inventory
+
+Flags:
+  -h, --help   Show this help
+
+Run "kasim ui --help" for UI-specific flags.
+`
+
+const uiHelpText = `Open the read-only Cluster Simulation Inventory.
+
+Usage:
+  kasim ui [flags]
+
+Flags:
+      --kubeconfig string   Kubeconfig path override
+      --context string      Kubeconfig context override
+      --host string         Listen host (default "127.0.0.1")
+      --port int            TCP port (default 8080)
+      --open                Open the UI in a browser
+  -h, --help                Show this help
+`
 
 // Dependencies contains concrete delivery wiring used by tests. It does not
 // add a product behavior seam; ScenarioRuntime still owns lifecycle behavior.
@@ -77,6 +113,10 @@ func run(
 	stdout, stderr io.Writer,
 	dependencies Dependencies,
 ) int {
+	if len(args) == 1 &&
+		(args[0] == "-h" || args[0] == "--help" || args[0] == "help") {
+		return writeHelp("", rootHelpText, stdout, stderr)
+	}
 	format, err := requestedOutputFormat(args)
 	if err != nil {
 		human, _ := presentation.ParseOutputFormat("human")
@@ -149,14 +189,18 @@ func runUI(
 ) int {
 	flags := flag.NewFlagSet("ui", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
-	var kubeconfigPath, contextName string
+	var kubeconfigPath, contextName, host string
 	var port int
 	var open bool
 	flags.StringVar(&kubeconfigPath, "kubeconfig", "", "kubeconfig path override")
 	flags.StringVar(&contextName, "context", "", "kubeconfig context override")
-	flags.IntVar(&port, "port", 8080, "loopback TCP port")
+	flags.StringVar(&host, "host", "127.0.0.1", "listen host")
+	flags.IntVar(&port, "port", 8080, "TCP port")
 	flags.BoolVar(&open, "open", false, "open the local UI in a browser")
 	if err := flags.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return writeHelp("ui", uiHelpText, stdout, stderr)
+		}
 		return writeFailure("ui", "InvocationInvalid", err.Error(), format, stderr)
 	}
 	if flags.NArg() != 0 {
@@ -169,6 +213,12 @@ func runUI(
 		return writeFailure(
 			"ui", "InvocationInvalid",
 			"--port must be between 1 and 65535", format, stderr,
+		)
+	}
+	if err := ui.ValidateHost(host); err != nil {
+		return writeFailure(
+			"ui", "InvocationInvalid",
+			"--host "+err.Error(), format, stderr,
 		)
 	}
 	if dependencies.InventorySource == nil {
@@ -192,6 +242,7 @@ func runUI(
 			ContextName:    contextName,
 			UseCurrent:     kubeconfigPath == "" || contextName == "",
 		},
+		Host: host,
 		Port: port,
 	})
 	if err != nil {
@@ -204,6 +255,12 @@ func runUI(
 	}
 	if target.Fingerprint != "" {
 		fmt.Fprintf(stdout, "Fingerprint: %s\n", target.Fingerprint)
+	}
+	if !server.IsLoopback() {
+		fmt.Fprintln(
+			stdout,
+			"Warning: the UI is listening beyond loopback over unencrypted HTTP; protect the capability URL and restrict network access.",
+		)
 	}
 	fmt.Fprintf(stdout, "URL: %s\nPress Ctrl+C to stop.\n", server.AccessURL())
 	if open {
@@ -1080,6 +1137,20 @@ func requestedOutputFormat(args []string) (presentation.OutputFormat, error) {
 		}
 	}
 	return presentation.ParseOutputFormat(name)
+}
+
+func writeHelp(command, value string, stdout, stderr io.Writer) int {
+	if _, err := io.WriteString(stdout, value); err != nil {
+		human, _ := presentation.ParseOutputFormat("human")
+		return writeFailure(
+			command,
+			"InvocationInvalid",
+			"write command output failed",
+			human,
+			stderr,
+		)
+	}
+	return 0
 }
 
 func outputFlagSet(name string) (*flag.FlagSet, *string) {

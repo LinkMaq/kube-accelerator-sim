@@ -67,6 +67,90 @@ func TestUICommandUsesExplicitTargetAndLoopbackLifecycle(t *testing.T) {
 	}
 }
 
+func TestHelpIsSuccessfulAndDoesNotNeedACluster(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range []struct {
+		name string
+		args []string
+		want []string
+	}{
+		{
+			name: "short root help",
+			args: []string{"-h"},
+			want: []string{"Usage:", "kasim <command> [flags]", "--help"},
+		},
+		{
+			name: "long root help",
+			args: []string{"--help"},
+			want: []string{"Commands:", "ui", "kasim ui --help"},
+		},
+		{
+			name: "help command",
+			args: []string{"help"},
+			want: []string{"Kasim simulates", "profile", "delete"},
+		},
+		{
+			name: "UI help",
+			args: []string{"ui", "--help"},
+			want: []string{"kasim ui [flags]", "--host string", "127.0.0.1"},
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := runCLI(t, cli.Dependencies{}, testCase.args)
+			if result.exit != 0 || result.stderr != "" {
+				t.Fatalf("help result = %#v", result)
+			}
+			for _, expected := range testCase.want {
+				if !strings.Contains(result.stdout, expected) {
+					t.Errorf("help output missing %q:\n%s", expected, result.stdout)
+				}
+			}
+		})
+	}
+}
+
+func TestUICommandSupportsExplicitListenHost(t *testing.T) {
+	t.Parallel()
+
+	port := freeTCPPort(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	result := runCLI(t, cli.Dependencies{
+		Context:         ctx,
+		InventorySource: inventorymemory.New(),
+	}, []string{
+		"ui",
+		"--kubeconfig", "/explicit/config",
+		"--context", "lab",
+		"--host", "0.0.0.0",
+		"--port", strconv.Itoa(port),
+	})
+	if result.exit != 0 || result.stderr != "" {
+		t.Fatalf("ui result = %#v", result)
+	}
+	for _, expected := range []string{
+		"http://0.0.0.0:" + strconv.Itoa(port) + "/#token=",
+		"Warning: the UI is listening beyond loopback over unencrypted HTTP",
+	} {
+		if !strings.Contains(result.stdout, expected) {
+			t.Errorf("ui output missing %q:\n%s", expected, result.stdout)
+		}
+	}
+}
+
+func TestUICommandRejectsHostWithPort(t *testing.T) {
+	t.Parallel()
+
+	result := runCLI(t, cli.Dependencies{}, []string{
+		"ui", "--host", "127.0.0.1:8080",
+	})
+	if result.exit != 2 || result.stdout != "" ||
+		!strings.Contains(result.stderr, "--host host must be an IP address or hostname without a port") {
+		t.Fatalf("ui result = %#v", result)
+	}
+}
+
 func TestUICommandUsesCurrentKubeconfigAndContextByDefault(t *testing.T) {
 	target := httptest.NewTLSServer(http.HandlerFunc(func(
 		response http.ResponseWriter,
@@ -541,6 +625,17 @@ func TestConnectedCLICoversPreflightConflictAndAcceptedTimeoutCategories(t *test
 		!strings.Contains(timeout.stderr, `"snapshot"`) {
 		t.Fatalf("accepted timeout lost receipt or Snapshot: %#v", timeout)
 	}
+}
+
+func freeTCPPort(t *testing.T) int {
+	t.Helper()
+	listener, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	listener.Close()
+	return port
 }
 
 type cliResult struct {

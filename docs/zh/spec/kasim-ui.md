@@ -22,6 +22,7 @@ UI 不创建、修改、扩缩、恢复或删除 Scenario，不管理 Kubernetes
 kasim ui \
   [--kubeconfig /absolute/path/to/config] \
   [--context exact-context-name] \
+  [--host 127.0.0.1] \
   [--port 8080] \
   [--open]
 ```
@@ -33,8 +34,11 @@ kasim ui \
   目标行为。
 - 解析后的 context 与客户端配置在启动时冻结。不回退到集群内配置；生命周期和
   写操作仍必须显式提供两个目标参数。
-- 只能监听 `127.0.0.1`，不提供 `--address`。
+- `--host` 接受一个不含端口的 IP 地址或主机名，默认为 `127.0.0.1`；非回环和
+  通配地址必须由用户显式指定。
 - 默认端口为 `8080`，`--port` 接受 `1..65535`。
+- 通配监听只接受同一端口上的 IP 字面量 HTTP Host。非回环监听会在访问 URL 前
+  输出未加密 HTTP 与能力 URL 的安全警告。
 - 命令输出 context、脱敏目标指纹、数据新鲜度和访问 URL。
 - `--open` 只在监听器和目标身份就绪后打开浏览器；打开失败只告警，因为 URL 仍可手动访问。
 - 端口冲突、目标无效、DNS/TLS/认证失败、Kubernetes 版本不兼容或目标指纹冲突会返回稳定启动诊断并关闭监听器。
@@ -43,7 +47,7 @@ kasim ui \
 
 命令遵循每个 release 有界的 Kubernetes 兼容矩阵，当前为 1.30–1.36；1.30 是最低版本，并不代表对尚未验证的新版本无限承诺。
 
-## 本地安全契约
+## 监听安全契约
 
 每次启动至少生成 256 位随机能力 token，URL 使用 fragment：
 
@@ -53,9 +57,9 @@ http://127.0.0.1:8080/#token=<base64url-capability>
 
 Fragment 不会发送到 HTTP 请求、服务端日志或 referrer。前端只把 token 保存在内存中，并在所有数据请求中发送 `Authorization: Bearer`；不写入 local storage、Cookie、日志或页面正文。
 
-本地服务必须：
+服务端必须：
 
-- 校验准确的回环 Host；
+- 校验选定的 Host 和端口；通配监听只接受 IP 字面量 Host；
 - 没有 token 时不返回集群数据；
 - 只接受 `GET` 和 `HEAD`，不存在修改接口；
 - 不发送宽松 CORS；
@@ -63,6 +67,10 @@ Fragment 不会发送到 HTTP 请求、服务端日志或 referrer。前端只�
 - 对 HTML 和数据设置 `Cache-Control: no-store`；
 - 不使用统计分析、Service Worker、远程字体、CDN 或第三方请求；
 - 只提供同一 `kasim` 版本内部使用的版本化 JSON/Fetch 流，不承诺远程公共 API。
+
+回环监听仍是安全默认值。非回环监听使用相同的临时 Bearer 能力保护，但 HTTP
+流量不加密；操作者必须使用可信网络，或在 Kasim 之外提供受保护的传输，并把
+终端输出的完整 URL 视为临时密钥。
 
 优先使用能携带 Bearer token 的 fetch streaming，失败时回退为有界鉴权轮询。禁止把 token 放进 query string，也不引入 Cookie 登录流程。
 
@@ -91,7 +99,7 @@ Fragment 不会发送到 HTTP 请求、服务端日志或 referrer。前端只�
 - Profile/Resource Contract 或 Kubernetes 数据来源；
 - Auxiliary Device Pool 关联和“仅调度信号”边界。
 
-搜索以及来源、Scenario、厂商、型号、信号角色、表现形式、健康度、数据源状态筛选都写入 URL。浏览器前进/后退恢复相同页面状态；能力 token 始终留在 fragment，不进入查询参数。
+搜索以及来源、Scenario、厂商、型号、信号角色、表现形式、健康度、数据源状态筛选和显式浅色/深色主题选择都写入 URL。浏览器前进/后退恢复相同页面状态；没有 `theme` 参数时跟随操作系统偏好，并响应系统主题变化。能力 token 始终留在 fragment，不进入查询参数或浏览器存储。
 
 内置英文和简体中文，根据浏览器语言首次选择，并允许页面切换。Kubernetes 字段名、准确资源名、对象名、驱动 ID 和厂商标识保持原文。
 
@@ -101,9 +109,9 @@ Fragment 不会发送到 HTTP 请求、服务端日志或 referrer。前端只�
 
 颜色始终带文字和形状冗余：Kasim 使用青色和 `Kasim`，非 Kasim 节点使用中性灰和 `Non-Kasim`，辅助信号使用紫色和 `Auxiliary`；绿色只用于有证据的正常/报告/模拟可用状态；黄色配合未知、部分或不支持；红色配合过期、离线或终止诊断。
 
-键盘可以操作筛选、清单行、详情抽屉、语言切换和关闭/重置。焦点始终可见，抽屉关闭后回到原行，Escape 可关闭；关键值不能只靠 hover。实时更新使用克制的 live region，不逐条朗读 watch 事件。
+键盘可以操作筛选、清单行、详情抽屉、主题与语言切换和关闭/重置。主题按钮同时暴露按下状态、当前配色和切换动作，不只依赖颜色。焦点始终可见，抽屉关闭后回到原行，主题切换重绘后仍保留焦点，Escape 可关闭抽屉；关键值不能只靠 hover。实时更新使用克制的 live region，不逐条朗读 watch 事件。
 
-在 360–430 CSS 像素下，准确设备/信号清单位于汇总之前；表格转为带字段标签的记录；筛选折叠后仍显示生效值；详情抽屉变成全宽面板；主要触控目标至少 44 CSS 像素。
+在 360–430 CSS 像素下，准确设备/信号清单位于汇总之前；表格转为带字段标签的记录；筛选折叠后仍显示生效值；主题按钮保持可见；详情抽屉变成全宽面板；主要触控目标至少 44 CSS 像素。主题过渡不承载状态，并在减少动态效果偏好下关闭。
 
 JavaScript 禁用或加载失败时，静态页不暴露任何集群数据，只说明本地实时清单需要 JavaScript；CLI 输出是恢复入口。
 
@@ -208,7 +216,7 @@ Pods 无权限时仅移除 requested，不移除 capacity；Claims 无权限时�
 
 ## 前端与包体预算
 
-生产代码使用标准语义 HTML、CSS 和 JavaScript module，通过 Go `embed` 嵌入。没有前端框架、图表库、远程资产、运行时 Node.js 或外部静态目录。允许可复现的构建期压缩，但源代码必须可审阅。
+生产代码使用标准语义 HTML、CSS 和 JavaScript module，通过 Go `embed` 嵌入。没有前端框架、图表库、远程资产、运行时 Node.js 或外部静态目录。同源首屏脚本会在 CSS 渲染前应用系统或 URL 选择的浅色/深色配色，不读取能力 fragment 或浏览器存储。允许可复现的构建期压缩，但源代码必须可审阅。
 
 Release gate：静态资源总计不超过 256 KiB 未压缩和 96 KiB gzip；UI 导致的压缩 release binary 增量不超过 1 MiB，并逐平台报告；页面不能发起跨域请求；可见页最多渲染 100 行，不能为缓存中的每个 Pod 创建 DOM；1,000 Node 清单仍可搜索和打开详情。
 
@@ -221,9 +229,9 @@ throwaway 原型的 HTML、JavaScript 和 CSS 总计 33,721 字节；其中 Java
 | Domain/unit | Fact 状态、known zero、单位安全汇总、Kasim 所有权、禁止厂商/健康猜测、Pod request、DRA identity、辅助池数量/可用性/关联校验。 |
 | Module Interface | loading 首帧、完整替换、单调 revision、慢消费者合并、partial/stale、目标冲突、幂等关闭且无 goroutine 泄漏。 |
 | Kubernetes Adapter | discovery、分页 list/watch、bookmark、断线、410、list-only polling、403、GVR/schema 不支持、稳定 DRA v1、禁止泄漏 raw object。 |
-| HTTP/security | 仅回环、准确 Host、token 三态、token 不进日志/referrer/cache、GET/HEAD、无 CORS、CSP、安全头、信号优雅退出。 |
-| Browser/component | 中英文、URL 筛选、键盘/焦点/抽屉、无 hover-only、390px/桌面、partial/stale/offline/empty、screen reader、无 JS 回退。 |
-| Visual regression | 证据清单桌面、中文部分权限手机、详情抽屉、长资源名、未知健康、Kasim 与 Non-Kasim 混合。 |
+| HTTP/security | 默认回环与显式 Host 监听、准确或通配安全 Host 校验、token 三态、token 不进日志/referrer/cache、GET/HEAD、无 CORS、CSP、安全头、信号优雅退出。 |
+| Browser/component | 中英文、系统与显式 URL 浅色/深色主题、URL 筛选、键盘/焦点/抽屉、无 hover-only、390px/桌面、partial/stale/offline/empty、screen reader、无 JS 回退。 |
+| Visual regression | 深色与浅色证据清单桌面、浅色中文部分权限手机、深色详情抽屉、长资源名、未知健康、Kasim 与 Non-Kasim 混合。 |
 | E2E scheduling | Kubernetes 1.30 floor 与当前 ceiling、多 Vendor Profile、标量信号、Pod 调度/request、非 Kasim 节点、重连和部分 RBAC。 |
 | E2E DRA | 所有稳定 DRA 版本、完整/不完整多 Slice pool、原生 ID、Claim 分配/reservation/Pod join、runtime unknown、旧 schema 不支持。 |
 | Auxiliary E2E | 两个 Synthetic Node，同时包含加速器与可配置 RDMA token pool；准确 Node resource；显式关联；scale/revision/status/cleanup；不宣称物理网络。 |

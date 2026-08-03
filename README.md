@@ -115,12 +115,12 @@ fidelity claim.
 
 ## Published packages
 
-The evidence-gated `v0.2.0` release publishes native CLI archives as GitHub
+The evidence-gated `v0.3.0` release publishes native CLI archives as GitHub
 Release assets and publishes both runtime artifacts through GitHub Packages:
 
 ```sh
-docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.2.0
-helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.2.0
+docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.3.0
+helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.3.0
 ```
 
 Use the chart directly from its OCI package:
@@ -128,7 +128,7 @@ Use the chart directly from its OCI package:
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.2.0 \
+  --version 0.3.0 \
   --kubeconfig ./target.kubeconfig \
   --kube-context target \
   --namespace kasim-system \
@@ -137,7 +137,7 @@ helm upgrade --install kasim-runtime \
 ```
 
 Download and verify the appropriate CLI archive and checksums from the
-[`v0.2.0` release](https://github.com/LinkMaq/kube-accelerator-sim/releases/tag/v0.2.0).
+[`v0.3.0` release](https://github.com/LinkMaq/kube-accelerator-sim/releases/tag/v0.3.0).
 The verification steps are documented in
 [Release verification](docs/operators/release-verification.md).
 

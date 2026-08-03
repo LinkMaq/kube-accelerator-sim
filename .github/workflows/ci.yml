@@ -179,24 +179,24 @@ jobs:
       - name: Build controller image
         run: >-
           docker build
-          --build-arg VERSION=0.2.0
+          --build-arg VERSION=0.3.0
           --build-arg SOURCE_REVISION=${{ github.sha }}
           --build-arg BUILD_DATE=1970-01-01T00:00:00Z
-          --tag kasim-controller:0.2.0
+          --tag kasim-controller:0.3.0
           .
 
       - name: Verify controller image metadata
         shell: bash
         run: |
-          test "$(docker image inspect kasim-controller:0.2.0 --format '{{.Config.User}}')" = "65532:65532"
-          test "$(docker image inspect kasim-controller:0.2.0 --format '{{index .Config.Labels "org.opencontainers.image.version"}}')" = "0.2.0"
-          test "$(docker image inspect kasim-controller:0.2.0 --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "${GITHUB_SHA}"
-          docker run --rm kasim-controller:0.2.0 --version | grep 'kasim-controller 0.2.0'
+          test "$(docker image inspect kasim-controller:0.3.0 --format '{{.Config.User}}')" = "65532:65532"
+          test "$(docker image inspect kasim-controller:0.3.0 --format '{{index .Config.Labels "org.opencontainers.image.version"}}')" = "0.3.0"
+          test "$(docker image inspect kasim-controller:0.3.0 --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "${GITHUB_SHA}"
+          docker run --rm kasim-controller:0.3.0 --version | grep 'kasim-controller 0.3.0'
 
       - name: Exercise chart install, upgrade, ownership, and uninstall
         env:
           KASIM_E2E_HELM: "1"
-          KASIM_CONTROLLER_IMAGE: kasim-controller:0.2.0
+          KASIM_CONTROLLER_IMAGE: kasim-controller:0.3.0
         run: >-
           go test -v ./test/e2e
           -run TestRuntimeChartInstallUpgradeUninstall

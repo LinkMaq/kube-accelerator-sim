@@ -11,20 +11,20 @@ helm upgrade --install kasim-runtime ./charts/kasim-runtime \
   --namespace kasim-system
 ```
 
-For the published `v0.2.0` package, install the same immutable chart directly
+For the published `v0.3.0` package, install the same immutable chart directly
 from GitHub Container Registry:
 
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.2.0 \
+  --version 0.3.0 \
   --kubeconfig ./target.kubeconfig \
   --kube-context target \
   --namespace kasim-system
 ```
 
 The chart selects
-`ghcr.io/linkmaq/kube-accelerator-sim-controller:0.2.0` by its matching
+`ghcr.io/linkmaq/kube-accelerator-sim-controller:0.3.0` by its matching
 `appVersion`. A different controller tag is rejected; use the chart and image
 from the same release.
 

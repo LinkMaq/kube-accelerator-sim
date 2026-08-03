@@ -1,5 +1,6 @@
-// Package ui serves the embedded read-only Kasim inventory on strict
-// loopback. It intentionally exposes no remote binding or mutation surface.
+// Package ui serves the embedded read-only Kasim inventory. It defaults to
+// loopback and requires an explicit host for any other binding. It exposes no
+// mutation surface.
 package ui
 
 import (
@@ -14,6 +15,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,6 +28,7 @@ const contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 
 type Options struct {
 	Module *inventory.Module
 	Target cluster.TargetSelection
+	Host   string
 	Port   int
 }
 
@@ -36,11 +39,16 @@ type Server struct {
 	store    *snapshotStore
 	token    string
 	url      string
+	loopback bool
 }
 
 func NewServer(ctx context.Context, options Options) (*Server, error) {
 	if options.Module == nil {
 		return nil, fmt.Errorf("Cluster Simulation Inventory Module is required")
+	}
+	host, err := normalizedHost(options.Host)
+	if err != nil {
+		return nil, err
 	}
 	if options.Port < 1 || options.Port > 65535 {
 		return nil, fmt.Errorf("port must be between 1 and 65535")
@@ -59,10 +67,17 @@ func NewServer(ctx context.Context, options Options) (*Server, error) {
 		stream.Close()
 		return nil, err
 	}
-	listener, err := net.Listen("tcp4", "127.0.0.1:"+strconv.Itoa(options.Port))
+	listenAddress := net.JoinHostPort(host, strconv.Itoa(options.Port))
+	listener, err := net.Listen("tcp", listenAddress)
 	if err != nil {
 		stream.Close()
-		return nil, fmt.Errorf("listen on 127.0.0.1:%d: %w", options.Port, err)
+		return nil, fmt.Errorf("listen on %s: %w", listenAddress, err)
+	}
+	tcpAddress, ok := listener.Addr().(*net.TCPAddr)
+	if !ok {
+		listener.Close()
+		stream.Close()
+		return nil, fmt.Errorf("listener did not resolve to a TCP address")
 	}
 	store := newSnapshotStore(loading)
 	server := &Server{
@@ -70,10 +85,11 @@ func NewServer(ctx context.Context, options Options) (*Server, error) {
 		stream:   stream,
 		store:    store,
 		token:    token,
-		url:      "http://" + listener.Addr().String() + "/#token=" + token,
+		url:      "http://" + net.JoinHostPort(host, strconv.Itoa(tcpAddress.Port)) + "/#token=" + token,
+		loopback: tcpAddress.IP.IsLoopback(),
 	}
 	server.http = &http.Server{
-		Handler:           server.handler(listener.Addr().String()),
+		Handler:           server.handler(host, tcpAddress.Port),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       65 * time.Second,
 		MaxHeaderBytes:    16 << 10,
@@ -84,6 +100,8 @@ func NewServer(ctx context.Context, options Options) (*Server, error) {
 func (server *Server) AccessURL() string { return server.url }
 
 func (server *Server) Target() inventory.Target { return server.store.current().Target }
+
+func (server *Server) IsLoopback() bool { return server.loopback }
 
 func (server *Server) Serve(ctx context.Context) error {
 	collectorCtx, cancelCollector := context.WithCancel(ctx)
@@ -141,7 +159,7 @@ func (server *Server) collect(ctx context.Context) {
 	}
 }
 
-func (server *Server) handler(expectedHost string) http.Handler {
+func (server *Server) handler(configuredHost string, port int) http.Handler {
 	assets, err := fs.Sub(embeddedAssets, "static")
 	if err != nil {
 		panic(err)
@@ -149,8 +167,8 @@ func (server *Server) handler(expectedHost string) http.Handler {
 	static := http.FileServer(http.FS(assets))
 	return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		setSecurityHeaders(response.Header())
-		if request.Host != expectedHost {
-			http.Error(response, "misdirected loopback request", http.StatusMisdirectedRequest)
+		if !requestHostAllowed(request.Host, configuredHost, port) {
+			http.Error(response, "misdirected request", http.StatusMisdirectedRequest)
 			return
 		}
 		if request.Method != http.MethodGet && request.Method != http.MethodHead {
@@ -174,18 +192,74 @@ func (server *Server) handler(expectedHost string) http.Handler {
 				return
 			}
 			server.streamSnapshots(response, request)
-		case "/", "/index.html", "/assets/app.css", "/assets/app.js":
+		case "/", "/index.html", "/assets/app.css", "/assets/app.js", "/assets/theme.js":
 			path := request.URL.Path
 			if path == "/assets/app.css" {
 				request.URL.Path = "/app.css"
 			} else if path == "/assets/app.js" {
 				request.URL.Path = "/app.js"
+			} else if path == "/assets/theme.js" {
+				request.URL.Path = "/theme.js"
 			}
 			static.ServeHTTP(response, request)
 		default:
 			http.NotFound(response, request)
 		}
 	})
+}
+
+// ValidateHost checks the host-only syntax accepted by Options. An empty host
+// is valid and resolves to the loopback default.
+func ValidateHost(value string) error {
+	_, err := normalizedHost(value)
+	return err
+}
+
+func normalizedHost(value string) (string, error) {
+	if value == "" {
+		return "127.0.0.1", nil
+	}
+	if strings.TrimSpace(value) != value || strings.ContainsAny(value, "/?#@") {
+		return "", fmt.Errorf("host must be an IP address or hostname without a port")
+	}
+	if net.ParseIP(value) != nil {
+		return value, nil
+	}
+	if strings.Contains(value, ":") {
+		return "", fmt.Errorf("host must be an IP address or hostname without a port")
+	}
+	for _, label := range strings.Split(value, ".") {
+		if label == "" || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
+			return "", fmt.Errorf("host must be an IP address or hostname without a port")
+		}
+		for _, character := range label {
+			if (character < 'a' || character > 'z') &&
+				(character < 'A' || character > 'Z') &&
+				(character < '0' || character > '9') && character != '-' {
+				return "", fmt.Errorf("host must be an IP address or hostname without a port")
+			}
+		}
+	}
+	return value, nil
+}
+
+func requestHostAllowed(value, configuredHost string, port int) bool {
+	host, requestedPort, err := net.SplitHostPort(value)
+	if err != nil || requestedPort != strconv.Itoa(port) {
+		return false
+	}
+	configuredIP := net.ParseIP(configuredHost)
+	if configuredIP == nil {
+		return strings.EqualFold(host, configuredHost)
+	}
+	requestedIP := net.ParseIP(host)
+	if requestedIP == nil {
+		return false
+	}
+	if configuredIP.IsUnspecified() {
+		return true
+	}
+	return requestedIP.Equal(configuredIP)
 }
 
 func (server *Server) streamSnapshots(response http.ResponseWriter, request *http.Request) {

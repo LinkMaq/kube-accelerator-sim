@@ -417,6 +417,7 @@ func measureUIAssets() (uiPackageBudget, error) {
 		"internal/ui/static/app.css",
 		"internal/ui/static/app.js",
 		"internal/ui/static/index.html",
+		"internal/ui/static/theme.js",
 	}
 	var raw bytes.Buffer
 	for _, path := range paths {

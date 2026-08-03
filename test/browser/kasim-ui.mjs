@@ -75,7 +75,7 @@ const browser = await chromium.launch({headless: true})
 await mkdir('test-results/kasim-ui', {recursive: true})
 
 try {
-  const page = await browser.newPage({viewport: {width: 1440, height: 900}})
+  const page = await browser.newPage({viewport: {width: 1440, height: 900}, colorScheme: 'dark'})
   const requests = [], consoleErrors = []
   page.on('request', request => requests.push(request.url()))
   page.on('console', message => {
@@ -99,6 +99,32 @@ try {
   assert(requests.every(url => !url.includes(token)), 'capability leaked into an HTTP request URL')
 
   await page.screenshot({path: 'test-results/kasim-ui/evidence-first-desktop.png'})
+
+  assert(await page.locator('html').getAttribute('data-theme') === 'dark', 'system dark theme was not applied')
+  assert(await page.locator('#theme').getAttribute('aria-pressed') === 'true', 'dark theme toggle state is missing')
+  const darkBackground = await page.locator('body').evaluate(element => getComputedStyle(element).backgroundColor)
+  await page.emulateMedia({colorScheme: 'light'})
+  await page.waitForFunction(() => document.documentElement.dataset.theme === 'light')
+  assert(!new URL(page.url()).searchParams.has('theme'), 'system theme leaked into the URL')
+  await page.waitForFunction(
+    previous => getComputedStyle(document.body).backgroundColor !== previous,
+    darkBackground,
+  )
+  const systemLightBackground = await page.locator('body').evaluate(element => getComputedStyle(element).backgroundColor)
+  assert(systemLightBackground !== darkBackground, 'system theme change did not alter the palette')
+  await page.emulateMedia({colorScheme: 'dark'})
+  await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark')
+
+  await page.locator('#theme').click()
+  await page.waitForFunction(() => new URL(location.href).searchParams.get('theme') === 'light')
+  assert(await page.locator('html').getAttribute('data-theme') === 'light', 'explicit light theme was not applied')
+  assert(await page.locator('#theme').getAttribute('aria-pressed') === 'false', 'light theme toggle state is missing')
+  assert((await page.locator('#theme').innerText()).includes('Light'), 'light theme label is missing')
+  assert(await page.locator('#theme').evaluate(element => element === document.activeElement), 'theme toggle lost keyboard focus')
+  assert(new URL(page.url()).hash === new URL(fixture.accessURL).hash, 'theme switching changed the capability fragment')
+  await page.screenshot({path: 'test-results/kasim-ui/evidence-first-desktop-light.png'})
+  await page.evaluate(() => history.back())
+  await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark' && !new URL(location.href).searchParams.has('theme'))
 
   await page.locator('[data-origin="kasim"]').click()
   await page.waitForFunction(() => new URL(location.href).searchParams.get('origin') === 'kasim')
@@ -131,6 +157,9 @@ try {
   await page.locator('#language').click()
   await page.waitForFunction(() => document.documentElement.lang === 'zh-CN')
   assert((await page.locator('h1').textContent()).includes('集群模拟清单'), 'Chinese locale did not render')
+  await page.locator('#theme').click()
+  await page.waitForFunction(() => document.documentElement.dataset.theme === 'light')
+  assert((await page.locator('#theme').innerText()).includes('浅色'), 'Chinese light theme label is missing')
   await page.setViewportSize({width: 390, height: 844})
   const inventoryBox = await page.locator('.inventory').boundingBox()
   const summaryBox = await page.locator('.summary').boundingBox()
