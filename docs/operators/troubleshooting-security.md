@@ -4,7 +4,7 @@
 
 | Diagnostic | Meaning | Safe response |
 | --- | --- | --- |
-| `InvocationInvalid` requesting target flags | A connected command omitted `--kubeconfig` or `--context` | Supply both; the CLI never falls back to current context or environment |
+| `InvocationInvalid` requesting target flags | A lifecycle command omitted `--kubeconfig` or `--context` | Supply both; only the read-only `kasim ui` command may use current kubeconfig defaults |
 | `TargetInvalid` or target fingerprint change | The named context resolves differently or `kube-system` identity changed | Stop and verify the exact API server, CA digest, and cluster identity |
 | Kubernetes version rejection | The server is outside 1.30–1.36 | Use a supported target; do not bypass preflight |
 | DRA unavailable | Stable DRA is unavailable or the server is outside 1.34–1.36 | Use `scheduling` if that matches the intended test, otherwise change target |

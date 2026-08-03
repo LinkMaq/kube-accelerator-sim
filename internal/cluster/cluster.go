@@ -25,11 +25,14 @@ const (
 	MaximumDevicesPerSlice = 128
 )
 
-// TargetSelection identifies exactly one context in exactly one kubeconfig.
-// Neither field has an environment or current-context fallback.
+// TargetSelection identifies one context in a kubeconfig source. UseCurrent
+// permits an interactive read-only caller to fill empty fields through the
+// standard client-go loading rules; lifecycle callers leave it false and must
+// supply both fields explicitly.
 type TargetSelection struct {
 	KubeconfigPath string
 	ContextName    string
+	UseCurrent     bool
 }
 
 // ConnectionReceipt is the redacted immutable identity of one authenticated

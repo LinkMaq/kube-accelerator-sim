@@ -72,7 +72,7 @@ func (*Adapter) Open(
 	ctx context.Context,
 	selection cluster.TargetSelection,
 ) (inventory.SourceStream, error) {
-	config, canonicalPath, serverURL, caDigest, err := loadConfig(selection)
+	config, canonicalPath, contextName, serverURL, caDigest, err := loadConfig(selection)
 	if err != nil {
 		return nil, err
 	}
@@ -96,14 +96,14 @@ func (*Adapter) Open(
 		return nil, fmt.Errorf("load bundled inventory profile catalog: %w", err)
 	}
 	fingerprintInput := strings.Join([]string{
-		"kasim.inventory-target.v1", serverURL, caDigest, selection.ContextName,
+		"kasim.inventory-target.v1", serverURL, caDigest, contextName,
 	}, "\x00")
 	fingerprint := sha256.Sum256([]byte(fingerprintInput))
 	streamCtx, cancel := context.WithCancel(ctx)
 	stream := &sourceStream{
 		client: dynamicClient,
 		target: inventory.Target{
-			ContextName:       selection.ContextName,
+			ContextName:       contextName,
 			Fingerprint:       "sha256:" + hex.EncodeToString(fingerprint[:]),
 			KubernetesVersion: serverVersion.GitVersion,
 		},
@@ -853,54 +853,104 @@ func deviceAttributes(
 
 func loadConfig(
 	selection cluster.TargetSelection,
-) (*rest.Config, string, string, string, error) {
-	if selection.KubeconfigPath == "" || selection.ContextName == "" {
-		return nil, "", "", "", fmt.Errorf(
+) (*rest.Config, string, string, string, string, error) {
+	if !selection.UseCurrent &&
+		(selection.KubeconfigPath == "" || selection.ContextName == "") {
+		return nil, "", "", "", "", fmt.Errorf(
 			"explicit kubeconfig path and context name are both required",
 		)
 	}
-	absolute, err := filepath.Abs(selection.KubeconfigPath)
-	if err != nil {
-		return nil, "", "", "", fmt.Errorf("resolve explicit kubeconfig path: %w", err)
-	}
-	canonical, err := filepath.EvalSymlinks(absolute)
-	if err != nil {
-		return nil, "", "", "", fmt.Errorf("resolve explicit kubeconfig symlinks: %w", err)
-	}
-	info, err := os.Stat(canonical)
-	if err != nil || !info.Mode().IsRegular() {
-		return nil, "", "", "", fmt.Errorf("explicit kubeconfig must be one regular file")
-	}
-	raw, err := clientcmd.LoadFromFile(canonical)
-	if err != nil {
-		return nil, "", "", "", fmt.Errorf("load explicit kubeconfig failed")
-	}
-	if _, found := raw.Contexts[selection.ContextName]; !found {
-		return nil, "", "", "", fmt.Errorf(
-			"explicit context %q does not exist in the selected kubeconfig",
-			selection.ContextName,
+	contextName := selection.ContextName
+	canonical := ""
+	var rawConfig clientcmd.ClientConfig
+	if selection.UseCurrent {
+		rules := clientcmd.NewDefaultClientConfigLoadingRules()
+		if selection.KubeconfigPath != "" {
+			var err error
+			canonical, err = canonicalKubeconfigPath(selection.KubeconfigPath)
+			if err != nil {
+				return nil, "", "", "", "", err
+			}
+			rules.ExplicitPath = canonical
+		} else {
+			canonical = strings.Join(rules.GetLoadingPrecedence(), string(os.PathListSeparator))
+		}
+		raw, err := rules.Load()
+		if err != nil {
+			return nil, "", "", "", "", fmt.Errorf("load current kubeconfig failed")
+		}
+		if contextName == "" {
+			contextName = raw.CurrentContext
+		}
+		if contextName == "" {
+			return nil, "", "", "", "", fmt.Errorf(
+				"current kubeconfig has no current-context",
+			)
+		}
+		if _, found := raw.Contexts[contextName]; !found {
+			return nil, "", "", "", "", fmt.Errorf(
+				"context %q does not exist in the current kubeconfig",
+				contextName,
+			)
+		}
+		rawConfig = clientcmd.NewNonInteractiveClientConfig(
+			*raw, contextName,
+			&clientcmd.ConfigOverrides{CurrentContext: contextName}, nil,
+		)
+	} else {
+		var err error
+		canonical, err = canonicalKubeconfigPath(selection.KubeconfigPath)
+		if err != nil {
+			return nil, "", "", "", "", err
+		}
+		raw, err := clientcmd.LoadFromFile(canonical)
+		if err != nil {
+			return nil, "", "", "", "", fmt.Errorf("load explicit kubeconfig failed")
+		}
+		if _, found := raw.Contexts[contextName]; !found {
+			return nil, "", "", "", "", fmt.Errorf(
+				"explicit context %q does not exist in the selected kubeconfig",
+				contextName,
+			)
+		}
+		rawConfig = clientcmd.NewNonInteractiveClientConfig(
+			*raw, contextName,
+			&clientcmd.ConfigOverrides{CurrentContext: contextName}, nil,
 		)
 	}
-	config, err := clientcmd.NewNonInteractiveClientConfig(
-		*raw, selection.ContextName,
-		&clientcmd.ConfigOverrides{CurrentContext: selection.ContextName}, nil,
-	).ClientConfig()
+	config, err := rawConfig.ClientConfig()
 	if err != nil {
-		return nil, "", "", "", fmt.Errorf("load explicit context failed")
+		return nil, "", "", "", "", fmt.Errorf("load selected context failed")
 	}
 	if err := rest.LoadTLSFiles(config); err != nil {
-		return nil, "", "", "", fmt.Errorf("load explicit target TLS files failed")
+		return nil, "", "", "", "", fmt.Errorf("load selected target TLS files failed")
 	}
 	if config.Insecure || len(config.CAData) == 0 || !strings.HasPrefix(config.Host, "https://") {
-		return nil, "", "", "", fmt.Errorf("explicit target requires verified HTTPS and cluster CA data")
+		return nil, "", "", "", "", fmt.Errorf("selected target requires verified HTTPS and cluster CA data")
 	}
 	config = rest.CopyConfig(config)
 	config.UserAgent = "kube-accelerator-sim/inventory"
 	config.QPS = 400
 	config.Burst = 800
 	ca := sha256.Sum256(config.CAData)
-	return config, canonical, strings.TrimSuffix(config.Host, "/"),
+	return config, canonical, contextName, strings.TrimSuffix(config.Host, "/"),
 		"sha256:" + hex.EncodeToString(ca[:]), nil
+}
+
+func canonicalKubeconfigPath(value string) (string, error) {
+	absolute, err := filepath.Abs(value)
+	if err != nil {
+		return "", fmt.Errorf("resolve explicit kubeconfig path: %w", err)
+	}
+	canonical, err := filepath.EvalSymlinks(absolute)
+	if err != nil {
+		return "", fmt.Errorf("resolve explicit kubeconfig symlinks: %w", err)
+	}
+	info, err := os.Stat(canonical)
+	if err != nil || !info.Mode().IsRegular() {
+		return "", fmt.Errorf("explicit kubeconfig must be one regular file")
+	}
+	return canonical, nil
 }
 
 func supportedMinor(serverVersion *version.Info) (int, error) {

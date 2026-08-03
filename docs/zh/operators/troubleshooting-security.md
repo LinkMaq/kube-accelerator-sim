@@ -4,7 +4,7 @@
 
 | 诊断 | 含义 | 安全处理方式 |
 | --- | --- | --- |
-| `InvocationInvalid` 要求目标参数 | 联网命令缺少 `--kubeconfig` 或 `--context` | 同时提供两者；CLI 不回退到环境或当前 context |
+| `InvocationInvalid` 要求目标参数 | 生命周期命令缺少 `--kubeconfig` 或 `--context` | 同时提供两者；只有只读 `kasim ui` 可以使用当前 kubeconfig 默认值 |
 | `TargetInvalid` 或目标指纹变化 | context 解析结果或 `kube-system` 身份变化 | 停止操作，核对 API Server、CA 摘要和集群身份 |
 | Kubernetes 版本被拒绝 | 服务端不在 1.30–1.36 | 使用受支持目标，不绕过预检 |
 | DRA 不可用 | 稳定版 DRA 不存在或版本不在 1.34–1.36 | 若符合测试目标则改用 `scheduling`，否则更换集群 |

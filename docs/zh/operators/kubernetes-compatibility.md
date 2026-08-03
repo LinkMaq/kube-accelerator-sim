@@ -30,7 +30,7 @@ DRA 在 1.34 和 1.36 运行。夜间和手动发布验证覆盖全部七个调�
 
 ## 真实性边界
 
-产品 CLI 只向显式 kubeconfig/context 指向的已有集群提交场景。一次性 kind 集群的
+产品生命周期 CLI 只向显式 kubeconfig/context 指向的已有集群提交场景。一次性 kind 集群的
 创建与删除只存在于 `test/e2e`。
 
 `scheduling` 证明 Kubernetes 控制平面放置和标量资源统计，不证明 Pod 执行、物理

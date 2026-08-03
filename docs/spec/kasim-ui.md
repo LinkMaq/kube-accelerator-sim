@@ -6,7 +6,7 @@ This specification turns the [Wayfinder decision map](https://github.com/LinkMaq
 
 ## Outcome
 
-`kasim ui` starts a temporary read-only web view for one explicitly selected Simulation Target. Its first screen answers:
+`kasim ui` starts a temporary read-only web view for one resolved Simulation Target. Its first screen answers:
 
 1. Which Nodes are Kasim Synthetic Nodes, and which are not Kasim-owned?
 2. Which accelerator and Auxiliary Device Signals does Kubernetes currently expose?
@@ -20,13 +20,22 @@ The UI never creates, changes, scales, heals, or deletes a Scenario. It never ow
 
 ```text
 kasim ui \
-  --kubeconfig /absolute/path/to/config \
-  --context exact-context-name \
+  [--kubeconfig /absolute/path/to/config] \
+  [--context exact-context-name] \
   [--port 8080] \
   [--open]
 ```
 
-- Both target flags are mandatory. There is no current-context, `KUBECONFIG`, or in-cluster fallback.
+- With neither target flag, the command follows standard client-go/kubectl
+  loading rules, including `KUBECONFIG`, the default kubeconfig path, and that
+  configuration's current-context.
+- `--kubeconfig` overrides the file source while retaining that file's
+  current-context when `--context` is absent. `--context` overrides the
+  context selected from the default loading rules when `--kubeconfig` is
+  absent. Supplying both keeps the original exact-target behavior.
+- The resolved context and client configuration are frozen at startup. There
+  is no in-cluster fallback, and lifecycle/mutation commands still require
+  both target flags explicitly.
 - The only listen address is `127.0.0.1`; there is no `--address` flag.
 - The default port is `8080`; `--port` accepts `1..65535`.
 - The command prints the target context, redacted fingerprint, freshness state, and access URL.
@@ -126,7 +135,7 @@ type SnapshotStream interface {
 }
 ```
 
-`OpenRequest` contains one explicit `cluster.TargetSelection`. `Open` fixes the target identity and returns after connection establishment. The first `Next` returns revision 1, often `loading` or `partial`. Later values are complete immutable replacements with a monotonically increasing local revision. A slow consumer keeps only the newest pending snapshot.
+`OpenRequest` contains one `cluster.TargetSelection`, which is either explicit or requests the UI-only current-kubeconfig defaults. `Open` resolves and freezes the target identity before it returns after connection establishment. The first `Next` returns revision 1, often `loading` or `partial`. Later values are complete immutable replacements with a monotonically increasing local revision. A slow consumer keeps only the newest pending snapshot.
 
 Temporary source failures never terminate the stream. `Next` returns a terminal error only for context cancellation, a closed stream, target mismatch, or a broken internal invariant. `Close` is idempotent, concurrency-safe, and waits until Module-owned watches, retries, timers, and goroutines stop.
 

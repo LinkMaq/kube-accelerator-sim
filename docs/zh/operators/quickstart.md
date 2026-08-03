@@ -1,7 +1,8 @@
 # 已有集群快速开始
 
 本教程从一个已经存在的 Kubernetes 集群开始。`kasim` 不创建、升级、停止或
-删除集群，也不会隐式使用 `$KUBECONFIG`、默认路径或当前 context。
+删除集群。生命周期命令使用显式 kubeconfig 和 context；只读 `kasim ui` 默认
+遵循 kubectl 的 kubeconfig 加载规则和当前 context。
 
 目标集群必须是 Kubernetes 1.30–1.36。这个范围全部支持 `scheduling`；只有
 1.34–1.36 支持 `dra-control-plane`。
@@ -110,10 +111,7 @@ kubectl --kubeconfig ./target.kubeconfig --context target \
 需要快速查看 Kasim 与真实节点上的设备信号时，启动本地只读清单：
 
 ```sh
-./dist/kasim ui \
-  --kubeconfig ./target.kubeconfig \
-  --context target \
-  --open
+./dist/kasim ui --open
 ```
 
 临时访问能力、证据规则、筛选和部分数据源行为见[集群清单 UI 指南](cluster-inventory-ui.md)。

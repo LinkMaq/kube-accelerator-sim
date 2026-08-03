@@ -1,17 +1,28 @@
 # Read-only cluster inventory UI
 
 `kasim ui` opens a temporary evidence-first view of accelerator and auxiliary
-signals in one explicitly selected Kubernetes cluster. It reads both Kasim
-Synthetic Nodes and other Nodes, but always places and labels Kasim Nodes
-separately.
+signals in one Kubernetes cluster. By default it uses the same kubeconfig and
+current context as kubectl. It reads both Kasim Synthetic Nodes and other
+Nodes, but always places and labels Kasim Nodes separately.
 
 ```sh
-./dist/kasim ui \
-  --kubeconfig ./target.kubeconfig \
-  --context target \
-  --port 8080 \
-  --open
+./dist/kasim ui --port 8080 --open
 ```
+
+Standard client-go loading honors `KUBECONFIG`, or `~/.kube/config` when the
+environment variable is unset, and selects current-context. Override either
+part when needed:
+
+```sh
+./dist/kasim ui --context target
+./dist/kasim ui --kubeconfig ./target.kubeconfig
+./dist/kasim ui --kubeconfig ./target.kubeconfig --context target
+```
+
+The CLI prints the resolved context before the URL and freezes that target for
+the process lifetime. Stop immediately if it is not the intended cluster.
+This default applies only to the read-only UI; lifecycle commands retain their
+explicit `--kubeconfig` plus `--context` contract.
 
 The command supports Kubernetes 1.30–1.36 and never owns cluster lifecycle.
 `--open` is optional; a browser-open failure leaves the printed URL usable.

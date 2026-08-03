@@ -22,7 +22,7 @@ The product exposes exactly two Fidelity Modes:
 - `scheduling` is the default. It creates owned Synthetic Nodes and reports Kubernetes-visible labels, scalar extended-resource capacity and allocatable values, Ready and Lease state, scheduler placement, resource exhaustion, and aggregate health changes. It does not claim Device Plugin registration, device-ID allocation, kubelet `Allocate`, NUMA admission, CDI injection, container device access, or accelerator computation.
 - `dra-control-plane` is explicit and version-gated. It exercises supported DRA APIs, including DeviceClass selection, ResourceSlice inventory, ResourceClaim allocation or reservation, and Pod scheduling. Missing APIs, permissions, or capabilities fail closed; the product never silently degrades to `scheduling`. It does not claim node preparation, CDI, node-local health streaming, or container device access.
 
-Node-runtime protocol fidelity is not a product Fidelity Mode. A separate End-to-End Test Harness may create a disposable kind cluster and run fake Device Plugin or DRA node agents against real kubelets. The product CLI continues to operate only on an existing, explicitly selected Simulation Target.
+Node-runtime protocol fidelity is not a product Fidelity Mode. A separate End-to-End Test Harness may create a disposable kind cluster and run fake Device Plugin or DRA node agents against real kubelets. Product lifecycle commands continue to operate only on an existing, explicitly selected Simulation Target; the read-only UI may resolve that target from the user's current kubeconfig.
 
 The public Module is the Scenario Instance lifecycle:
 

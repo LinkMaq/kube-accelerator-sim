@@ -116,10 +116,20 @@ kubectl --kubeconfig "$KUBECONFIG_PATH" --context "$KUBE_CONTEXT" \
 Open the temporary read-only cluster inventory only on loopback:
 
 ```sh
+"$KASIM_BIN" ui --port 8080 --open
+```
+
+This uses kubectl's current kubeconfig and current-context. When that is not
+the intended target, override either default or both explicitly:
+
+```sh
+"$KASIM_BIN" ui --context "$KUBE_CONTEXT" --port 8080 --open
 "$KASIM_BIN" ui \
   --kubeconfig "$KUBECONFIG_PATH" --context "$KUBE_CONTEXT" \
   --port 8080 --open
 ```
+
+Verify the resolved context printed before the URL.
 
 Use a different free port when required. Never construct an `--address`
 argument, proxy the port, or publish the fragment capability. Stop the process

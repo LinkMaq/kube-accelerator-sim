@@ -69,17 +69,22 @@ the result as a new revision. They are not imperative backend operations.
 
 ### Explicit Simulation Target
 
-Every command that contacts Kubernetes requires both:
+Every lifecycle or mutation command that contacts Kubernetes requires both:
 
 ```text
 --kubeconfig /explicit/path/to/config
 --context exact-context-name
 ```
 
-The CLI does not use the kubeconfig current context, the default
-`~/.kube/config`, or `KUBECONFIG` as a substitute for either flag. It resolves
-the file to a canonical absolute path, loads the named context once, and keeps
-that client configuration immutable for the process lifetime.
+Those commands do not use the kubeconfig current context, the default
+`~/.kube/config`, or `KUBECONFIG` as a substitute for either flag. The CLI
+resolves the file to a canonical absolute path, loads the named context once,
+and keeps that client configuration immutable for the process lifetime.
+
+The later read-only `kasim ui` command is the narrow exception defined by
+[ADR 0010](0010-embed-authenticated-loopback-ui.md): it defaults to the standard
+client-go kubeconfig loading rules and current context, permits either target
+flag as an independent override, then freezes and prints the resolved context.
 
 The target fingerprint is the SHA-256 digest of the `kube-system` Namespace
 UID with a domain separator. The connection report separately includes the
