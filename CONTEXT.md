@@ -13,7 +13,7 @@ A representation of accelerator capacity, availability, health, and placement be
 _Avoid_: Hardware emulation, compute emulation
 
 **Simulation Target（模拟目标集群）**:
-An existing Kubernetes cluster, selected explicitly by the user, to which the CLI submits an accelerator simulation scenario. The cluster lifecycle is owned outside the product CLI.
+An existing Kubernetes cluster selected by the user. Lifecycle commands name it explicitly before submitting an accelerator simulation scenario; the read-only UI may resolve it from the user's current kubeconfig. The cluster lifecycle is owned outside the product CLI.
 _Avoid_: Managed cluster, embedded cluster
 
 **Cluster Simulation Inventory（集群模拟清单）**:

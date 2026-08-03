@@ -21,8 +21,8 @@ features:
     title: 有证据支撑的厂商契约
     details: 覆盖 NVIDIA、AMD、昇腾、海光、寒武纪等主流生态的准确 Kubernetes 资源名和型号信息。
   - icon: ◎
-    title: 显式指定目标集群
-    details: 每条联网命令都必须指定 kubeconfig 和 context；CLI 不负责 Kubernetes 集群生命周期。
+    title: 安全选择目标集群
+    details: 生命周期命令显式指定 kubeconfig 和 context；只读 UI 可使用当前目标。CLI 不负责 Kubernetes 集群生命周期。
   - icon: ⎈
     title: 调度与稳定版 DRA
     details: Kubernetes 1.30–1.36 支持标量资源调度，1.34–1.36 支持稳定版 resource.k8s.io/v1 控制平面投射。

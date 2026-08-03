@@ -47,9 +47,9 @@ Scenario Instance; it does not claim that the etcd database file shrank.
 
 ## Truth boundary
 
-The product CLI only submits scenarios to an existing explicit kubeconfig and
-context. Disposable kind cluster creation and deletion exists only inside
-`test/e2e`.
+The product lifecycle CLI only submits scenarios to an existing explicit
+kubeconfig and context. Disposable kind cluster creation and deletion exists
+only inside `test/e2e`.
 
 The `scheduling` suite proves Kubernetes control-plane placement and scalar
 resource accounting. It does not prove Pod execution, physical Accelerator

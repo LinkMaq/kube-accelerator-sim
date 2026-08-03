@@ -1,16 +1,25 @@
 # 只读集群清单 UI
 
-`kasim ui` 为一个显式选择的 Kubernetes 集群启动临时、证据优先的加速卡与
-辅助信号视图。它会读取 Kasim Synthetic Node 和其他真实节点，但始终把
-Kasim 节点放在前面并显著区分。
+`kasim ui` 为一个 Kubernetes 集群启动临时、证据优先的加速卡与辅助信号视图。
+默认使用与 kubectl 相同的 kubeconfig 和当前 context。它会读取 Kasim
+Synthetic Node 和其他真实节点，但始终把 Kasim 节点放在前面并显著区分。
 
 ```sh
-./dist/kasim ui \
-  --kubeconfig ./target.kubeconfig \
-  --context target \
-  --port 8080 \
-  --open
+./dist/kasim ui --port 8080 --open
 ```
+
+标准 client-go 加载规则会读取 `KUBECONFIG`；未设置时读取 `~/.kube/config`，
+并选择 current-context。需要时可只覆盖其中一项，或同时准确指定两项：
+
+```sh
+./dist/kasim ui --context target
+./dist/kasim ui --kubeconfig ./target.kubeconfig
+./dist/kasim ui --kubeconfig ./target.kubeconfig --context target
+```
+
+CLI 会先打印解析后的 context，再打印访问 URL，并在进程生命周期内冻结该目标。
+如果不是预期集群，应立即停止。这个默认行为只属于只读 UI；生命周期命令仍要求
+同时显式提供 `--kubeconfig` 和 `--context`。
 
 该命令支持 Kubernetes 1.30–1.36，不负责集群生命周期。`--open` 是可选项；
 即使打开浏览器失败，终端打印的 URL 仍可使用。监听地址固定为

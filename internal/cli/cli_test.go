@@ -3,8 +3,15 @@ package cli_test
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
+	"fmt"
 	"net"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -17,6 +24,7 @@ import (
 	"github.com/LinkMaq/kube-accelerator-sim/internal/controlplane"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/controlplane/memory"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/domain"
+	inventorykubernetes "github.com/LinkMaq/kube-accelerator-sim/internal/inventory/kubernetes"
 	inventorymemory "github.com/LinkMaq/kube-accelerator-sim/internal/inventory/memory"
 )
 
@@ -56,6 +64,117 @@ func TestUICommandUsesExplicitTargetAndLoopbackLifecycle(t *testing.T) {
 	}
 	if opened == "" || !strings.Contains(opened, "#token=") {
 		t.Fatalf("browser URL = %q", opened)
+	}
+}
+
+func TestUICommandUsesCurrentKubeconfigAndContextByDefault(t *testing.T) {
+	target := httptest.NewTLSServer(http.HandlerFunc(func(
+		response http.ResponseWriter,
+		request *http.Request,
+	) {
+		response.Header().Set("Content-Type", "application/json")
+		if request.URL.Path == "/version" {
+			_, _ = fmt.Fprint(response, `{
+  "major":"1","minor":"36","gitVersion":"v1.36.3",
+  "gitCommit":"test","gitTreeState":"clean","buildDate":"test",
+  "goVersion":"test","compiler":"gc","platform":"linux/amd64"
+}`)
+			return
+		}
+		if request.URL.Query().Get("watch") == "true" {
+			<-request.Context().Done()
+			return
+		}
+		_, _ = fmt.Fprint(response, `{
+  "apiVersion":"v1","kind":"List",
+  "metadata":{"resourceVersion":"1"},"items":[]
+}`)
+	}))
+	defer target.Close()
+
+	kubeconfigPath := filepath.Join(t.TempDir(), "config")
+	caPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: target.Certificate().Raw,
+	})
+	caData := base64.StdEncoding.EncodeToString(caPEM)
+	kubeconfig := fmt.Sprintf(`apiVersion: v1
+kind: Config
+clusters:
+- name: current-cluster
+  cluster:
+    server: %s
+    certificate-authority-data: %s
+contexts:
+- name: current-lab
+  context:
+    cluster: current-cluster
+    user: current-user
+- name: override-lab
+  context:
+    cluster: current-cluster
+    user: current-user
+current-context: current-lab
+users:
+- name: current-user
+  user: {}
+`, target.URL, caData)
+	if err := os.WriteFile(kubeconfigPath, []byte(kubeconfig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, testCase := range []struct {
+		name                  string
+		environmentKubeconfig string
+		targetArguments       []string
+		expectedContext       string
+	}{
+		{
+			name:                  "current kubeconfig and current context",
+			environmentKubeconfig: kubeconfigPath,
+			expectedContext:       "current-lab",
+		},
+		{
+			name:                  "current kubeconfig with context override",
+			environmentKubeconfig: kubeconfigPath,
+			targetArguments:       []string{"--context", "override-lab"},
+			expectedContext:       "override-lab",
+		},
+		{
+			name:                  "kubeconfig override with its current context",
+			environmentKubeconfig: "/definitely/not/read",
+			targetArguments:       []string{"--kubeconfig", kubeconfigPath},
+			expectedContext:       "current-lab",
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Setenv("KUBECONFIG", testCase.environmentKubeconfig)
+			listener, err := net.Listen("tcp4", "127.0.0.1:0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			port := listener.Addr().(*net.TCPAddr).Port
+			listener.Close()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			arguments := append([]string{"ui", "--port", strconv.Itoa(port), "--open"},
+				testCase.targetArguments...)
+			result := runCLI(t, cli.Dependencies{
+				Context:         ctx,
+				InventorySource: inventorykubernetes.New(),
+				OpenBrowser: func(string) error {
+					cancel()
+					return nil
+				},
+			}, arguments)
+			if result.exit != 0 || result.stderr != "" {
+				t.Fatalf("ui result = %#v", result)
+			}
+			if !strings.Contains(result.stdout, "Target: "+testCase.expectedContext) {
+				t.Fatalf("ui output = %q", result.stdout)
+			}
+		})
 	}
 }
 

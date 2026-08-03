@@ -21,8 +21,8 @@ features:
     title: Evidence-backed vendors
     details: Exact Kubernetes resource contracts for NVIDIA, AMD, Ascend, Hygon, Cambricon, and a broad accelerator catalog.
   - icon: ◎
-    title: Explicit targets
-    details: Every connected command names both kubeconfig and context. The CLI never owns Kubernetes cluster lifecycle.
+    title: Safe target selection
+    details: Lifecycle commands name both kubeconfig and context; the read-only UI can use your current target. The CLI never owns Kubernetes cluster lifecycle.
   - icon: ⎈
     title: Scheduling and stable DRA
     details: Scalar scheduling across Kubernetes 1.30–1.36 and stable resource.k8s.io/v1 projection on 1.34–1.36.

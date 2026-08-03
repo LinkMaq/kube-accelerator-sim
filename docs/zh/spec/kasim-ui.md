@@ -6,7 +6,7 @@
 
 ## 目标
 
-`kasim ui` 为一个显式选择的 Simulation Target 启动临时、只读的本地网页。首页直接回答：
+`kasim ui` 为一个已解析的 Simulation Target 启动临时、只读的本地网页。首页直接回答：
 
 1. 哪些是 Kasim Synthetic Node，哪些节点不归 Kasim 管理？
 2. Kubernetes 当前暴露了哪些加速器与辅助设备信号？
@@ -20,13 +20,19 @@ UI 不创建、修改、扩缩、恢复或删除 Scenario，不管理 Kubernetes
 
 ```text
 kasim ui \
-  --kubeconfig /absolute/path/to/config \
-  --context exact-context-name \
+  [--kubeconfig /absolute/path/to/config] \
+  [--context exact-context-name] \
   [--port 8080] \
   [--open]
 ```
 
-- 两个目标参数都必须显式提供，不读取 current-context、`KUBECONFIG` 或集群内配置。
+- 两个目标参数都不提供时，命令遵循标准 client-go/kubectl 加载规则，包括
+  `KUBECONFIG`、默认 kubeconfig 路径以及该配置的 current-context。
+- 只提供 `--kubeconfig` 时使用该文件的 current-context；只提供 `--context`
+  时从默认加载规则得到的配置中选择该 context；同时提供两者时保持原有的准确
+  目标行为。
+- 解析后的 context 与客户端配置在启动时冻结。不回退到集群内配置；生命周期和
+  写操作仍必须显式提供两个目标参数。
 - 只能监听 `127.0.0.1`，不提供 `--address`。
 - 默认端口为 `8080`，`--port` 接受 `1..65535`。
 - 命令输出 context、脱敏目标指纹、数据新鲜度和访问 URL。
@@ -119,7 +125,7 @@ type SnapshotStream interface {
 }
 ```
 
-`OpenRequest` 只包含显式 `cluster.TargetSelection`。`Open` 固定目标身份后返回；第一次 `Next` 返回 revision 1，通常为 loading 或 partial。之后每个值都是完整、不可变的替换快照，本地 revision 单调递增。慢消费者只保留最新待发快照。
+`OpenRequest` 只包含一个 `cluster.TargetSelection`，它可以是显式目标，也可以请求仅 UI 可用的当前 kubeconfig 默认值。`Open` 在建立连接后返回前会解析并固定目标身份；第一次 `Next` 返回 revision 1，通常为 loading 或 partial。之后每个值都是完整、不可变的替换快照，本地 revision 单调递增。慢消费者只保留最新待发快照。
 
 临时数据源错误不终止流。只有 context 取消、流关闭、目标冲突或内部不变量破坏才由 `Next` 返回终止错误。`Close` 可重复、并发安全，并等待模块创建的 watch、重试、计时器和 goroutine 全部停止。
 

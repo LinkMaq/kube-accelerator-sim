@@ -1,5 +1,6 @@
 // Package cli delivers the concrete kasim command surface without introducing
-// a plugin seam or reading implicit Kubernetes configuration.
+// a plugin seam. Lifecycle commands require explicit Kubernetes configuration;
+// the read-only UI may resolve the user's current kubeconfig target.
 package cli
 
 import (
@@ -151,8 +152,8 @@ func runUI(
 	var kubeconfigPath, contextName string
 	var port int
 	var open bool
-	flags.StringVar(&kubeconfigPath, "kubeconfig", "", "explicit kubeconfig path")
-	flags.StringVar(&contextName, "context", "", "exact kubeconfig context")
+	flags.StringVar(&kubeconfigPath, "kubeconfig", "", "kubeconfig path override")
+	flags.StringVar(&contextName, "context", "", "kubeconfig context override")
 	flags.IntVar(&port, "port", 8080, "loopback TCP port")
 	flags.BoolVar(&open, "open", false, "open the local UI in a browser")
 	if err := flags.Parse(args); err != nil {
@@ -162,12 +163,6 @@ func runUI(
 		return writeFailure(
 			"ui", "InvocationInvalid",
 			"ui accepts flags only", format, stderr,
-		)
-	}
-	if kubeconfigPath == "" || contextName == "" {
-		return writeFailure(
-			"ui", "InvocationInvalid",
-			"ui requires --kubeconfig and --context", format, stderr,
 		)
 	}
 	if port < 1 || port > 65535 {
@@ -195,6 +190,7 @@ func runUI(
 		Target: cluster.TargetSelection{
 			KubeconfigPath: kubeconfigPath,
 			ContextName:    contextName,
+			UseCurrent:     kubeconfigPath == "" || contextName == "",
 		},
 		Port: port,
 	})

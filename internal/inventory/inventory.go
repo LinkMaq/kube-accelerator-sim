@@ -292,7 +292,8 @@ func (module *Module) Open(
 	if module == nil || module.source == nil {
 		return nil, fmt.Errorf("Cluster Simulation Inventory source is required")
 	}
-	if request.Target.KubeconfigPath == "" || request.Target.ContextName == "" {
+	if !request.Target.UseCurrent &&
+		(request.Target.KubeconfigPath == "" || request.Target.ContextName == "") {
 		return nil, fmt.Errorf("explicit kubeconfig path and context name are both required")
 	}
 	source, err := module.source.Open(ctx, request.Target)

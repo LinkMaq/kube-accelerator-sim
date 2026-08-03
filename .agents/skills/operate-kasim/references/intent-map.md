@@ -11,7 +11,7 @@ lifecycle.
 | “部署多厂商/混合卡集群” | Compile and apply a Scenario YAML | groups, profiles, models, topology |
 | “列出支持的厂家/型号” | `profile list` and selected `profile show` | none; offline |
 | “看看有哪些卡/节点” | `status` plus scenario-labeled Node inventory | Scenario name, target |
-| “打开 UI/查看整个集群的卡和 RDMA” | `kasim ui` read-only loopback inventory | kubeconfig, context, optional local port |
+| “打开 UI/查看整个集群的卡和 RDMA” | `kasim ui` read-only loopback inventory | current kubeconfig/context by default; optional overrides and local port |
 | “给加速卡加 RDMA/SR-IOV 信号” | Scenario YAML with an Auxiliary Device Pool | exact full resource name, local Accelerator Pool association, counts |
 | “模拟坏卡/恢复卡” | `health` typed revision | Scenario, group, pool, healthy count |
 | “扩到/缩到 N 台” | `scale` typed revision | Scenario, group, replicas |

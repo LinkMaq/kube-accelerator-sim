@@ -19,8 +19,11 @@ drivers, device files, telemetry, or accelerator computation.
    python3 .agents/skills/operate-kasim/scripts/doctor.py
    ```
 
-3. For any connected operation, obtain both an explicit kubeconfig path and
-   exact context name. Never use an implicit current context or `KUBECONFIG`.
+3. For lifecycle or mutation operations, obtain both an explicit kubeconfig
+   path and exact context name. The read-only `kasim ui` command may use the
+   standard current kubeconfig/current-context defaults when that is the
+   user's intended target; record the context printed before the URL and stop
+   if it is unexpected.
 4. Treat the cluster as an existing Simulation Target. Do not make `kasim`
    create, upgrade, stop, or delete it. Provision a cluster only when the user
    separately and explicitly requests that infrastructure action.
@@ -88,8 +91,11 @@ reviewed the evidence and explicitly accepts them.
 6. Run `kasim status ... --watch -o json`, then inspect only Nodes labeled
    `simulation.kasim.io/scenario=<scenario>`.
 7. When the user asks to see the whole cluster or open the UI, run `kasim ui`
-   with the same explicit target. Do not add a remote bind, proxy, tunnel, or
-   persistent service. Treat its fragment URL as a temporary read capability.
+   with no target flags when kubectl's current kubeconfig/context is the
+   intended target; otherwise override it with `--kubeconfig` and/or
+   `--context`. Verify the context printed before the URL. Do not add a remote
+   bind, proxy, tunnel, or persistent service. Treat its fragment URL as a
+   temporary read capability.
 8. Report the context, target fingerprint, Scenario UID and generation,
    resolved profiles, requested/observed pool totals, fidelity surfaces,
    diagnostics, and receipt paths.

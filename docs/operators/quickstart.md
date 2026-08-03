@@ -1,8 +1,9 @@
 # Existing-cluster quickstart
 
 This walkthrough starts with an already-existing Kubernetes cluster. `kasim`
-does not create, upgrade, stop, or delete that cluster, and it never uses an
-implicit kubeconfig, `$KUBECONFIG`, default path, or current context.
+does not create, upgrade, stop, or delete that cluster. Lifecycle commands use
+an explicit kubeconfig and context; the read-only `kasim ui` command defaults
+to kubectl's kubeconfig loading rules and current context.
 
 The target must be Kubernetes 1.30–1.36. Use `scheduling` throughout that
 range. Use `dra-control-plane` only on 1.34–1.36.
@@ -122,10 +123,7 @@ Open the local read-only inventory when you need a fast visual check across
 both Kasim and non-Kasim Nodes:
 
 ```sh
-./dist/kasim ui \
-  --kubeconfig ./target.kubeconfig \
-  --context target \
-  --open
+./dist/kasim ui --open
 ```
 
 See the [cluster inventory UI guide](cluster-inventory-ui.md) for its

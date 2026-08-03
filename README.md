@@ -63,14 +63,15 @@ Then submit and observe a scenario:
   -o json
 ```
 
-Open the embedded, read-only inventory for the same explicit target:
+Open the embedded, read-only inventory with the kubeconfig and current context
+that kubectl would use:
 
 ```sh
-./dist/kasim ui \
-  --kubeconfig ./target.kubeconfig \
-  --context target \
-  --open
+./dist/kasim ui --open
 ```
+
+Use `--kubeconfig` and/or `--context` only when overriding those defaults.
+Scenario lifecycle commands continue to require both flags explicitly.
 
 The loopback page shows Kasim and non-Kasim Nodes, exact scalar accelerator
 and auxiliary signals, native DRA device identities, observed Pod requests,
