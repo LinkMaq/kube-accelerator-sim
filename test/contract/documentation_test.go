@@ -206,6 +206,7 @@ func TestExamplesCoverEverySelectableVendorResourceSignal(t *testing.T) {
 		t.Fatal(err)
 	}
 	covered := make(map[string]struct{})
+	coveredAuxiliary := make(map[string]struct{})
 	for _, path := range documentedScenarioPaths(t, root) {
 		encoded, err := os.ReadFile(path)
 		if err != nil {
@@ -226,6 +227,13 @@ func TestExamplesCoverEverySelectableVendorResourceSignal(t *testing.T) {
 				resolution.ResourceAlias(),
 			)] = struct{}{}
 		}
+		for _, resolution := range receipt.AuxiliaryResolutions() {
+			coveredAuxiliary[exampleSignalKey(
+				resolution.ProfileDigest().String(),
+				resolution.ContractID(),
+				resolution.ResourceAlias(),
+			)] = struct{}{}
+		}
 	}
 
 	for _, summary := range snapshot.List() {
@@ -235,6 +243,20 @@ func TestExamplesCoverEverySelectableVendorResourceSignal(t *testing.T) {
 		}
 		for _, contract := range profile.Contracts() {
 			for _, resource := range contract.Resources() {
+				if contract.Subject() == "auxiliary" {
+					key := exampleSignalKey(
+						profile.Digest().String(),
+						contract.ID(),
+						resource.Alias(),
+					)
+					if _, found := coveredAuxiliary[key]; !found {
+						t.Errorf(
+							"examples do not cover auxiliary signal %s %s/%s",
+							profile.ID(), contract.ID(), resource.Alias(),
+						)
+					}
+					continue
+				}
 				compatible := false
 				for _, model := range profile.Models() {
 					if model.Selectable() &&

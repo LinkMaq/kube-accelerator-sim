@@ -29,6 +29,9 @@ features:
   - icon: ↻
     title: 由回执驱动的生命周期
     details: Ready 快照、不可变修订、乐观并发前置条件、边界清晰的所有权和安全清理。
+  - icon: ◫
+    title: 只读本地清单
+    details: 一条回环命令即可查看 Kasim 与真实节点、准确的加速卡和辅助信号、原生 DRA 标识与证据缺口。
 ---
 
 <section class="kasim-surface">

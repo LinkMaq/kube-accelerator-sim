@@ -20,7 +20,7 @@ spec:
         - name: gc200
           profile:
             id: graphcore
-            revision: 2026-07-31
+            revision: 2026-08-03
             digest: sha256:056fea94141b281c7d553a2670ca6e52faa1d5938b954b3715c709fe3927f4d3
           model: graphcore-gc200
           contract: device-plugin

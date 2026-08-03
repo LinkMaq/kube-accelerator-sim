@@ -19,7 +19,7 @@ or vendor preference. Model lifecycle such as `current-product`,
 
 ## Bundled ecosystem coverage
 
-The catalog revision is `2026-07-31`. Use `kasim profile show <id> -o json` for
+The catalog revision is `2026-08-03`. Use `kasim profile show <id> -o json` for
 the exact source URLs, immutable revisions, checked dates, contract spellings,
 models, limitations, and digest.
 

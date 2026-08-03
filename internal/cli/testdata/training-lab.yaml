@@ -21,7 +21,7 @@ spec:
         - name: training
           profile:
             id: nvidia
-            revision: 2026-07-31
+            revision: 2026-08-03
             digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
           model: nvidia-h100
           contract: device-plugin

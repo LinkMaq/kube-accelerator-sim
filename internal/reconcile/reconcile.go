@@ -160,11 +160,12 @@ func (reconciler *InstanceReconciler) Reconcile(
 		return reconciler.fail(ctx, key, record, diagnosticCode(err), err, retryable(err))
 	}
 	graph, err := projection.Build(projection.BuildInput{
-		InstanceName: record.Name,
-		InstanceUID:  record.InstanceUID,
-		Generation:   record.DesiredGeneration,
-		Scenario:     compiled.Scenario(),
-		Resolutions:  receipt.Resolutions(),
+		InstanceName:         record.Name,
+		InstanceUID:          record.InstanceUID,
+		Generation:           record.DesiredGeneration,
+		Scenario:             compiled.Scenario(),
+		Resolutions:          receipt.Resolutions(),
+		AuxiliaryResolutions: receipt.AuxiliaryResolutions(),
 	})
 	if err != nil {
 		return reconciler.fail(ctx, key, record, "ConvergenceFailed", err, false)
@@ -955,6 +956,7 @@ func (reconciler *InstanceReconciler) compileAndVerify(
 	if err := verifyProfileReceipts(
 		compiled.Scenario(),
 		receipt.Resolutions(),
+		receipt.AuxiliaryResolutions(),
 		record.Revision.Profiles,
 	); err != nil {
 		return scenario.CanonicalScenario{}, scenario.CompileReceipt{}, err
@@ -965,6 +967,7 @@ func (reconciler *InstanceReconciler) compileAndVerify(
 func verifyProfileReceipts(
 	compiled domain.Scenario,
 	resolutions []catalog.ResolvedSelection,
+	auxiliaryResolutions []catalog.ResolvedSelection,
 	accepted []controlplane.ProfileReceipt,
 ) error {
 	acceptedByID := make(map[string]controlplane.ProfileReceipt, len(accepted))
@@ -978,7 +981,26 @@ func verifyProfileReceipts(
 		acceptedByID[profile.ID] = profile
 	}
 	resolutionIndex := 0
+	auxiliaryResolutionIndex := 0
 	used := make(map[string]struct{})
+	verify := func(
+		profile domain.ProfileReference,
+		resolved catalog.ResolvedSelection,
+	) error {
+		profileID := profile.ID().String()
+		acceptedProfile, found := acceptedByID[profileID]
+		if !found ||
+			acceptedProfile.Revision != profile.Revision() ||
+			acceptedProfile.Digest != resolved.ProfileDigest() ||
+			acceptedProfile.Class != resolved.ProfileClass() {
+			return fmt.Errorf(
+				"accepted profile receipt %q does not match the catalog resolution",
+				profileID,
+			)
+		}
+		used[profileID] = struct{}{}
+		return nil
+	}
 	for _, group := range compiled.NodeGroups() {
 		for _, pool := range group.Pools() {
 			if resolutionIndex >= len(resolutions) {
@@ -986,21 +1008,24 @@ func verifyProfileReceipts(
 			}
 			resolved := resolutions[resolutionIndex]
 			resolutionIndex++
-			profileID := pool.Profile().ID().String()
-			acceptedProfile, found := acceptedByID[profileID]
-			if !found ||
-				acceptedProfile.Revision != pool.Profile().Revision() ||
-				acceptedProfile.Digest != resolved.ProfileDigest() ||
-				acceptedProfile.Class != resolved.ProfileClass() {
-				return fmt.Errorf(
-					"accepted profile receipt %q does not match the catalog resolution",
-					profileID,
-				)
+			if err := verify(pool.Profile(), resolved); err != nil {
+				return err
 			}
-			used[profileID] = struct{}{}
+		}
+		for _, pool := range group.AuxiliaryPools() {
+			if auxiliaryResolutionIndex >= len(auxiliaryResolutions) {
+				return fmt.Errorf("compile receipt has too few auxiliary pool resolutions")
+			}
+			resolved := auxiliaryResolutions[auxiliaryResolutionIndex]
+			auxiliaryResolutionIndex++
+			if err := verify(pool.Profile(), resolved); err != nil {
+				return err
+			}
 		}
 	}
-	if resolutionIndex != len(resolutions) || len(used) != len(acceptedByID) {
+	if resolutionIndex != len(resolutions) ||
+		auxiliaryResolutionIndex != len(auxiliaryResolutions) ||
+		len(used) != len(acceptedByID) {
 		return fmt.Errorf("accepted profile receipts do not exactly match the Scenario")
 	}
 	return nil
@@ -1712,6 +1737,7 @@ func (reconciler *InstanceReconciler) statusIntent(
 	type poolKey struct {
 		group string
 		pool  string
+		role  string
 	}
 	observedNodes := make(map[string]*cluster.ObservedNodeState)
 	observedSlices := make([]*cluster.ObservedResourceSliceState, 0)
@@ -1727,10 +1753,12 @@ func (reconciler *InstanceReconciler) statusIntent(
 	poolsByKey := make(map[poolKey]controlplane.PoolStatus)
 	for _, node := range graph.Nodes() {
 		for _, pool := range node.Pools() {
-			key := poolKey{group: node.Group(), pool: pool.Name()}
+			key := poolKey{group: node.Group(), pool: pool.Name(), role: "accelerator"}
 			current := poolsByKey[key]
 			current.Group = key.group
 			current.Pool = key.pool
+			current.Role = key.role
+			current.ResourceName = pool.ResourceName()
 			current.RequestedTotal = saturatingAdd(
 				current.RequestedTotal,
 				pool.Capacity(),
@@ -1784,6 +1812,32 @@ func (reconciler *InstanceReconciler) statusIntent(
 			}
 			poolsByKey[key] = current
 		}
+		for _, pool := range node.AuxiliaryPools() {
+			key := poolKey{group: node.Group(), pool: pool.Name(), role: "auxiliary"}
+			current := poolsByKey[key]
+			current.Group = key.group
+			current.Pool = key.pool
+			current.Role = key.role
+			current.Category = pool.Category()
+			current.ResourceName = pool.ResourceName()
+			current.RequestedTotal = saturatingAdd(
+				current.RequestedTotal,
+				pool.Capacity(),
+			)
+			current.RequestedHealthy = saturatingAdd(
+				current.RequestedHealthy,
+				pool.Allocatable(),
+			)
+			if actual := observedNodes[node.Name()]; actual != nil {
+				if value, ok := parseObservedCount(actual.Capacity[pool.ResourceName()]); ok {
+					current.ObservedTotal = saturatingAdd(current.ObservedTotal, value)
+				}
+				if value, ok := parseObservedCount(actual.Allocatable[pool.ResourceName()]); ok {
+					current.ObservedHealthy = saturatingAdd(current.ObservedHealthy, value)
+				}
+			}
+			poolsByKey[key] = current
+		}
 	}
 	keys := make([]poolKey, 0, len(poolsByKey))
 	for key := range poolsByKey {
@@ -1791,6 +1845,9 @@ func (reconciler *InstanceReconciler) statusIntent(
 	}
 	slices.SortFunc(keys, func(left, right poolKey) int {
 		if compared := compareStrings(left.group, right.group); compared != 0 {
+			return compared
+		}
+		if compared := compareStrings(left.role, right.role); compared != 0 {
 			return compared
 		}
 		return compareStrings(left.pool, right.pool)

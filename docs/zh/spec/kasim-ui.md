@@ -1,6 +1,6 @@
 # `kasim ui` 集群模拟清单提案
 
-状态：**已完成设计，当前版本尚未实现。**
+状态：**已实现，将随下一版本发布。**
 
 本文把 [Wayfinder 决策地图](https://github.com/LinkMaq/kube-accelerator-sim/issues/34)、[Kubernetes 清单研究](../../research/kasim-ui-kubernetes-inventory.md)和[加速器与 RDMA 信号研究](../../research/kasim-ui-accelerator-rdma-signals.md)收敛为可直接实施的产品契约。相关领域词汇见 [`CONTEXT.md`](../../../CONTEXT.md)，架构决策见 [ADR 0008](../../adr/0008-stream-cluster-simulation-inventory-snapshots.md)、[ADR 0009](../../adr/0009-model-auxiliary-device-pools.md)和 [ADR 0010](../../adr/0010-embed-authenticated-loopback-ui.md)。
 

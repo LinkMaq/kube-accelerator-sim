@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/LinkMaq/kube-accelerator-sim/internal/domain"
@@ -44,6 +45,54 @@ func TestPoolCountsAllowUnavailableAndScaledDownDesiredState(t *testing.T) {
 		if _, err := domain.NewPoolCounts(test.total, test.healthy); err == nil {
 			t.Errorf("NewPoolCounts(%d, %d) unexpectedly succeeded", test.total, test.healthy)
 		}
+	}
+}
+
+func TestAuxiliaryDevicePoolPreservesSchedulingOnlyContractAndAssociations(t *testing.T) {
+	t.Parallel()
+
+	name, err := domain.ParseName("rdma-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	profileID, err := domain.ParseName("rdma-shared-device-plugin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest, err := domain.ParseDigest("sha256:" + strings.Repeat("a", 64))
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile, err := domain.NewProfileReference(profileID, "2026-08-03", digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accelerator, err := domain.ParseName("h100")
+	if err != nil {
+		t.Fatal(err)
+	}
+	counts, err := domain.NewAuxiliaryCounts(8, 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool, err := domain.NewAuxiliaryDevicePool(domain.AuxiliaryDevicePoolInput{
+		Name: name, Profile: profile, Contract: "shared-hca",
+		Resource: "shared-token", ResourceName: "rdma/rdma_shared_device_a",
+		Counts: counts, AssociatedAcceleratorPools: []domain.Name{accelerator},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pool.ResourceName() != "rdma/rdma_shared_device_a" ||
+		pool.Counts().Total() != 8 || pool.Counts().Available() != 6 ||
+		len(pool.AssociatedAcceleratorPools()) != 1 ||
+		pool.AssociatedAcceleratorPools()[0].String() != "h100" {
+		t.Fatalf("Auxiliary Device Pool = %#v", pool)
+	}
+	associations := pool.AssociatedAcceleratorPools()
+	associations[0], _ = domain.ParseName("mutated")
+	if pool.AssociatedAcceleratorPools()[0].String() != "h100" {
+		t.Fatal("Auxiliary Device Pool associations are mutable")
 	}
 }
 

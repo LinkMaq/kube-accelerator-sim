@@ -33,6 +33,9 @@ type ScenarioInstanceSpec struct {
 type PoolStatus struct {
 	Group            string `json:"group"`
 	Pool             string `json:"pool"`
+	Role             string `json:"role,omitempty"`
+	Category         string `json:"category,omitempty"`
+	ResourceName     string `json:"resourceName,omitempty"`
 	RequestedTotal   int64  `json:"requestedTotal"`
 	RequestedHealthy int64  `json:"requestedHealthy"`
 	ObservedTotal    int64  `json:"observedTotal"`

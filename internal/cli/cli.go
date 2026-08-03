@@ -10,7 +10,11 @@ import (
 	"io"
 	"math"
 	"os"
+	"os/exec"
+	"os/signal"
+	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/LinkMaq/kube-accelerator-sim/internal/application"
@@ -18,8 +22,11 @@ import (
 	"github.com/LinkMaq/kube-accelerator-sim/internal/cluster"
 	clusterkubernetes "github.com/LinkMaq/kube-accelerator-sim/internal/cluster/kubernetes"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/domain"
+	"github.com/LinkMaq/kube-accelerator-sim/internal/inventory"
+	inventorykubernetes "github.com/LinkMaq/kube-accelerator-sim/internal/inventory/kubernetes"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/presentation"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/scenario"
+	"github.com/LinkMaq/kube-accelerator-sim/internal/ui"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/version"
 )
 
@@ -29,8 +36,11 @@ const creationIdentity = "kasim-cli/v1"
 // Dependencies contains concrete delivery wiring used by tests. It does not
 // add a product behavior seam; ScenarioRuntime still owns lifecycle behavior.
 type Dependencies struct {
-	Connect application.ConnectorFunc
-	Catalog catalog.Snapshot
+	Connect         application.ConnectorFunc
+	Catalog         catalog.Snapshot
+	Context         context.Context
+	InventorySource inventory.Source
+	OpenBrowser     func(string) error
 }
 
 // Run executes one concrete CLI invocation and returns its stable exit
@@ -41,7 +51,11 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		stdin,
 		stdout,
 		stderr,
-		Dependencies{Connect: connectKubernetes},
+		Dependencies{
+			Connect:         connectKubernetes,
+			InventorySource: inventorykubernetes.New(),
+			OpenBrowser:     openBrowser,
+		},
 	)
 }
 
@@ -71,7 +85,7 @@ func run(
 		return writeFailure(
 			"",
 			"InvocationInvalid",
-			"usage: kasim <version|profile|apply>",
+			"usage: kasim <version|profile|apply|status|health|scale|delete|ui>",
 			format,
 			stderr,
 		)
@@ -113,6 +127,8 @@ func run(
 		return runScale(args[1:], snapshot, dependencies.Connect, format, stdout, stderr)
 	case "delete":
 		return runDelete(args[1:], snapshot, dependencies.Connect, format, stdout, stderr)
+	case "ui":
+		return runUI(args[1:], dependencies, format, stdout, stderr)
 	default:
 		return writeFailure(
 			args[0],
@@ -122,6 +138,105 @@ func run(
 			stderr,
 		)
 	}
+}
+
+func runUI(
+	args []string,
+	dependencies Dependencies,
+	format presentation.OutputFormat,
+	stdout, stderr io.Writer,
+) int {
+	flags := flag.NewFlagSet("ui", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	var kubeconfigPath, contextName string
+	var port int
+	var open bool
+	flags.StringVar(&kubeconfigPath, "kubeconfig", "", "explicit kubeconfig path")
+	flags.StringVar(&contextName, "context", "", "exact kubeconfig context")
+	flags.IntVar(&port, "port", 8080, "loopback TCP port")
+	flags.BoolVar(&open, "open", false, "open the local UI in a browser")
+	if err := flags.Parse(args); err != nil {
+		return writeFailure("ui", "InvocationInvalid", err.Error(), format, stderr)
+	}
+	if flags.NArg() != 0 {
+		return writeFailure(
+			"ui", "InvocationInvalid",
+			"ui accepts flags only", format, stderr,
+		)
+	}
+	if kubeconfigPath == "" || contextName == "" {
+		return writeFailure(
+			"ui", "InvocationInvalid",
+			"ui requires --kubeconfig and --context", format, stderr,
+		)
+	}
+	if port < 1 || port > 65535 {
+		return writeFailure(
+			"ui", "InvocationInvalid",
+			"--port must be between 1 and 65535", format, stderr,
+		)
+	}
+	if dependencies.InventorySource == nil {
+		return writeFailure(
+			"ui", "TargetUnavailable",
+			"Kubernetes inventory source is unavailable", format, stderr,
+		)
+	}
+	ctx := dependencies.Context
+	stop := func() {}
+	if ctx == nil {
+		ctx, stop = signal.NotifyContext(
+			context.Background(), os.Interrupt, syscall.SIGTERM,
+		)
+	}
+	defer stop()
+	server, err := ui.NewServer(ctx, ui.Options{
+		Module: inventory.New(dependencies.InventorySource),
+		Target: cluster.TargetSelection{
+			KubeconfigPath: kubeconfigPath,
+			ContextName:    contextName,
+		},
+		Port: port,
+	})
+	if err != nil {
+		return writeFailure("ui", "TargetUnavailable", err.Error(), format, stderr)
+	}
+	target := server.Target()
+	fmt.Fprintf(stdout, "Kasim UI\nTarget: %s\n", target.ContextName)
+	if target.KubernetesVersion != "" {
+		fmt.Fprintf(stdout, "Kubernetes: %s\n", target.KubernetesVersion)
+	}
+	if target.Fingerprint != "" {
+		fmt.Fprintf(stdout, "Fingerprint: %s\n", target.Fingerprint)
+	}
+	fmt.Fprintf(stdout, "URL: %s\nPress Ctrl+C to stop.\n", server.AccessURL())
+	if open {
+		opener := dependencies.OpenBrowser
+		if opener == nil {
+			opener = openBrowser
+		}
+		if err := opener(server.AccessURL()); err != nil {
+			fmt.Fprintf(stderr, "warning: browser open failed; use the printed URL\n")
+		}
+	}
+	if err := server.Serve(ctx); err != nil {
+		return writeFailure("ui", "TargetUnavailable", err.Error(), format, stderr)
+	}
+	return 0
+}
+
+func openBrowser(value string) error {
+	var command string
+	var args []string
+	switch runtime.GOOS {
+	case "darwin":
+		command, args = "open", []string{value}
+	case "windows":
+		command, args = "rundll32", []string{"url.dll,FileProtocolHandler", value}
+	default:
+		command, args = "xdg-open", []string{value}
+	}
+	return exec.Command(command, args...).Start()
 }
 
 func connectKubernetes(
@@ -1041,14 +1156,17 @@ func profileResult(profile catalog.ProfileView) presentation.ProfileResult {
 			})
 		}
 		contracts = append(contracts, presentation.ContractResult{
-			ID:              contract.ID(),
-			Kind:            contract.Kind(),
-			ProviderScope:   contract.ProviderScope(),
-			FidelityModes:   contract.FidelityModes(),
-			Resources:       resources,
-			IdentitySignals: signals,
-			Capabilities:    contract.Capabilities(),
-			EvidenceRefs:    contract.EvidenceRefs(),
+			ID:                 contract.ID(),
+			Subject:            contract.Subject(),
+			AuxiliaryCategory:  contract.AuxiliaryCategory(),
+			ResourceNamePolicy: contract.ResourceNamePolicy(),
+			Kind:               contract.Kind(),
+			ProviderScope:      contract.ProviderScope(),
+			FidelityModes:      contract.FidelityModes(),
+			Resources:          resources,
+			IdentitySignals:    signals,
+			Capabilities:       contract.Capabilities(),
+			EvidenceRefs:       contract.EvidenceRefs(),
 		})
 	}
 	models := make([]presentation.ModelResult, 0, len(profile.Models()))
@@ -1089,16 +1207,20 @@ func compileResult(
 			err,
 		)
 	}
-	resolutions := make([]presentation.ResolutionResult, 0, len(receipt.Resolutions()))
-	for _, resolution := range receipt.Resolutions() {
+	allResolutions := append(receipt.Resolutions(), receipt.AuxiliaryResolutions()...)
+	resolutions := make([]presentation.ResolutionResult, 0, len(allResolutions))
+	for _, resolution := range allResolutions {
 		resolutions = append(resolutions, presentation.ResolutionResult{
-			ProfileClass:  resolution.ProfileClass(),
-			ProfileDigest: resolution.ProfileDigest().String(),
-			ModelID:       resolution.ModelID(),
-			ContractID:    resolution.ContractID(),
-			ResourceAlias: resolution.ResourceAlias(),
-			ResourceName:  resolution.ResourceName(),
-			Evidence:      evidenceResults(resolution.Evidence()),
+			ProfileClass:       resolution.ProfileClass(),
+			ProfileDigest:      resolution.ProfileDigest().String(),
+			Subject:            resolution.Subject(),
+			AuxiliaryCategory:  resolution.AuxiliaryCategory(),
+			ResourceNamePolicy: resolution.ResourceNamePolicy(),
+			ModelID:            resolution.ModelID(),
+			ContractID:         resolution.ContractID(),
+			ResourceAlias:      resolution.ResourceAlias(),
+			ResourceName:       resolution.ResourceName(),
+			Evidence:           evidenceResults(resolution.Evidence()),
 		})
 	}
 	return presentation.ScenarioCompileResult{
@@ -1204,6 +1326,9 @@ func lifecycleResult(
 			pools = append(pools, presentation.PoolResult{
 				Group:            pool.Group,
 				Pool:             pool.Pool,
+				Role:             pool.Role,
+				Category:         pool.Category,
+				ResourceName:     pool.ResourceName,
 				RequestedTotal:   pool.RequestedTotal,
 				RequestedHealthy: pool.RequestedHealthy,
 				ObservedTotal:    pool.ObservedTotal,

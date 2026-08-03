@@ -11,6 +11,7 @@ const documentationRoot = path.join(repositoryRoot, 'docs')
 
 const zhNav = [
   { text: '指南', link: '/zh/operators/quickstart' },
+  { text: '清单 UI', link: '/zh/operators/cluster-inventory-ui' },
   { text: '场景', link: '/zh/operators/scenario-examples' },
   { text: '兼容性', link: '/zh/operators/kubernetes-compatibility' },
   { text: '设备档案', link: '/zh/operators/profile-evidence' },
@@ -25,6 +26,7 @@ const zhSidebar = [
       { text: '概览', link: '/zh/' },
       { text: '已有集群快速开始', link: '/zh/operators/quickstart' },
       { text: '运行时安装', link: '/zh/operators/runtime-installation' },
+      { text: '只读集群清单 UI', link: '/zh/operators/cluster-inventory-ui' },
     ],
   },
   {
@@ -228,6 +230,7 @@ export default defineConfig({
     siteTitle: 'Kasim',
     nav: [
       { text: 'Guide', link: '/operators/quickstart' },
+      { text: 'Inventory UI', link: '/operators/cluster-inventory-ui' },
       { text: 'Scenarios', link: '/operators/scenario-examples' },
       { text: 'Compatibility', link: '/operators/kubernetes-compatibility' },
       { text: 'Profiles', link: '/operators/profile-evidence' },
@@ -241,6 +244,7 @@ export default defineConfig({
           { text: 'Overview', link: '/' },
           { text: 'Existing-cluster quickstart', link: '/operators/quickstart' },
           { text: 'Runtime installation', link: '/operators/runtime-installation' },
+          { text: 'Read-only cluster inventory UI', link: '/operators/cluster-inventory-ui' },
         ],
       },
       {

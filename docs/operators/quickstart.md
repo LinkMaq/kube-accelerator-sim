@@ -23,8 +23,8 @@ The matching controller image and Helm chart are published through GitHub
 Packages:
 
 ```sh
-docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.1.0
-helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.1.0
+docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.2.0
+helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.2.0
 ```
 
 ## 2. Inspect and compile offline
@@ -65,7 +65,7 @@ package and pin its version:
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.1.0 \
+  --version 0.2.0 \
   --kubeconfig ./target.kubeconfig \
   --kube-context target \
   --namespace kasim-system \
@@ -117,6 +117,19 @@ kubectl --kubeconfig ./target.kubeconfig --context target \
 The status receipt is authoritative for readiness, desired/observed
 generation, instance UID, resolved profiles, fidelity surfaces, diagnostics,
 and owned-object counts.
+
+Open the local read-only inventory when you need a fast visual check across
+both Kasim and non-Kasim Nodes:
+
+```sh
+./dist/kasim ui \
+  --kubeconfig ./target.kubeconfig \
+  --context target \
+  --open
+```
+
+See the [cluster inventory UI guide](cluster-inventory-ui.md) for its
+ephemeral capability, evidence rules, filters, and partial-source behavior.
 
 ## 5. Apply typed health and scale revisions
 

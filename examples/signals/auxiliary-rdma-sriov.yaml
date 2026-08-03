@@ -1,0 +1,79 @@
+metadata:
+  name: auxiliary-network-signals
+spec:
+  fidelity: scheduling
+  acceptance:
+    provisionalProfiles: false
+  nodeGroups:
+    - name: nvidia-rdma-workers
+      replicas: 2
+      node:
+        capacity:
+          cpu: "64"
+          memory: 512Gi
+          pods: "110"
+        placement:
+          zone: lab-a
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: h100
+          profile:
+            id: nvidia
+            revision: 2026-08-03
+            digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
+          model: nvidia-h100
+          contract: device-plugin
+          resource: gpu
+          variant: {}
+          count: 8
+          healthy: 8
+      auxiliaryDevicePools:
+        - name: rdma-a
+          profile:
+            id: rdma-shared-device-plugin
+            revision: 2026-08-03
+            digest: sha256:47a91b9586b98c5362610722f0b2fe3ee278d773717d6748d88e890d6974a6d8
+          contract: shared-hca
+          resource: shared-token
+          resourceName: rdma/rdma_shared_device_a
+          count: 16
+          available: 16
+          associatedAcceleratorPools:
+            - h100
+    - name: amd-sriov-workers
+      replicas: 1
+      node:
+        capacity:
+          cpu: "64"
+          memory: 512Gi
+          pods: "110"
+        placement:
+          zone: lab-b
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: mi300x
+          profile:
+            id: amd
+            revision: 2026-08-03
+            digest: sha256:c165c4b0616a2f4064e6a1805e14d97ed76b66d632a9c050fda89cd8b15d2bea
+          model: amd-mi300x
+          contract: device-plugin
+          resource: gpu
+          variant: {}
+          count: 8
+          healthy: 8
+      auxiliaryDevicePools:
+        - name: sriov-a
+          profile:
+            id: sriov-network-device-plugin
+            revision: 2026-08-03
+            digest: sha256:3e925812d245b51146c0bcc833b276244c93aa76412c29ab3a4735bca9eb44cd
+          contract: sriov-resource
+          resource: virtual-function
+          resourceName: example.com/sriov_net_a
+          count: 8
+          available: 6
+          associatedAcceleratorPools:
+            - mi300x

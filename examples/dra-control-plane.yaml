@@ -20,7 +20,7 @@ spec:
         - name: h100
           profile:
             id: nvidia
-            revision: 2026-07-31
+            revision: 2026-08-03
             digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
           model: nvidia-h100
           contract: dra
@@ -43,7 +43,7 @@ spec:
         - name: mi300x
           profile:
             id: amd
-            revision: 2026-07-31
+            revision: 2026-08-03
             digest: sha256:c165c4b0616a2f4064e6a1805e14d97ed76b66d632a9c050fda89cd8b15d2bea
           model: amd-mi300x
           contract: dra
@@ -66,7 +66,7 @@ spec:
         - name: trainium2
           profile:
             id: aws-neuron
-            revision: 2026-07-31
+            revision: 2026-08-03
             digest: sha256:91d50953e6d1dc76ddd602b08a215938062cdad7fa2b4414e8b2766447575756
           model: aws-trainium2
           contract: dra

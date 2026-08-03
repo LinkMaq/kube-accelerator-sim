@@ -20,7 +20,7 @@ spec:
         - name: c500
           profile:
             id: metax
-            revision: 2026-07-31
+            revision: 2026-08-03
             digest: sha256:c39da7311ee12247f621832c3a4f24bcbfa8b6563bd2eaf1014615d25a959ebd
           model: metax-c500
           contract: device-plugin

@@ -76,6 +76,9 @@ func TestReleasePipelineIsEvidenceGatedAndReproducible(t *testing.T) {
 		"kasim-runtime-",
 		"SourceDateEpoch",
 		"buildid=",
+		"kasim_measure_no_ui",
+		"compressedBinaryDeltaBytes",
+		"maxUIBinaryDeltaBytes",
 	} {
 		if !strings.Contains(builder, required) {
 			t.Errorf("release builder is missing %q", required)
@@ -105,17 +108,17 @@ func TestReleasePipelineIsEvidenceGatedAndReproducible(t *testing.T) {
 func TestVersionedReleaseNotesAreBilingualAndNamePublishedPackages(t *testing.T) {
 	t.Parallel()
 
-	notes := readReleaseContractFile(t, "../../release/notes/v0.1.0.md")
+	notes := readReleaseContractFile(t, "../../release/notes/v0.2.0.md")
 	for _, required := range []string{
 		"# 中文",
 		"# English",
-		"ghcr.io/linkmaq/kube-accelerator-sim-controller:0.1.0",
+		"ghcr.io/linkmaq/kube-accelerator-sim-controller:0.2.0",
 		"oci://ghcr.io/linkmaq/charts/kasim-runtime",
 		"Linux amd64/arm64",
 		"Windows amd64",
 	} {
 		if !strings.Contains(notes, required) {
-			t.Errorf("v0.1.0 release notes are missing %q", required)
+			t.Errorf("v0.2.0 release notes are missing %q", required)
 		}
 	}
 	if strings.Index(notes, "# 中文") > strings.Index(notes, "# English") {
@@ -132,10 +135,10 @@ func TestReleaseInputsDeclareExplicitPublicSurfaceVersions(t *testing.T) {
 		`"scenarioTransport": "v1alpha1"`,
 		`"productKubernetesTransport": "simulation.kasim.io/v1alpha1"`,
 		`"machineOutput": "v1alpha1"`,
-		`"catalog": "2026-07-31"`,
+		`"catalog": "2026-08-03"`,
 		`"compatibilityMatrix": "2026-07-30"`,
 		`"controllerImage": "v1"`,
-		`"chart": "0.1.0"`,
+		`"chart": "0.2.0"`,
 	} {
 		if !strings.Contains(inputs, required) {
 			t.Errorf("release inputs are missing explicit surface %s", required)

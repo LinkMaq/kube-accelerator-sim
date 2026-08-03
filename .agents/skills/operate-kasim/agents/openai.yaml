@@ -1,4 +1,4 @@
 interface:
   display_name: "Kasim Accelerator Operator"
-  short_description: "Install runtime and operate simulated accelerators"
-  default_prompt: "Use $operate-kasim to install Kasim and start a simulated accelerator scenario on my Kubernetes cluster."
+  short_description: "Operate simulated accelerators and inventory UI"
+  default_prompt: "Use $operate-kasim to start a simulated accelerator scenario and inspect it with the read-only UI."

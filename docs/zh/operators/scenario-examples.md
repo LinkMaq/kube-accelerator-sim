@@ -26,6 +26,7 @@
 | 厂商预设 | [examples/vendors](../../../examples/vendors) | 17 个可选厂商生态各自可直接提交的 Scenario |
 | 扩展资源变体 | [extended-resource-variants.yaml](../../../examples/signals/extended-resource-variants.yaml) | 替代、切分、共享、虚拟、显存和核心资源信号 |
 | 稳定版 DRA | [dra-control-plane.yaml](../../../examples/dra-control-plane.yaml) | Kubernetes 1.34–1.36 上的 NVIDIA、AMD、AWS Neuron `resource.k8s.io/v1` 清单 |
+| RDMA 与 SR-IOV 辅助信号 | [auxiliary-rdma-sriov.yaml](../../../examples/signals/auxiliary-rdma-sriov.yaml) | H100 加可配置 RDMA 令牌，以及 MI300X 加可配置 SR-IOV VF 令牌 |
 | 参考规模 | [reference-scale.yaml](../../../test/e2e/testdata/reference-scale.yaml) | 1,000 个 Synthetic Node、8,000 个单位的发布门禁 |
 
 完整厂商/资源矩阵及其证据性省略项见[示例索引](../../../examples/README.md)。例如：
@@ -36,6 +37,10 @@
   -o json
 
 ./dist/kasim apply -f ./examples/signals/extended-resource-variants.yaml \
+  --dry-run=client \
+  -o json
+
+./dist/kasim apply -f ./examples/signals/auxiliary-rdma-sriov.yaml \
   --dry-run=client \
   -o json
 ```

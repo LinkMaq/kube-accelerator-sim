@@ -1,6 +1,6 @@
 ---
 name: operate-kasim
-description: Operate kube-accelerator-sim from natural-language requests. Use when a user asks to install or upgrade the Kasim runtime in an existing Kubernetes cluster; start, mock, or deploy NVIDIA, AMD, Huawei Ascend, Hygon DCU, Cambricon, Biren, Iluvatar, Enflame, Moore Threads, MetaX, Intel, or other simulated accelerators; create homogeneous or heterogeneous scenarios; inspect profiles, nodes, resources, status, and receipts; change simulated health or scale; safely stop or delete a Scenario Instance; or diagnose a Kasim deployment.
+description: Operate kube-accelerator-sim from natural-language requests. Use when a user asks to install or upgrade the Kasim runtime in an existing Kubernetes cluster; start, mock, or deploy NVIDIA, AMD, Huawei Ascend, Hygon DCU, Cambricon, Biren, Iluvatar, Enflame, Moore Threads, MetaX, Intel, or other simulated accelerators; add RDMA or SR-IOV Auxiliary Device Pools; open the read-only kasim ui; inspect profiles, nodes, resources, DRA devices, status, and receipts; change simulated health or scale; safely stop or delete a Scenario Instance; or diagnose a Kasim deployment.
 ---
 
 # Operate Kasim
@@ -50,6 +50,9 @@ lifecycle operation.
 For one homogeneous pool, prefer `kasim apply demo`. For heterogeneous,
 multi-pool, partitioned, or reusable configurations, use a Scenario document.
 Start from `examples/` and preserve its exact profile revision and digest.
+For RDMA or SR-IOV signals, start from
+`examples/signals/auxiliary-rdma-sriov.yaml`; preserve the local Accelerator
+Pool association and require the user-provided fully qualified resource name.
 
 Always inspect the catalog before choosing identifiers:
 
@@ -84,12 +87,20 @@ reviewed the evidence and explicitly accepts them.
    `dist/receipts/<scenario>/`.
 6. Run `kasim status ... --watch -o json`, then inspect only Nodes labeled
    `simulation.kasim.io/scenario=<scenario>`.
-7. Report the context, target fingerprint, Scenario UID and generation,
+7. When the user asks to see the whole cluster or open the UI, run `kasim ui`
+   with the same explicit target. Do not add a remote bind, proxy, tunnel, or
+   persistent service. Treat its fragment URL as a temporary read capability.
+8. Report the context, target fingerprint, Scenario UID and generation,
    resolved profiles, requested/observed pool totals, fidelity surfaces,
    diagnostics, and receipt paths.
 
 Do not claim success from object creation alone. Require a `Ready` Snapshot
 with the requested inventory and achieved fidelity surfaces.
+
+For read-only inspection, distinguish scalar resource signals from native DRA
+device identities. Keep health unknown unless the selected source reports it.
+An Auxiliary Device Pool is a scheduling token and never proves a physical
+NIC, link, CNI, network fabric, GPUDirect path, or data-plane connectivity.
 
 ## Revise and remove safely
 

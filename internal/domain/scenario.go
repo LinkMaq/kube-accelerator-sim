@@ -1,6 +1,17 @@
 package domain
 
-import "fmt"
+import (
+	"fmt"
+	"regexp"
+	"strings"
+)
+
+var qualifiedResourcePartPattern = regexp.MustCompile(
+	`^[A-Za-z0-9](?:[-A-Za-z0-9_.]*[A-Za-z0-9])?$`,
+)
+var resourceDomainPattern = regexp.MustCompile(
+	`^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?(?:\.[a-z0-9](?:[-a-z0-9]*[a-z0-9])?)*$`,
+)
 
 // PoolCounts keeps total capacity and requested healthy availability together.
 type PoolCounts struct {
@@ -51,6 +62,33 @@ func (counts PoolCounts) Total() uint64 {
 func (counts PoolCounts) Healthy() uint64 {
 	return counts.healthy
 }
+
+// AuxiliaryCounts keeps the published quantity and schedulable availability
+// of an Auxiliary Device Pool separate from physical device health.
+type AuxiliaryCounts struct {
+	total     uint64
+	available uint64
+}
+
+func NewAuxiliaryCounts(total, available int64) (AuxiliaryCounts, error) {
+	if total < 0 {
+		return AuxiliaryCounts{}, fmt.Errorf("auxiliary count must be non-negative: %d", total)
+	}
+	if available < 0 {
+		return AuxiliaryCounts{}, fmt.Errorf(
+			"auxiliary available count must be non-negative: %d", available,
+		)
+	}
+	if available > total {
+		return AuxiliaryCounts{}, fmt.Errorf(
+			"auxiliary available count %d exceeds total count %d", available, total,
+		)
+	}
+	return AuxiliaryCounts{total: uint64(total), available: uint64(available)}, nil
+}
+
+func (counts AuxiliaryCounts) Total() uint64     { return counts.total }
+func (counts AuxiliaryCounts) Available() uint64 { return counts.available }
 
 // ProfileReference pins one immutable Vendor Profile revision and digest.
 type ProfileReference struct {
@@ -178,6 +216,89 @@ func (pool AcceleratorPool) Counts() PoolCounts {
 	return pool.counts
 }
 
+type AuxiliaryDevicePoolInput struct {
+	Name                       Name
+	Profile                    ProfileReference
+	Contract                   string
+	Resource                   string
+	ResourceName               string
+	Counts                     AuxiliaryCounts
+	AssociatedAcceleratorPools []Name
+}
+
+// AuxiliaryDevicePool is one immutable, scheduling-only auxiliary resource
+// surface. It does not represent physical NIC or data-plane inventory.
+type AuxiliaryDevicePool struct {
+	name                       Name
+	profile                    ProfileReference
+	contract                   string
+	resource                   string
+	resourceName               string
+	counts                     AuxiliaryCounts
+	associatedAcceleratorPools []Name
+}
+
+func NewAuxiliaryDevicePool(input AuxiliaryDevicePoolInput) (AuxiliaryDevicePool, error) {
+	if input.Name.value == "" {
+		return AuxiliaryDevicePool{}, fmt.Errorf("Auxiliary Device Pool requires a name")
+	}
+	if input.Profile.id.value == "" {
+		return AuxiliaryDevicePool{}, fmt.Errorf("Auxiliary Device Pool requires a profile")
+	}
+	if !dnsLabelPattern.MatchString(input.Contract) {
+		return AuxiliaryDevicePool{}, fmt.Errorf("invalid auxiliary Resource Contract %q", input.Contract)
+	}
+	if !dnsLabelPattern.MatchString(input.Resource) {
+		return AuxiliaryDevicePool{}, fmt.Errorf("invalid auxiliary resource alias %q", input.Resource)
+	}
+	if !validExtendedResourceName(input.ResourceName) {
+		return AuxiliaryDevicePool{}, fmt.Errorf(
+			"invalid auxiliary extended resource name %q", input.ResourceName,
+		)
+	}
+	if len(input.AssociatedAcceleratorPools) == 0 {
+		return AuxiliaryDevicePool{}, fmt.Errorf(
+			"Auxiliary Device Pool requires an Accelerator Pool association",
+		)
+	}
+	seen := make(map[string]struct{}, len(input.AssociatedAcceleratorPools))
+	for _, association := range input.AssociatedAcceleratorPools {
+		if association.value == "" {
+			return AuxiliaryDevicePool{}, fmt.Errorf("invalid Accelerator Pool association")
+		}
+		if _, duplicate := seen[association.value]; duplicate {
+			return AuxiliaryDevicePool{}, fmt.Errorf(
+				"duplicate Accelerator Pool association %q", association.value,
+			)
+		}
+		seen[association.value] = struct{}{}
+	}
+	return AuxiliaryDevicePool{
+		name: input.Name, profile: input.Profile, contract: input.Contract,
+		resource: input.Resource, resourceName: input.ResourceName,
+		counts:                     input.Counts,
+		associatedAcceleratorPools: append([]Name(nil), input.AssociatedAcceleratorPools...),
+	}, nil
+}
+
+func (pool AuxiliaryDevicePool) Name() Name                { return pool.name }
+func (pool AuxiliaryDevicePool) Profile() ProfileReference { return pool.profile }
+func (pool AuxiliaryDevicePool) Contract() string          { return pool.contract }
+func (pool AuxiliaryDevicePool) Resource() string          { return pool.resource }
+func (pool AuxiliaryDevicePool) ResourceName() string      { return pool.resourceName }
+func (pool AuxiliaryDevicePool) Counts() AuxiliaryCounts   { return pool.counts }
+func (pool AuxiliaryDevicePool) AssociatedAcceleratorPools() []Name {
+	return append([]Name(nil), pool.associatedAcceleratorPools...)
+}
+
+func validExtendedResourceName(value string) bool {
+	prefix, name, found := strings.Cut(value, "/")
+	return found && len(prefix) <= 253 && len(name) <= 63 &&
+		resourceDomainPattern.MatchString(prefix) &&
+		qualifiedResourcePartPattern.MatchString(name) &&
+		prefix != "kubernetes.io" && !strings.HasSuffix(prefix, ".kubernetes.io")
+}
+
 // Taint is portable scheduling intent for one Node template.
 type Taint struct {
 	key    string
@@ -278,18 +399,20 @@ func (node NodeTemplate) Taints() []Taint {
 
 // NodeGroupInput combines one homogeneous template, replica target, and pools.
 type NodeGroupInput struct {
-	Name     Name
-	Replicas ReplicaCount
-	Node     NodeTemplate
-	Pools    []AcceleratorPool
+	Name           Name
+	Replicas       ReplicaCount
+	Node           NodeTemplate
+	Pools          []AcceleratorPool
+	AuxiliaryPools []AuxiliaryDevicePool
 }
 
 // NodeGroup repeats one immutable Node template with stable replica indices.
 type NodeGroup struct {
-	name     Name
-	replicas ReplicaCount
-	node     NodeTemplate
-	pools    []AcceleratorPool
+	name           Name
+	replicas       ReplicaCount
+	node           NodeTemplate
+	pools          []AcceleratorPool
+	auxiliaryPools []AuxiliaryDevicePool
 }
 
 // NewNodeGroup rejects invalid or duplicate Accelerator Pool names.
@@ -310,11 +433,30 @@ func NewNodeGroup(input NodeGroupInput) (NodeGroup, error) {
 		}
 		poolNames[pool.name.value] = struct{}{}
 	}
+	auxiliaryNames := make(map[string]struct{}, len(input.AuxiliaryPools))
+	for _, pool := range input.AuxiliaryPools {
+		if pool.name.value == "" {
+			return NodeGroup{}, fmt.Errorf("Node Group contains an invalid Auxiliary Device Pool")
+		}
+		if _, duplicate := auxiliaryNames[pool.name.value]; duplicate {
+			return NodeGroup{}, fmt.Errorf("duplicate Auxiliary Device Pool name %q", pool.name.value)
+		}
+		auxiliaryNames[pool.name.value] = struct{}{}
+		for _, association := range pool.associatedAcceleratorPools {
+			if _, found := poolNames[association.value]; !found {
+				return NodeGroup{}, fmt.Errorf(
+					"Auxiliary Device Pool %q references unknown Accelerator Pool %q",
+					pool.name.value, association.value,
+				)
+			}
+		}
+	}
 	return NodeGroup{
-		name:     input.Name,
-		replicas: input.Replicas,
-		node:     input.Node,
-		pools:    append([]AcceleratorPool(nil), input.Pools...),
+		name:           input.Name,
+		replicas:       input.Replicas,
+		node:           input.Node,
+		pools:          append([]AcceleratorPool(nil), input.Pools...),
+		auxiliaryPools: append([]AuxiliaryDevicePool(nil), input.AuxiliaryPools...),
 	}, nil
 }
 
@@ -332,6 +474,10 @@ func (group NodeGroup) Node() NodeTemplate {
 
 func (group NodeGroup) Pools() []AcceleratorPool {
 	return append([]AcceleratorPool(nil), group.pools...)
+}
+
+func (group NodeGroup) AuxiliaryPools() []AuxiliaryDevicePool {
+	return append([]AuxiliaryDevicePool(nil), group.auxiliaryPools...)
 }
 
 // ScenarioInput is target-independent desired state for one Scenario.

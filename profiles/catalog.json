@@ -1,6 +1,6 @@
 {
-  "schemaVersion": "v1alpha1",
-  "revision": "2026-07-31",
+  "schemaVersion": "v1alpha2",
+  "revision": "2026-08-03",
   "profiles": [
     {
       "id": "nvidia",
@@ -448,6 +448,34 @@
         {"id":"qualcomm-cloud-ai-100-pro","displayName":"Qualcomm Cloud AI 100 Pro","aliases":["Cloud AI 100 Pro"],"lifecycle":"catalog-only","selectable":false,"contracts":[],"resourceAliases":[],"evidenceRefs":["models"]},
         {"id":"qualcomm-cloud-ai-100-ultra","displayName":"Qualcomm Cloud AI 100 Ultra","aliases":["Cloud AI 100 Ultra"],"lifecycle":"catalog-only","selectable":false,"contracts":[],"resourceAliases":[],"evidenceRefs":["models"]}
       ]
+    },
+    {
+      "id":"rdma-shared-device-plugin",
+      "displayName":"RDMA Shared Device Plugin",
+      "class":"verified",
+      "evidence":[{"id":"upstream","grade":"A","source":"https://github.com/Mellanox/k8s-rdma-shared-dev-plugin/blob/3beab3b1c014b976dc1da80d0dfa2ccbebec0513/README.md","revision":"3beab3b1c014b976dc1da80d0dfa2ccbebec0513","checkedAt":"2026-08-03"}],
+      "contracts":[{
+        "id":"shared-hca","subject":"auxiliary","auxiliaryCategory":"rdma","resourceNamePolicy":"scenario-required","kind":"extended-resource","providerScope":"upstream-configurable","fidelityModes":["scheduling"],
+        "resources":[{"alias":"shared-token","name":"","unit":"shared-token"}],
+        "identitySignals":[],
+        "capabilities":{"health":"not-public","topology":"not-public","sharing":"verified","partitioning":"not-applicable"},
+        "evidenceRefs":["upstream"]
+      }],
+      "models":[]
+    },
+    {
+      "id":"sriov-network-device-plugin",
+      "displayName":"SR-IOV Network Device Plugin",
+      "class":"verified",
+      "evidence":[{"id":"upstream","grade":"A","source":"https://github.com/k8snetworkplumbingwg/sriov-network-device-plugin/blob/efe22f8722ceae918c6703830107b3e82b089ef1/README.md","revision":"efe22f8722ceae918c6703830107b3e82b089ef1","checkedAt":"2026-08-03"}],
+      "contracts":[{
+        "id":"sriov-resource","subject":"auxiliary","auxiliaryCategory":"sriov","resourceNamePolicy":"scenario-required","kind":"extended-resource","providerScope":"upstream-configurable","fidelityModes":["scheduling"],
+        "resources":[{"alias":"virtual-function","name":"","unit":"virtual-function"}],
+        "identitySignals":[],
+        "capabilities":{"health":"not-public","topology":"verified","sharing":"not-applicable","partitioning":"verified"},
+        "evidenceRefs":["upstream"]
+      }],
+      "models":[]
     }
   ]
 }

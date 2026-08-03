@@ -57,8 +57,14 @@ func (adapter Adapter) Render(
 	inputs := make([]projection.NodeFragmentInput, 0, len(graph.Nodes()))
 	for _, node := range graph.Nodes() {
 		labels := make(map[string]string)
-		capacity := make(map[string]uint64, len(node.Pools()))
-		allocatable := make(map[string]uint64, len(node.Pools()))
+		capacity := make(
+			map[string]uint64,
+			len(node.Pools())+len(node.AuxiliaryPools()),
+		)
+		allocatable := make(
+			map[string]uint64,
+			len(node.Pools())+len(node.AuxiliaryPools()),
+		)
 		for _, pool := range node.Pools() {
 			if _, collision := capacity[pool.ResourceName()]; collision {
 				return projection.ProjectionFragment{}, fmt.Errorf(
@@ -82,6 +88,17 @@ func (adapter Adapter) Render(
 				}
 				labels[signal.Key] = signal.Value
 			}
+		}
+		for _, pool := range node.AuxiliaryPools() {
+			if _, collision := capacity[pool.ResourceName()]; collision {
+				return projection.ProjectionFragment{}, fmt.Errorf(
+					"Node %q has duplicate extended resource %q",
+					node.Name(),
+					pool.ResourceName(),
+				)
+			}
+			capacity[pool.ResourceName()] = pool.Capacity()
+			allocatable[pool.ResourceName()] = pool.Allocatable()
 		}
 		inputs = append(inputs, projection.NodeFragmentInput{
 			Name:           node.Name(),

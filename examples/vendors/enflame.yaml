@@ -20,7 +20,7 @@ spec:
         - name: s60
           profile:
             id: enflame
-            revision: 2026-07-31
+            revision: 2026-08-03
             digest: sha256:12d285901e12e6b3494454cbb4adcfcd58df1eea3f4dd6546cdaf27712459d82
           model: enflame-s60
           contract: device-plugin

@@ -20,7 +20,7 @@ spec:
         - name: tpu-v6e
           profile:
             id: google-tpu
-            revision: 2026-07-31
+            revision: 2026-08-03
             digest: sha256:145994176db738324df8a4bcf573ff109dc72df60e586f30676dc1cca89ac83d
           model: google-tpu-v6e
           contract: gke

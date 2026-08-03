@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -15,7 +17,47 @@ import (
 	"github.com/LinkMaq/kube-accelerator-sim/internal/controlplane"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/controlplane/memory"
 	"github.com/LinkMaq/kube-accelerator-sim/internal/domain"
+	inventorymemory "github.com/LinkMaq/kube-accelerator-sim/internal/inventory/memory"
 )
+
+func TestUICommandUsesExplicitTargetAndLoopbackLifecycle(t *testing.T) {
+	t.Parallel()
+
+	listener, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	listener.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	opened := ""
+	dependencies := cli.Dependencies{
+		Context:         ctx,
+		InventorySource: inventorymemory.New(),
+		OpenBrowser: func(value string) error {
+			opened = value
+			return nil
+		},
+	}
+	result := runCLI(t, dependencies, []string{
+		"ui",
+		"--kubeconfig", "/explicit/config",
+		"--context", "lab",
+		"--port", strconv.Itoa(port),
+		"--open",
+	})
+	if result.exit != 0 || result.stderr != "" {
+		t.Fatalf("ui result = %#v", result)
+	}
+	if !strings.Contains(result.stdout, "Target: lab") ||
+		!strings.Contains(result.stdout, "http://127.0.0.1:"+strconv.Itoa(port)+"/#token=") {
+		t.Fatalf("ui output = %q", result.stdout)
+	}
+	if opened == "" || !strings.Contains(opened, "#token=") {
+		t.Fatalf("browser URL = %q", opened)
+	}
+}
 
 func TestOfflineCommandsNeedNoClusterConfiguration(t *testing.T) {
 	t.Setenv("KUBECONFIG", "/definitely/not/read")
@@ -26,7 +68,7 @@ func TestOfflineCommandsNeedNoClusterConfiguration(t *testing.T) {
 	}{
 		"version": {
 			args: []string{"version", "-o", "json"},
-			want: []string{`"kind": "Version"`, `"catalogVersion": "2026-07-31"`},
+			want: []string{`"kind": "Version"`, `"catalogVersion": "2026-08-03"`},
 		},
 		"profile list": {
 			args: []string{"profile", "list", "-o", "json"},

@@ -3,6 +3,7 @@ package extended_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -16,6 +17,77 @@ import (
 )
 
 const instanceUIDValue = "6cb2dd6f-c608-4e79-aaf6-e3fa1287f73c"
+
+func TestProjectionRendersAuxiliarySchedulingSignalsBesideAccelerators(t *testing.T) {
+	t.Parallel()
+
+	snapshot, err := catalog.LoadBundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	auxiliaryProfile, err := snapshot.Show("rdma-shared-device-plugin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	document := fmt.Sprintf(`
+metadata:
+  name: auxiliary-lab
+spec:
+  fidelity: scheduling
+  acceptance: {provisionalProfiles: false}
+  nodeGroups:
+    - name: nodes
+      replicas: 1
+      node: {capacity: {}, placement: {}, labels: {}, taints: []}
+      acceleratorPools:
+        - name: accelerators
+          profile: {id: nvidia, revision: 2026-08-03, digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de}
+          model: nvidia-h100
+          contract: device-plugin
+          resource: gpu
+          variant: {}
+          count: 4
+          healthy: 4
+      auxiliaryDevicePools:
+        - name: rdma-a
+          profile: {id: rdma-shared-device-plugin, revision: %s, digest: %s}
+          contract: shared-hca
+          resource: shared-token
+          resourceName: rdma/rdma_shared_device_a
+          count: 8
+          available: 6
+          associatedAcceleratorPools: [accelerators]
+`, auxiliaryProfile.Revision(), auxiliaryProfile.Digest())
+	input, err := scenario.Document([]byte(document))
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiled, receipt, err := scenario.Compile(input, snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	uid, _ := domain.ParseInstanceUID(instanceUIDValue)
+	generation, _ := domain.NewGeneration(1)
+	graph, err := projection.Build(projection.BuildInput{
+		InstanceName: compiled.Scenario().Name(), InstanceUID: uid,
+		Generation: generation, Scenario: compiled.Scenario(),
+		Resolutions:          receipt.Resolutions(),
+		AuxiliaryResolutions: receipt.AuxiliaryResolutions(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fragment, err := extended.New().Render(graph, schedulingCapabilities())
+	if err != nil {
+		t.Fatal(err)
+	}
+	node := fragment.Nodes()[0]
+	if node.Capacity()["nvidia.com/gpu"] != 4 ||
+		node.Capacity()["rdma/rdma_shared_device_a"] != 8 ||
+		node.Allocatable()["rdma/rdma_shared_device_a"] != 6 {
+		t.Fatalf("projected resources = capacity %#v allocatable %#v", node.Capacity(), node.Allocatable())
+	}
+}
 
 func TestProjectionRendersExactSourceBackedCapacityAndSchedulingGate(t *testing.T) {
 	t.Parallel()

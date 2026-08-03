@@ -16,7 +16,7 @@ Vendor Profile 是描述准确 Kubernetes 可见契约的不可变数据记录�
 
 ## 内置生态覆盖
 
-目录修订为 `2026-07-31`。使用 `kasim profile show <id> -o json` 查看准确来源、
+目录修订为 `2026-08-03`。使用 `kasim profile show <id> -o json` 查看准确来源、
 修订、检查日期、资源契约、型号、限制和摘要。
 
 | 生态 | Profile ID | 等级 | 代表性可选型号或状态 |

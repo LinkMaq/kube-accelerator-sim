@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	productVersion = "0.1.0"
+	productVersion = "0.2.0"
 	chartPath      = "../../charts/kasim-runtime"
 )
 
@@ -169,7 +169,7 @@ func TestVendoredRuntimeAssetsMatchCanonicalLocks(t *testing.T) {
 	}
 	productCRDSum := sha256.Sum256(chartCRD)
 	if got, want := fmt.Sprintf("%x", productCRDSum[:]),
-		"6edf364b62e22de7deb05e817a865601cfce0af9943a73f85c4a8bddb0d15be9"; got != want {
+		"fc4162c4d9b3137fa5c195e22c6604c625abb55b8a29c839856e1120467d3bd4"; got != want {
 		t.Fatalf("product CRD SHA-256 = %s, want %s", got, want)
 	}
 
@@ -244,8 +244,8 @@ func TestChartVersionsAndImmutableRuntimeInputsStayExplicit(t *testing.T) {
 	}
 	for key, want := range map[string]string{
 		"simulation.kasim.io/schema-version":        "v1alpha1",
-		"simulation.kasim.io/product-crd-sha256":    "6edf364b62e22de7deb05e817a865601cfce0af9943a73f85c4a8bddb0d15be9",
-		"simulation.kasim.io/catalog-revision":      "2026-07-31",
+		"simulation.kasim.io/product-crd-sha256":    "fc4162c4d9b3137fa5c195e22c6604c625abb55b8a29c839856e1120467d3bd4",
+		"simulation.kasim.io/catalog-revision":      "2026-08-03",
 		"simulation.kasim.io/kubernetes-range":      "1.30-1.36",
 		"simulation.kasim.io/kwok-version":          "v0.8.0",
 		"simulation.kasim.io/kwok-manifest-sha256":  "a4c16e6431e382dcb5c1903139344b7a68652f16a6460337fe17a678a426f405",

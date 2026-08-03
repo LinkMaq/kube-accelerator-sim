@@ -132,6 +132,9 @@ type InstanceRecord struct {
 type PoolStatus struct {
 	Group            string
 	Pool             string
+	Role             string
+	Category         string
+	ResourceName     string
 	RequestedTotal   int64
 	RequestedHealthy int64
 	ObservedTotal    int64

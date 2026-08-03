@@ -20,7 +20,7 @@ spec:
         - name: rngd
           profile:
             id: furiosa
-            revision: 2026-07-31
+            revision: 2026-08-03
             digest: sha256:f05d79dfed7c38d29ac1f1b31931d200299f8c3712856acf0a0d52676df44d1e
           model: furiosa-rngd
           contract: device-plugin

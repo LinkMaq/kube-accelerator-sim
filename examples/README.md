@@ -69,6 +69,13 @@ selectable stable-DRA contracts: NVIDIA `gpu.nvidia.com`, AMD `gpu.amd.com`,
 and AWS Neuron `neuron.aws.com`. DRA examples require Kubernetes 1.34–1.36;
 the scalar examples support the bounded 1.30–1.36 range.
 
+[`signals/auxiliary-rdma-sriov.yaml`](signals/auxiliary-rdma-sriov.yaml)
+combines NVIDIA H100 with configurable RDMA shared tokens and AMD MI300X with
+configurable SR-IOV virtual-function tokens. Both auxiliary Profiles require
+the Scenario to supply the exact fully qualified resource name. Their counts
+are scheduler-visible tokens, not proof of a physical NIC, link, CNI, fabric,
+GPUDirect path, or working network.
+
 The catalog also records `enflame.com/gcu-count` and exact Hygon
 `hygon.com/dcu-mig-*` profiles, but no bundled Accelerator Model currently has
 a source-backed compatibility mapping to those aliases. Vastai through HAMi
