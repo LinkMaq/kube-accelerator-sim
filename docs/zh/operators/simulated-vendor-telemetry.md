@@ -11,7 +11,7 @@ Kasim 通过一个只读的集群内端点，为每个准确归属的 Synthetic 
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.4.0 \
+  --version 0.4.1 \
   --namespace kasim-system \
   --create-namespace
 
@@ -27,7 +27,7 @@ Operator CRD，可以改用 ServiceMonitor；两种发现方式不要同时使�
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.4.0 \
+  --version 0.4.1 \
   --namespace kasim-system \
   --set telemetry.serviceMonitor.enabled=true
 ```
@@ -41,13 +41,15 @@ ServiceMonitor 关闭。
 H200 场景可能生成如下 NVIDIA 原生 family：
 
 ```text
-DCGM_FI_DEV_GPU_UTIL{Hostname="kasim-node-...",gpu="0",UUID="kasim-...",device="kasim0",modelName="nvidia-h200",kasim_instance="h200-lab",kasim_node="kasim-node-...",kasim_pool="accelerators",kasim_profile="nvidia",kasim_model="nvidia-h200",kasim_device="kasim-...",kasim_simulated="true"} 72.4
+DCGM_FI_DEV_GPU_UTIL{Hostname="kasim-node-...",gpu="0",UUID="kasim-...",device="kasim0",modelName="nvidia-h200",node="kasim-node-...",kasim_instance="h200-lab",kasim_node="kasim-node-...",kasim_pool="accelerators",kasim_profile="nvidia",kasim_model="nvidia-h200",kasim_device="kasim-...",kasim_simulated="true"} 72.4
 ```
 
 原始 family 名和原生 label key 来自固定版本的 exporter 证据。额外的 `kasim_*`
 标签是刻意保留的来源标识，让查询和告警始终能够证明数据是模拟值；
-`kasim_value_model="correlated-v1"` 标识所用数值模型。Synthetic Node
-是聚合端点中的 series 维度；Kasim 不会为每个节点伪造 exporter Pod 或 Service。
+`kasim_value_model="correlated-v1"` 标识所用数值模型。每条设备指标还会携带兼容标签
+`node=<Synthetic Node>`；它始终与 `kasim_node` 一致，不会使用承载集中式 telemetry Pod
+的真实节点，因此 PromQL 不需要通过 `kube_pod_info` 推导设备归属。Synthetic Node 是
+聚合端点中的 series 维度；Kasim 不会为每个节点伪造 exporter Pod 或 Service。
 
 每个归属节点都会生成 `kasim_telemetry_node_info`，每个设备都会生成
 `kasim_telemetry_device_contract_available`。证据不足的档案返回 `0`，而不是编造
@@ -72,7 +74,7 @@ Kasim 每 15 秒生成一次不可变快照。同一时间桶内重复抓取数�
 这些曲线适合验证 Prometheus 采集、看板、告警规则和平台适配，不可用于板卡选型、
 性能评测、温控或功耗规划、硬件故障诊断及性能对比。
 
-## v0.4.0 覆盖范围
+## 自 v0.4.0 起的覆盖范围
 
 | 状态 | 档案 |
 | --- | --- |

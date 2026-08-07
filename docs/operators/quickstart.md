@@ -25,8 +25,8 @@ The matching controller image and Helm chart are published through GitHub
 Packages:
 
 ```sh
-docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.4.0
-helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.4.0
+docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.4.1
+helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.4.1
 ```
 
 ## 2. Inspect and compile offline
@@ -67,7 +67,7 @@ package and pin its version:
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.4.0 \
+  --version 0.4.1 \
   --kubeconfig ./target.kubeconfig \
   --kube-context target \
   --namespace kasim-system \

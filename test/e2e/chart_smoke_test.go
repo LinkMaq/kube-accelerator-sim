@@ -32,7 +32,7 @@ func TestRuntimeChartInstallUpgradeUninstall(t *testing.T) {
 	dockerBinary := requiredBinary(t, "DOCKER_BIN", "docker")
 	image := os.Getenv("KASIM_CONTROLLER_IMAGE")
 	if image == "" {
-		image = "kasim-controller:0.4.0"
+		image = "kasim-controller:0.4.1"
 	}
 	chartPath, err := filepath.Abs("../../charts/kasim-runtime")
 	if err != nil {
@@ -119,7 +119,7 @@ func TestRuntimeChartInstallUpgradeUninstall(t *testing.T) {
 		"--set",
 		"controller.image.repository=kasim-controller",
 		"--set",
-		"controller.image.tag=0.4.0",
+		"controller.image.tag=0.4.1",
 		"--set",
 		"controller.image.pullPolicy=Never",
 		"--set",

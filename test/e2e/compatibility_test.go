@@ -43,7 +43,7 @@ func TestCompatibilitySchedulingLifecycle(t *testing.T) {
 	}
 	controllerImage := os.Getenv("KASIM_CONTROLLER_IMAGE")
 	if controllerImage == "" {
-		controllerImage = "kasim-controller:0.4.0"
+		controllerImage = "kasim-controller:0.4.1"
 	}
 	chartPath := absolutePath(t, "../../charts/kasim-runtime")
 	scenarioPath := absolutePath(t, "../../internal/cli/testdata/training-lab.yaml")
@@ -381,6 +381,43 @@ spec:
 		"node/"+syntheticNode,
 		"-o=jsonpath={.status.allocatable.nvidia\\.com/gpu}",
 	)
+	telemetryPodNode := kubeOutput(
+		t,
+		ctx,
+		kubectlBinary,
+		adminKubeconfig,
+		"get",
+		"pods",
+		"--namespace=kasim-system",
+		"--selector=app.kubernetes.io/component=telemetry",
+		"-o=jsonpath={.items[0].spec.nodeName}",
+	)
+	if telemetryPodNode != realNode || telemetryPodNode == syntheticNode {
+		t.Fatalf(
+			"centralized telemetry Pod Node = %q, want real Node %q and not Synthetic Node %q",
+			telemetryPodNode,
+			realNode,
+			syntheticNode,
+		)
+	}
+	waitFor(t, ctx, "centralized telemetry attribution to Synthetic Node", func() bool {
+		metrics := tryKubeValue(
+			ctx,
+			kubectlBinary,
+			adminKubeconfig,
+			"get",
+			"--raw=/api/v1/namespaces/kasim-system/services/http:compat-kasim-runtime-telemetry:9400/proxy/metrics",
+		)
+		for _, line := range strings.Split(metrics, "\n") {
+			if strings.HasPrefix(line, "DCGM_FI_DEV_GPU_UTIL{") &&
+				prometheusLineHasLabel(line, "Hostname", syntheticNode) &&
+				prometheusLineHasLabel(line, "kasim_node", syntheticNode) &&
+				prometheusLineHasLabel(line, "node", syntheticNode) {
+				return true
+			}
+		}
+		return false
+	})
 
 	placementPod := schedulingPod(
 		"compat-placement",
@@ -781,6 +818,11 @@ type productCLIResult struct {
 	stderr   string
 }
 
+func prometheusLineHasLabel(line, name, value string) bool {
+	label := name + `="` + value + `"`
+	return strings.Contains(line, "{"+label) || strings.Contains(line, ","+label)
+}
+
 func runProductCLI(
 	ctx context.Context,
 	binary string,
@@ -925,7 +967,7 @@ func installCompatibilityRuntime(
 		"--set",
 		"controller.image.repository=kasim-controller",
 		"--set",
-		"controller.image.tag=0.4.0",
+		"controller.image.tag=0.4.1",
 		"--set",
 		"controller.image.pullPolicy=Never",
 		"--set",
@@ -1578,7 +1620,7 @@ func writeCompatibilityReceipt(
 		},
 		"runtime": map[string]any{
 			"controllerImage": controllerImage,
-			"chart":           "kasim-runtime-0.4.0",
+			"chart":           "kasim-runtime-0.4.1",
 			"kwokImage":       chartKWOKTestRepo + "@" + chartKWOKAMD64Digest,
 		},
 		"releaseInputs": inputs,

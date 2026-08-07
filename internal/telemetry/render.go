@@ -156,6 +156,7 @@ func provenanceLabels(device Device, state string) map[string]string {
 		"kasim_profile":      device.ProfileID,
 		"kasim_simulated":    "true",
 		"kasim_value_model":  "correlated-v1",
+		"node":               device.NodeName,
 	}
 	if state != "" {
 		result["state"] = state

@@ -21,8 +21,8 @@ go build -trimpath -o ./dist/kasim ./cmd/kasim
 Helm Chart 发布在 GitHub Packages：
 
 ```sh
-docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.4.0
-helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.4.0
+docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.4.1
+helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.4.1
 ```
 
 ## 2. 离线检查并编译
@@ -60,7 +60,7 @@ helm upgrade --install kasim-runtime ./charts/kasim-runtime \
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.4.0 \
+  --version 0.4.1 \
   --kubeconfig ./target.kubeconfig \
   --kube-context target \
   --namespace kasim-system \

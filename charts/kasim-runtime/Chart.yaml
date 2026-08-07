@@ -2,8 +2,8 @@ apiVersion: v2
 name: kasim-runtime
 description: Existing-cluster runtime for Kubernetes accelerator simulation
 type: application
-version: 0.4.0
-appVersion: 0.4.0
+version: 0.4.1
+appVersion: 0.4.1
 kubeVersion: ">=1.30.0-0 <1.37.0-0"
 home: https://github.com/LinkMaq/kube-accelerator-sim
 sources:

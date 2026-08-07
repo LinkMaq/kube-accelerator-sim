@@ -134,6 +134,43 @@ func TestRenderIsDeterministicCorrelatedAndParseable(t *testing.T) {
 	}
 }
 
+func TestCentralizedEndpointAttributesDevicesToSyntheticNodes(t *testing.T) {
+	t.Parallel()
+
+	module := testModule(t)
+	observation := Observation{
+		Nodes: []Node{
+			{InstanceName: "lab", InstanceUID: "instance-uid", Name: "kasim-node-a", Group: "workers"},
+			{InstanceName: "lab", InstanceUID: "instance-uid", Name: "kasim-node-b", Group: "workers"},
+		},
+	}
+	for _, node := range observation.Nodes {
+		observation.Devices = append(observation.Devices, Device{
+			InstanceName: node.InstanceName, InstanceUID: node.InstanceUID,
+			NodeName: node.Name, NodeGroup: node.Group, Pool: "accelerators",
+			ProfileID: "nvidia", ModelID: "nvidia-h200", Healthy: true,
+		})
+	}
+
+	families := parseExpositionAt(
+		t,
+		module,
+		observation,
+		time.Date(2026, 8, 7, 12, 0, 0, 0, time.UTC),
+	)
+	samples := families["DCGM_FI_DEV_GPU_UTIL"].Metric
+	if len(samples) != 2 {
+		t.Fatalf("GPU utilization samples = %d, want 2", len(samples))
+	}
+	for _, sample := range samples {
+		labels := metricLabels(sample)
+		if labels["node"] == "" || labels["node"] != labels["Hostname"] ||
+			labels["node"] != labels["kasim_node"] {
+			t.Errorf("device node identity labels = %#v", labels)
+		}
+	}
+}
+
 func TestRenderReportsUnavailableWithoutInventingNativeMetrics(t *testing.T) {
 	t.Parallel()
 

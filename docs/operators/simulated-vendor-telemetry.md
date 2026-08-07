@@ -14,7 +14,7 @@ Scenario file or any `kasim` command:
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.4.0 \
+  --version 0.4.1 \
   --namespace kasim-system \
   --create-namespace
 
@@ -31,7 +31,7 @@ duplicate targets:
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.4.0 \
+  --version 0.4.1 \
   --namespace kasim-system \
   --set telemetry.serviceMonitor.enabled=true
 ```
@@ -46,13 +46,16 @@ entirely outside the chart, set
 An H200 Scenario can expose a native NVIDIA family such as:
 
 ```text
-DCGM_FI_DEV_GPU_UTIL{Hostname="kasim-node-...",gpu="0",UUID="kasim-...",device="kasim0",modelName="nvidia-h200",kasim_instance="h200-lab",kasim_node="kasim-node-...",kasim_pool="accelerators",kasim_profile="nvidia",kasim_model="nvidia-h200",kasim_device="kasim-...",kasim_simulated="true"} 72.4
+DCGM_FI_DEV_GPU_UTIL{Hostname="kasim-node-...",gpu="0",UUID="kasim-...",device="kasim0",modelName="nvidia-h200",node="kasim-node-...",kasim_instance="h200-lab",kasim_node="kasim-node-...",kasim_pool="accelerators",kasim_profile="nvidia",kasim_model="nvidia-h200",kasim_device="kasim-...",kasim_simulated="true"} 72.4
 ```
 
 The original family name and native label keys come from a pinned exporter
 source. The `kasim_*` labels are intentionally additional: every query and
 alert can prove that the sample is synthetic; `kasim_value_model="correlated-v1"`
-identifies the value model. Synthetic Nodes are series
+identifies the value model. Every device sample also carries the compatibility
+label `node=<Synthetic Node>`. It always matches `kasim_node` and never names
+the real Node that hosts the centralized telemetry Pod, so PromQL does not need
+to derive device ownership from `kube_pod_info`. Synthetic Nodes are series
 dimensions on this aggregate endpoint; Kasim does not create a fake exporter
 Pod or Service for every Node.
 
@@ -85,7 +88,7 @@ platform-adapter tests. They must not be used for accelerator sizing,
 benchmarking, thermal or power planning, fault diagnosis, or performance
 comparison.
 
-## Coverage in v0.4.0
+## Coverage since v0.4.0
 
 | State | Profiles |
 | --- | --- |

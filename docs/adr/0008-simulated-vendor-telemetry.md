@@ -51,8 +51,11 @@ The runtime exposes `GET` and `HEAD` only:
 
 Synthetic Nodes are metric-series dimensions, not scrape targets or fake
 exporter Pods. Every native sample carries exact source-backed native labels
-plus `kasim_*` provenance including `kasim_simulated="true"`, Scenario Instance,
-Synthetic Node, pool, profile, model, and stable simulated device identity.
+plus `node=<Synthetic Node>` and `kasim_*` provenance including
+`kasim_simulated="true"`, Scenario Instance, Synthetic Node, pool, profile,
+model, and stable simulated device identity. The compatibility `node` label is
+device ownership, never the real Node that schedules the centralized telemetry
+Pod.
 
 ### Deep Module and seams
 
@@ -138,7 +141,8 @@ observe or reproduce physical vendor telemetry.
 - Telemetry failure cannot stop scheduling reconciliation.
 - Adding or promoting a vendor is usually a catalog and golden-fixture change.
 - The central endpoint does not reproduce a real vendor DaemonSet's one-target-
-  per-node topology; queries should group by native Node labels or `kasim_node`.
+  per-node topology; queries should group by native Node labels, `kasim_node`,
+  or the common `node` compatibility label rather than Pod placement.
 - Provisional and unavailable vendors remain visible without fabricated data.
 - The image contains one additional internal runtime binary and the chart owns
   one additional read-only Pod, Service, ServiceAccount, Role, and Binding.
