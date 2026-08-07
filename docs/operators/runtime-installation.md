@@ -28,6 +28,7 @@ The chart defines separate deny-by-default identities:
 | observer | Read and watch Scenario Instances | No |
 | operator | Submit, update, observe, and delete exact Scenario Instances; read the `kube-system` UID and simulator-owned Node/Lease/Pod inventory; create self-access reviews | No |
 | controller | Reconcile exact simulator-owned resources | Yes, only through application ownership checks |
+| telemetry | Read Scenario Instances and exactly owned Synthetic Nodes; expose immutable simulated Prometheus samples | No |
 | KWOK controller | Maintain the pinned simulated Node/Pod surfaces | Only its exact runtime surface |
 | Stage installer | Helm hooks that apply/delete five exact pinned Stage names | Only those five Stage objects |
 
@@ -37,6 +38,12 @@ The generated ClusterRole names are
 only the role it needs. The CLI submitter must not receive the controller,
 KWOK, CRD, RBAC, Namespace mutation, Secret, impersonation, Pod eviction, or
 service-account-token permissions.
+
+Telemetry is enabled by default as a separate single-replica, read-only
+Deployment and ClusterIP Service. Its ServiceAccount can only `get`, `list`,
+and `watch` Scenario Instances and Nodes. See
+[Simulated vendor Prometheus telemetry](simulated-vendor-telemetry.md) for
+scrape discovery, evidence classes, and staleness behavior.
 
 ## Ownership and uninstall
 

@@ -113,6 +113,6 @@ simulates DRA inventory, claims, allocation, scheduler reservation, and
 cleanup. It does not perform node preparation or container device injection.
 
 All examples model Kubernetes-visible surfaces. The project does not provide
-device access, does not execute accelerator compute, does not install vendor
-drivers, does not provide vendor telemetry, does not simulate NUMA topology,
-and does not inject CDI devices.
+device access, execute accelerator compute, install vendor drivers, observe
+physical vendor telemetry, simulate NUMA topology, or inject CDI devices.
+Source-backed Prometheus schemas contain explicitly simulated values only.

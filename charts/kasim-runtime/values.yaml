@@ -15,6 +15,27 @@ controller:
       cpu: 500m
       memory: 256Mi
 
+telemetry:
+  enabled: true
+  refreshInterval: 15s
+  staleAfter: 45s
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+  service:
+    port: 9400
+    prometheusScrape: true
+    annotations: {}
+  serviceMonitor:
+    enabled: false
+    interval: 15s
+    scrapeTimeout: 10s
+    labels: {}
+
 kwok:
   image:
     repository: registry.k8s.io/kwok/kwok
@@ -33,6 +54,8 @@ dra:
 
 serviceAccounts:
   controller:
+    annotations: {}
+  telemetry:
     annotations: {}
   observer:
     annotations: {}

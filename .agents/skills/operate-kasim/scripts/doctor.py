@@ -27,7 +27,11 @@ def command_path(explicit: str | None, candidates: list[Path], name: str) -> str
     return shutil.which(name)
 
 
-def run(command: list[str], timeout: int = 20) -> dict[str, Any]:
+def run(
+    command: list[str],
+    timeout: int = 20,
+    stdout_limit: int = 4000,
+) -> dict[str, Any]:
     try:
         completed = subprocess.run(
             command,
@@ -43,7 +47,7 @@ def run(command: list[str], timeout: int = 20) -> dict[str, Any]:
         "exitCode": completed.returncode,
     }
     if completed.stdout.strip():
-        result["stdout"] = completed.stdout.strip()[:4000]
+        result["stdout"] = completed.stdout.strip()[:stdout_limit]
     if completed.stderr.strip():
         result["stderr"] = completed.stderr.strip()[:1000]
     return result
@@ -91,8 +95,10 @@ def main() -> int:
     if (args.kubeconfig is None) != (args.context is None):
         parser.error("--kubeconfig and --context must be supplied together")
 
-    default_root = Path(__file__).resolve().parents[4]
-    repo_root = (args.repo_root or default_root).expanduser().resolve()
+    if args.repo_root is not None:
+        repo_root = args.repo_root.expanduser().resolve()
+    else:
+        repo_root = Path(__file__).resolve().parents[4]
     kasim = command_path(
         args.kasim_bin,
         [repo_root / "dist" / "kasim", repo_root / "bin" / "kasim"],
@@ -164,18 +170,25 @@ def main() -> int:
                 target["schedulingSupported"] = minor in SUPPORTED_MINORS
                 target["stableDRASupported"] = minor is not None and 34 <= minor <= 36
 
-            runtime_result = run([
-                *base,
-                "--namespace",
-                "kasim-system",
-                "get",
-                "deployments",
-                "-l",
-                "app.kubernetes.io/instance=kasim-runtime",
-                "-o",
-                "json",
-            ])
+            runtime_result = run(
+                [
+                    *base,
+                    "--namespace",
+                    "kasim-system",
+                    "get",
+                    "deployments",
+                    "-l",
+                    "app.kubernetes.io/instance=kasim-runtime",
+                    "-o",
+                    "json",
+                ],
+                stdout_limit=256_000,
+            )
             runtime_doc = parsed_json(runtime_result)
+            runtime_stdout = runtime_result.get("stdout", "")
+            if len(runtime_stdout) > 4000:
+                runtime_result["stdout"] = runtime_stdout[:4000]
+                runtime_result["stdoutTruncated"] = True
             target["runtimeCommand"] = runtime_result
             if runtime_doc is not None:
                 items = runtime_doc.get("items", [])

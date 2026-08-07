@@ -18,7 +18,7 @@ Verify downloaded files from the release directory:
 
 ```sh
 sha256sum --check checksums.txt
-gh attestation verify kasim_0.3.0_linux_amd64.tar.gz \
+gh attestation verify kasim_0.4.0_linux_amd64.tar.gz \
   --repo LinkMaq/kube-accelerator-sim
 cosign verify-blob \
   --bundle checksums.txt.sigstore.json \
@@ -50,11 +50,13 @@ cosign verify \
   ghcr.io/linkmaq/kube-accelerator-sim-controller@sha256:REPLACE_WITH_DIGEST
 
 helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.3.0
+  --version 0.4.0
 ```
 
 `release-receipt.json` is the authoritative public-surface and compatibility
 receipt. Support is bounded to the exact Kubernetes patches and modes in its
 embedded compatibility lock; `1.30-1.36` is not an open-ended `1.30+` promise.
 The scheduling modes do not claim physical devices, computation, vendor
-drivers, telemetry, CDI injection, NUMA behavior, or container device access.
+drivers, physical telemetry, CDI injection, NUMA behavior, or container device
+access. Simulated Prometheus samples remain a separate, explicit observation
+surface.

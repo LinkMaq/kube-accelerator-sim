@@ -124,6 +124,7 @@ func TestOperatorDocumentationIsExplicitAndCapabilityBounded(t *testing.T) {
 		"docs/operators/upgrade-rollback.md",
 		"docs/operators/troubleshooting-security.md",
 		"docs/operators/profile-evidence.md",
+		"docs/operators/simulated-vendor-telemetry.md",
 		"docs/operators/requirement-traceability.md",
 		"docs/operators/final-audit.md",
 	}
@@ -140,11 +141,12 @@ func TestOperatorDocumentationIsExplicitAndCapabilityBounded(t *testing.T) {
 		"1.30–1.36",
 		"1.34–1.36",
 		"does not provide device access",
-		"does not execute accelerator compute",
-		"does not install vendor drivers",
-		"does not provide vendor telemetry",
-		"does not simulate NUMA topology",
-		"does not inject CDI devices",
+		"execute accelerator compute",
+		"install vendor drivers",
+		"physical vendor telemetry",
+		"simulate NUMA topology",
+		"inject CDI devices",
+		`kasim_simulated="true"`,
 	} {
 		if !strings.Contains(docs, requiredText) {
 			t.Errorf("operator documentation is missing boundary or explicit target text %q", requiredText)

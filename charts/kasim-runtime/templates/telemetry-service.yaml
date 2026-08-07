@@ -1,0 +1,30 @@
+{{- if .Values.telemetry.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kasim-runtime.fullname" . }}-telemetry
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kasim-runtime.labels" . | nindent 4 }}
+    app.kubernetes.io/component: telemetry
+  {{- if or .Values.telemetry.service.annotations (and .Values.telemetry.service.prometheusScrape (not .Values.telemetry.serviceMonitor.enabled)) }}
+  annotations:
+    {{- if and .Values.telemetry.service.prometheusScrape (not .Values.telemetry.serviceMonitor.enabled) }}
+    prometheus.io/scrape: "true"
+    prometheus.io/path: /metrics
+    prometheus.io/port: {{ .Values.telemetry.service.port | quote }}
+    {{- end }}
+    {{- with .Values.telemetry.service.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "kasim-runtime.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: telemetry
+  ports:
+    - name: telemetry
+      port: {{ .Values.telemetry.service.port }}
+      targetPort: telemetry
+{{- end }}

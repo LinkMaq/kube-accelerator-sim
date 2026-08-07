@@ -101,7 +101,7 @@ features:
       <h3>Deliberately out of scope</h3>
       <ul>
         <li>Physical device access or accelerator computation</li>
-        <li>CUDA, ROCm, CANN, firmware, or vendor telemetry</li>
+        <li>CUDA, ROCm, CANN, firmware, or physical vendor telemetry</li>
         <li>NUMA topology, CDI injection, and node preparation</li>
         <li>Kubernetes cluster creation or lifecycle management</li>
       </ul>

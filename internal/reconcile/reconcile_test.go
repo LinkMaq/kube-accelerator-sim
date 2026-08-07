@@ -860,7 +860,10 @@ func TestReconcileReportsOvercommitmentWithoutTouchingBoundPods(t *testing.T) {
 		UID:       "pod-uid",
 		NodeName:  syntheticNodeName(t),
 		Phase:     "Running",
-		Requested: map[string]string{"nvidia.com/gpu": "6"},
+		Requested: map[string]string{
+			"cpu":            "100m",
+			"nvidia.com/gpu": "6",
+		},
 	}}, 8, 4)
 	fixture := newFixtureScenario(t, recording.Options{
 		Capabilities: schedulingCapabilities(),
@@ -886,6 +889,33 @@ func TestReconcileReportsOvercommitmentWithoutTouchingBoundPods(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("Overcommitted condition missing: %#v", fixture.commits[0].Status.Conditions)
+	}
+}
+
+func TestReconcileRejectsNonIntegerProjectedResourceRequest(t *testing.T) {
+	t.Parallel()
+
+	observed := completeObservedGraph(t, false, []cluster.ObservedPod{{
+		Namespace: "default",
+		Name:      "bound-workload",
+		UID:       "pod-uid",
+		NodeName:  syntheticNodeName(t),
+		Phase:     "Running",
+		Requested: map[string]string{
+			"cpu":            "100m",
+			"nvidia.com/gpu": "1500m",
+		},
+	}})
+	fixture := newFixture(t, recording.Options{
+		Capabilities: schedulingCapabilities(),
+		Observed:     observed,
+	})
+	_, err := fixture.reconciler.Reconcile(context.Background(), fixture.key)
+	if err == nil || !strings.Contains(
+		err.Error(),
+		`resource request "nvidia.com/gpu" is not an integer`,
+	) {
+		t.Fatalf("non-integer projected resource error = %v", err)
 	}
 }
 

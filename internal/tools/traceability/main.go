@@ -181,7 +181,7 @@ func buildRoutes() map[string]route {
 		evidence:       compatibility,
 	})
 	add([]string{"RBAC-004"}, route{
-		implementation: []string{"Dockerfile", "charts/kasim-runtime/templates/controller-deployment.yaml", "charts/kasim-runtime/templates/kwok-deployment.yaml"},
+		implementation: []string{"Dockerfile", "charts/kasim-runtime/templates/controller-deployment.yaml", "charts/kasim-runtime/templates/telemetry-deployment.yaml", "charts/kasim-runtime/templates/kwok-deployment.yaml"},
 		tests:          []string{"test/packaging/chart_test.go", "test/e2e/chart_smoke_test.go"},
 		evidence:       ci,
 	})
@@ -191,8 +191,8 @@ func buildRoutes() map[string]route {
 		evidence:       ci,
 	})
 	add([]string{"REL-003"}, route{
-		implementation: []string{"cmd/kasim/main.go", "cmd/kasim-controller/main.go", "Makefile"},
-		tests:          []string{"cmd/kasim/main_test.go", "cmd/kasim-controller/main_test.go"},
+		implementation: []string{"cmd/kasim/main.go", "cmd/kasim-controller/main.go", "cmd/kasim-telemetry/main.go", "Makefile"},
+		tests:          []string{"cmd/kasim/main_test.go", "cmd/kasim-controller/main_test.go", "cmd/kasim-telemetry/main_test.go"},
 		evidence:       ci,
 	})
 	add([]string{"REL-004"}, route{
@@ -274,6 +274,21 @@ func buildRoutes() map[string]route {
 		implementation: []string{"internal/domain/status.go", "internal/presentation/presentation.go", "internal/reconcile/reconcile.go"},
 		tests:          []string{"internal/domain/status_test.go", "internal/presentation/presentation_test.go", "internal/reconcile/reconcile_test.go"},
 		evidence:       append(append([]string{}, compatibility...), scale...),
+	})
+	add(requirementRange("TEL", 1, 8), route{
+		implementation: []string{
+			"internal/telemetry/telemetry.go",
+			"internal/telemetry/render.go",
+			"internal/telemetry/kubernetes/adapter.go",
+			"telemetryprofiles/catalog.json",
+			"charts/kasim-runtime/templates/telemetry-deployment.yaml",
+		},
+		tests: []string{
+			"internal/telemetry/telemetry_test.go",
+			"internal/telemetry/kubernetes/adapter_test.go",
+			"test/packaging/chart_test.go",
+		},
+		evidence: ci,
 	})
 	add(requirementRange("TARGET", 1, 5), route{
 		implementation: []string{"internal/cluster/kubernetes/connect.go", "internal/cli/cli.go", "internal/cluster/cluster.go"},

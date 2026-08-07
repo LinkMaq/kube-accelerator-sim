@@ -100,7 +100,7 @@ features:
       <h3>明确不在范围内</h3>
       <ul>
         <li>物理设备访问或加速器计算</li>
-        <li>CUDA、ROCm、CANN、固件或厂商遥测</li>
+        <li>CUDA、ROCm、CANN、固件或物理厂商遥测</li>
         <li>NUMA 拓扑、CDI 注入和节点准备</li>
         <li>Kubernetes 集群创建或生命周期管理</li>
       </ul>

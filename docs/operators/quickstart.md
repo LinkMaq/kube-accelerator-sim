@@ -25,8 +25,8 @@ The matching controller image and Helm chart are published through GitHub
 Packages:
 
 ```sh
-docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.3.0
-helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.3.0
+docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.4.0
+helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.4.0
 ```
 
 ## 2. Inspect and compile offline
@@ -67,7 +67,7 @@ package and pin its version:
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.3.0 \
+  --version 0.4.0 \
   --kubeconfig ./target.kubeconfig \
   --kube-context target \
   --namespace kasim-system \
@@ -85,6 +85,10 @@ helm status kasim-runtime \
 kubectl --kubeconfig ./target.kubeconfig --context target \
   --namespace kasim-system \
   rollout status deployment/kasim-runtime-kasim-runtime-controller
+
+kubectl --kubeconfig ./target.kubeconfig --context target \
+  --namespace kasim-system \
+  rollout status deployment/kasim-runtime-kasim-runtime-telemetry
 ```
 
 Installation is intentionally separate from `kasim apply`. The CLI never
@@ -119,6 +123,20 @@ kubectl --kubeconfig ./target.kubeconfig --context target \
 The status receipt is authoritative for readiness, desired/observed
 generation, instance UID, resolved profiles, fidelity surfaces, diagnostics,
 and owned-object counts.
+
+Forward the default read-only Prometheus endpoint to inspect the simulated
+native metric schemas for those Nodes:
+
+```sh
+kubectl --kubeconfig ./target.kubeconfig --context target \
+  --namespace kasim-system \
+  port-forward service/kasim-runtime-kasim-runtime-telemetry 9400:9400
+
+curl --fail http://127.0.0.1:9400/metrics
+```
+
+See [Simulated vendor Prometheus telemetry](simulated-vendor-telemetry.md) for
+evidence coverage, ServiceMonitor discovery, labels, and value semantics.
 
 Open the local read-only inventory when you need a fast visual check across
 both Kasim and non-Kasim Nodes:

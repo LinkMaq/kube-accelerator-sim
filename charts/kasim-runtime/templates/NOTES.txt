@@ -9,6 +9,15 @@ Controller image version: {{ .Chart.AppVersion }}
 Kubernetes compatibility: 1.30-1.36
 Stable DRA v1: Kubernetes 1.34-1.36 only
 KWOK: v0.8.0, image pinned by OCI digest
+{{- if .Values.telemetry.enabled }}
+Simulated vendor telemetry: enabled, catalog 2026-08-07
+
+  kubectl -n {{ .Release.Namespace }} port-forward \
+    service/{{ include "kasim-runtime.fullname" . }}-telemetry \
+    {{ .Values.telemetry.service.port }}:{{ .Values.telemetry.service.port }}
+{{- else }}
+Simulated vendor telemetry: disabled
+{{- end }}
 
 Observer and operator permissions are separate ClusterRoles:
 

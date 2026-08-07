@@ -1,0 +1,85 @@
+{{- if .Values.telemetry.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kasim-runtime.fullname" . }}-telemetry
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kasim-runtime.labels" . | nindent 4 }}
+    app.kubernetes.io/component: telemetry
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      {{- include "kasim-runtime.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: telemetry
+  template:
+    metadata:
+      labels:
+        {{- include "kasim-runtime.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: telemetry
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        simulation.kasim.io/product-version: {{ .Chart.AppVersion | quote }}
+        simulation.kasim.io/telemetry-catalog-revision: "2026-08-07"
+        simulation.kasim.io/telemetry-catalog-sha256: 500ab769c3746e746b0bb880089052114f14f6894f6fe9c74c22bcb78dc2557e
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "kasim-runtime.fullname" . }}-telemetry
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        {{- include "kasim-runtime.realNodeAffinity" . | nindent 8 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: telemetry
+          image: {{ include "kasim-runtime.controllerImage" . }}
+          imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
+          command: [/kasim-telemetry]
+          args:
+            - --listen-address=:9400
+            - --refresh-interval={{ .Values.telemetry.refreshInterval }}
+            - --stale-after={{ .Values.telemetry.staleAfter }}
+          ports:
+            - name: telemetry
+              containerPort: 9400
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: telemetry
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: telemetry
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            {{- toYaml .Values.telemetry.resources | nindent 12 }}
+{{- end }}

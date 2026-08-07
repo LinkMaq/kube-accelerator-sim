@@ -56,4 +56,6 @@ Vendor Profile 是描述准确 Kubernetes 可见契约的不可变数据记录�
 ```
 
 选择 provisional 档案前必须阅读证据限制。流行度不能替代准确的 Kubernetes 契约。
-任何档案都不声明物理硬件行为或计算能力。
+任何调度档案都不声明物理硬件行为或计算能力。独立版本的 Telemetry Contract 可以
+保留有依据的 Prometheus 结构并生成明确标识的模拟值，但不代表物理厂商遥测。详见
+[模拟厂商 Prometheus 遥测](simulated-vendor-telemetry.md)。

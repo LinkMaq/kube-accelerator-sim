@@ -68,7 +68,9 @@ The following commands are offline:
 For provisional profiles, review the evidence limitation before opting in.
 Popularity is not a substitute for an exact Kubernetes contract.
 
-No profile asserts physical hardware behavior. The product does not provide
-device access, does not execute accelerator compute, does not install vendor
-drivers, does not provide vendor telemetry, does not simulate NUMA topology,
-and does not inject CDI devices.
+No scheduling profile asserts physical hardware behavior. A separately
+versioned Telemetry Contract may preserve source-backed Prometheus schemas and
+generate explicitly simulated values, but the product does not observe
+physical vendor telemetry, provide device access, execute accelerator compute,
+install vendor drivers, simulate NUMA topology, or inject CDI devices. See
+[Simulated vendor Prometheus telemetry](simulated-vendor-telemetry.md).

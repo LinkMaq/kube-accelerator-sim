@@ -95,3 +95,31 @@ The root examples retain small topology-focused scenarios:
 Repository contract tests recursively compile every YAML file under
 `examples/` and verify that every model-compatible bundled resource signal is
 represented at least once.
+
+## Prometheus telemetry from the same examples
+
+After the default v0.4 runtime is installed, the existing examples also drive
+Simulated Vendor Telemetry; there is no separate telemetry Scenario syntax.
+For example:
+
+```sh
+./dist/kasim apply -f ./examples/vendors/nvidia.yaml \
+  --kubeconfig ./target.kubeconfig \
+  --context target
+
+kubectl --kubeconfig ./target.kubeconfig --context target \
+  --namespace kasim-system \
+  port-forward service/kasim-runtime-kasim-runtime-telemetry 9400:9400
+
+curl --fail http://127.0.0.1:9400/metrics | grep DCGM_FI_DEV_GPU_UTIL
+```
+
+The AMD, Intel GPU, Huawei Ascend, Cambricon, Iluvatar, Enflame, and Furiosa
+vendor examples similarly emit their verified native families. The RDMA half
+of `signals/auxiliary-rdma-sriov.yaml` emits upstream node_exporter
+`node_infiniband_*` families; the SR-IOV half reports telemetry unavailable
+because a schedulable VF token is not evidence of a native hardware exporter.
+Intel Gaudi, AWS Neuron, Google TPU, Moore Threads, Graphcore, and MetaX are
+reported as provisional, while Biren, Hygon, and Kunlunxin are unavailable in
+v0.4. Kasim never derives a metric name from the scheduling resource merely to
+make an example look covered.

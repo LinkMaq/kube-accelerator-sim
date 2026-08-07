@@ -11,29 +11,32 @@ helm upgrade --install kasim-runtime ./charts/kasim-runtime \
   --namespace kasim-system
 ```
 
-For the published `v0.3.0` package, install the same immutable chart directly
+For the published `v0.4.0` package, install the same immutable chart directly
 from GitHub Container Registry:
 
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.3.0 \
+  --version 0.4.0 \
   --kubeconfig ./target.kubeconfig \
   --kube-context target \
   --namespace kasim-system
 ```
 
 The chart selects
-`ghcr.io/linkmaq/kube-accelerator-sim-controller:0.3.0` by its matching
+`ghcr.io/linkmaq/kube-accelerator-sim-controller:0.4.0` by its matching
 `appVersion`. A different controller tag is rejected; use the chart and image
 from the same release.
 
-The default controller and KWOK Pods are non-root, use a read-only root
+The default controller, telemetry, and KWOK Pods are non-root, use a read-only root
 filesystem, drop all Linux capabilities, and have hard node affinity excluding
 simulator-owned Synthetic Nodes.
 
 The chart creates separate observer, lifecycle operator, product controller,
-KWOK controller, and Stage installer service accounts and exact RBAC roles.
+read-only telemetry, KWOK controller, and Stage installer service accounts and
+exact RBAC roles. Telemetry is enabled by default at the in-cluster
+`/metrics` endpoint on port 9400; it exposes deterministic simulated values in
+source-backed vendor metric families and never reads physical devices.
 The Stage installer is used only by bounded Helm hooks. Bind human or
 automation identities to the observer/operator ClusterRoles according to their
 job; do not grant the product controller role to CLI submitters.

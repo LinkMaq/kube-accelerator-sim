@@ -32,7 +32,7 @@ func TestRuntimeChartInstallUpgradeUninstall(t *testing.T) {
 	dockerBinary := requiredBinary(t, "DOCKER_BIN", "docker")
 	image := os.Getenv("KASIM_CONTROLLER_IMAGE")
 	if image == "" {
-		image = "kasim-controller:0.3.0"
+		image = "kasim-controller:0.4.0"
 	}
 	chartPath, err := filepath.Abs("../../charts/kasim-runtime")
 	if err != nil {
@@ -119,7 +119,7 @@ func TestRuntimeChartInstallUpgradeUninstall(t *testing.T) {
 		"--set",
 		"controller.image.repository=kasim-controller",
 		"--set",
-		"controller.image.tag=0.3.0",
+		"controller.image.tag=0.4.0",
 		"--set",
 		"controller.image.pullPolicy=Never",
 		"--set",
@@ -133,6 +133,7 @@ func TestRuntimeChartInstallUpgradeUninstall(t *testing.T) {
 
 	for _, deployment := range []string{
 		"contract-kasim-runtime-controller",
+		"contract-kasim-runtime-telemetry",
 		"contract-kasim-runtime-kwok-controller",
 	} {
 		runKube(
@@ -147,6 +148,15 @@ func TestRuntimeChartInstallUpgradeUninstall(t *testing.T) {
 			"--timeout=180s",
 		)
 	}
+	assertKubeOutput(
+		t,
+		ctx,
+		kubectlBinary,
+		kubeconfig,
+		"kasim_telemetry_catalog_info",
+		"get",
+		"--raw=/api/v1/namespaces/kasim-system/services/http:contract-kasim-runtime-telemetry:9400/proxy/metrics",
+	)
 
 	syntheticNode := `apiVersion: v1
 kind: Node
@@ -223,7 +233,7 @@ spec:
 		"--namespace=kasim-system",
 		"--selector=app.kubernetes.io/name=kasim-runtime",
 	)
-	for _, component := range []string{"controller", "kwok-controller"} {
+	for _, component := range []string{"controller", "telemetry", "kwok-controller"} {
 		waitFor(t, ctx, component+" Pod restart on a real Node", func() bool {
 			node := tryKubeValue(
 				ctx,

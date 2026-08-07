@@ -17,6 +17,13 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
       -X github.com/LinkMaq/kube-accelerator-sim/internal/version.sourceRevision=${SOURCE_REVISION} \
       -X github.com/LinkMaq/kube-accelerator-sim/internal/version.buildDate=${BUILD_DATE}" \
     -o /out/kasim-controller ./cmd/kasim-controller
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -trimpath \
+    -ldflags="-s -w \
+      -X github.com/LinkMaq/kube-accelerator-sim/internal/version.productVersion=${VERSION} \
+      -X github.com/LinkMaq/kube-accelerator-sim/internal/version.sourceRevision=${SOURCE_REVISION} \
+      -X github.com/LinkMaq/kube-accelerator-sim/internal/version.buildDate=${BUILD_DATE}" \
+    -o /out/kasim-telemetry ./cmd/kasim-telemetry
 
 FROM gcr.io/distroless/static-debian13:nonroot@sha256:f7f8f729987ad0fdf6b05eeeae94b26e6a0f613bdf46feea7fc40f7bd72953e6
 
@@ -32,6 +39,7 @@ LABEL org.opencontainers.image.title="kube-accelerator-sim controller" \
       org.opencontainers.image.created=$BUILD_DATE
 
 COPY --from=build /out/kasim-controller /kasim-controller
+COPY --from=build /out/kasim-telemetry /kasim-telemetry
 USER 65532:65532
-EXPOSE 8080 8081
+EXPOSE 8080 8081 9400
 ENTRYPOINT ["/kasim-controller"]

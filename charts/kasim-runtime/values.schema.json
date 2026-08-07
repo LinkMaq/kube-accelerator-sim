@@ -15,6 +15,38 @@
         "resources": {"type": "object"}
       }
     },
+    "telemetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "refreshInterval", "staleAfter", "resources", "service", "serviceMonitor"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "refreshInterval": {"type": "string", "pattern": "^[1-9][0-9]?[sm]$"},
+        "staleAfter": {"type": "string", "pattern": "^[1-9][0-9]?[sm]$"},
+        "resources": {"type": "object"},
+        "service": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["port", "prometheusScrape", "annotations"],
+          "properties": {
+            "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+            "prometheusScrape": {"type": "boolean"},
+            "annotations": {"type": "object", "additionalProperties": {"type": "string"}}
+          }
+        },
+        "serviceMonitor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "interval", "scrapeTimeout", "labels"],
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "interval": {"type": "string", "pattern": "^[1-9][0-9]?[sm]$"},
+            "scrapeTimeout": {"type": "string", "pattern": "^[1-9][0-9]?[sm]$"},
+            "labels": {"type": "object", "additionalProperties": {"type": "string"}}
+          }
+        }
+      }
+    },
     "kwok": {
       "type": "object",
       "additionalProperties": false,
@@ -42,9 +74,10 @@
     "serviceAccounts": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["controller", "observer", "operator", "stageInstaller", "kwok"],
+      "required": ["controller", "telemetry", "observer", "operator", "stageInstaller", "kwok"],
       "properties": {
         "controller": {"$ref": "#/$defs/serviceAccount"},
+        "telemetry": {"$ref": "#/$defs/serviceAccount"},
         "observer": {"$ref": "#/$defs/serviceAccount"},
         "operator": {"$ref": "#/$defs/serviceAccount"},
         "stageInstaller": {"$ref": "#/$defs/serviceAccount"},
@@ -65,7 +98,7 @@
     "nodeSelector": {"type": "object", "additionalProperties": {"type": "string"}},
     "tolerations": {"type": "array", "items": {"type": "object"}}
   },
-  "required": ["controller", "kwok", "dra", "serviceAccounts"],
+  "required": ["controller", "telemetry", "kwok", "dra", "serviceAccounts"],
   "$defs": {
     "productImage": {
       "type": "object",

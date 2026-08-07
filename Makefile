@@ -27,6 +27,7 @@ build:
 	mkdir -p dist
 	$(GO) build -trimpath -ldflags "$(LDFLAGS)" -o dist/kasim ./cmd/kasim
 	$(GO) build -trimpath -ldflags "$(LDFLAGS)" -o dist/kasim-controller ./cmd/kasim-controller
+	$(GO) build -trimpath -ldflags "$(LDFLAGS)" -o dist/kasim-telemetry ./cmd/kasim-telemetry
 
 chart-verify:
 	$(HELM) lint charts/kasim-runtime --strict
@@ -75,10 +76,14 @@ docs-dev:
 	$(NPM) run docs:dev
 
 format:
-	gofmt -w $$(find . -type f -name '*.go' -not -path './vendor/*')
+	gofmt -w $$(find . \
+		\( -path './.git' -o -path './dist' -o -path './node_modules' -o -path './vendor' \) -prune \
+		-o -type f -name '*.go' -print)
 
 format-check:
-	@unformatted="$$(gofmt -l $$(find . -type f -name '*.go' -not -path './vendor/*'))"; \
+	@unformatted="$$(gofmt -l $$(find . \
+		\( -path './.git' -o -path './dist' -o -path './node_modules' -o -path './vendor' \) -prune \
+		-o -type f -name '*.go' -print))"; \
 	if test -n "$$unformatted"; then \
 		printf 'gofmt required:\\n%s\\n' "$$unformatted"; \
 		exit 1; \

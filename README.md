@@ -78,17 +78,26 @@ and auxiliary signals, native DRA device identities, observed Pod requests,
 and ResourceClaim allocation evidence. Its ephemeral capability stays in the
 URL fragment; the command exposes no remote listen address or mutation route.
 
+The runtime also exposes source-backed, explicitly simulated vendor
+Prometheus schemas for owned Synthetic Nodes. Forward the read-only endpoint:
+
+```sh
+kubectl -n kasim-system port-forward service/kasim-runtime-kasim-runtime-telemetry 9400:9400
+curl --fail http://127.0.0.1:9400/metrics
+```
+
 Continue with the [operator quickstart](docs/operators/quickstart.md) for exact
 receipt handling, health and scale revisions, safe deletion, and runtime
 cleanup.
 
 ## Deliberate fidelity boundary
 
-The simulator writes Kubernetes control-plane objects only. It does not
-provide device access, does not execute accelerator compute, does not install
-vendor drivers, does not provide vendor telemetry, does not simulate NUMA
-topology, and does not inject CDI devices. It also does not claim CUDA, ROCm,
-CANN, firmware, device-file, collective-communication, or Pod runtime
+The simulator writes Kubernetes control-plane objects and can generate
+source-backed Prometheus schemas with explicit `kasim_simulated="true"`
+values. It does not provide device access, execute accelerator compute,
+install vendor drivers, observe or reproduce physical vendor telemetry,
+simulate NUMA topology, or inject CDI devices. It also does not claim CUDA,
+ROCm, CANN, firmware, device-file, collective-communication, or Pod runtime
 fidelity.
 
 `scheduling` proves scalar capacity, allocatable accounting, placement, and
@@ -103,6 +112,7 @@ fidelity claim.
 - [Accelerator vendor and resource-signal examples](examples/README.md)
 - [Scenario examples](docs/operators/scenario-examples.md)
 - [Read-only cluster inventory UI](docs/operators/cluster-inventory-ui.md)
+- [Simulated vendor Prometheus telemetry](docs/operators/simulated-vendor-telemetry.md)
 - [Vendor profile evidence and support classes](docs/operators/profile-evidence.md)
 - [Runtime installation and permissions](docs/operators/runtime-installation.md)
 - [Kubernetes compatibility](docs/operators/kubernetes-compatibility.md)
@@ -115,12 +125,12 @@ fidelity claim.
 
 ## Published packages
 
-The evidence-gated `v0.3.0` release publishes native CLI archives as GitHub
+The evidence-gated `v0.4.0` release publishes native CLI archives as GitHub
 Release assets and publishes both runtime artifacts through GitHub Packages:
 
 ```sh
-docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.3.0
-helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.3.0
+docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.4.0
+helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.4.0
 ```
 
 Use the chart directly from its OCI package:
@@ -128,7 +138,7 @@ Use the chart directly from its OCI package:
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.3.0 \
+  --version 0.4.0 \
   --kubeconfig ./target.kubeconfig \
   --kube-context target \
   --namespace kasim-system \
@@ -137,7 +147,7 @@ helm upgrade --install kasim-runtime \
 ```
 
 Download and verify the appropriate CLI archive and checksums from the
-[`v0.3.0` release](https://github.com/LinkMaq/kube-accelerator-sim/releases/tag/v0.3.0).
+[`v0.4.0` release](https://github.com/LinkMaq/kube-accelerator-sim/releases/tag/v0.4.0).
 The verification steps are documented in
 [Release verification](docs/operators/release-verification.md).
 

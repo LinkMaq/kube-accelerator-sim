@@ -34,6 +34,18 @@ func TestProductBinariesReportVersionMetadata(t *testing.T) {
 				"kubernetes=1.30-1.36",
 			},
 		},
+		{
+			name: "telemetry",
+			args: []string{"run", "../../cmd/kasim-telemetry", "--version"},
+			want: []string{
+				"kasim-telemetry dev",
+				"schema=v1alpha1",
+				"catalog=2026-08-03",
+				"kubernetes=1.30-1.36",
+				"telemetry-catalog=2026-08-07",
+				"digest=sha256:500ab769c3746e746b0bb880089052114f14f6894f6fe9c74c22bcb78dc2557e",
+			},
+		},
 	}
 
 	for _, test := range tests {

@@ -1528,6 +1528,7 @@
       "implementation": [
         "Dockerfile",
         "charts/kasim-runtime/templates/controller-deployment.yaml",
+        "charts/kasim-runtime/templates/telemetry-deployment.yaml",
         "charts/kasim-runtime/templates/kwok-deployment.yaml"
       ],
       "tests": [
@@ -1573,11 +1574,13 @@
       "implementation": [
         "cmd/kasim/main.go",
         "cmd/kasim-controller/main.go",
+        "cmd/kasim-telemetry/main.go",
         "Makefile"
       ],
       "tests": [
         "cmd/kasim/main_test.go",
-        "cmd/kasim-controller/main_test.go"
+        "cmd/kasim-controller/main_test.go",
+        "cmd/kasim-telemetry/main_test.go"
       ],
       "evidence": [
         ".github/workflows/ci.yml"
@@ -2345,6 +2348,150 @@
       ],
       "evidence": [
         ".github/workflows/compatibility.yml"
+      ]
+    },
+    {
+      "id": "TEL-001",
+      "implementation": [
+        "internal/telemetry/telemetry.go",
+        "internal/telemetry/render.go",
+        "internal/telemetry/kubernetes/adapter.go",
+        "telemetryprofiles/catalog.json",
+        "charts/kasim-runtime/templates/telemetry-deployment.yaml"
+      ],
+      "tests": [
+        "internal/telemetry/telemetry_test.go",
+        "internal/telemetry/kubernetes/adapter_test.go",
+        "test/packaging/chart_test.go"
+      ],
+      "evidence": [
+        ".github/workflows/ci.yml"
+      ]
+    },
+    {
+      "id": "TEL-002",
+      "implementation": [
+        "internal/telemetry/telemetry.go",
+        "internal/telemetry/render.go",
+        "internal/telemetry/kubernetes/adapter.go",
+        "telemetryprofiles/catalog.json",
+        "charts/kasim-runtime/templates/telemetry-deployment.yaml"
+      ],
+      "tests": [
+        "internal/telemetry/telemetry_test.go",
+        "internal/telemetry/kubernetes/adapter_test.go",
+        "test/packaging/chart_test.go"
+      ],
+      "evidence": [
+        ".github/workflows/ci.yml"
+      ]
+    },
+    {
+      "id": "TEL-003",
+      "implementation": [
+        "internal/telemetry/telemetry.go",
+        "internal/telemetry/render.go",
+        "internal/telemetry/kubernetes/adapter.go",
+        "telemetryprofiles/catalog.json",
+        "charts/kasim-runtime/templates/telemetry-deployment.yaml"
+      ],
+      "tests": [
+        "internal/telemetry/telemetry_test.go",
+        "internal/telemetry/kubernetes/adapter_test.go",
+        "test/packaging/chart_test.go"
+      ],
+      "evidence": [
+        ".github/workflows/ci.yml"
+      ]
+    },
+    {
+      "id": "TEL-004",
+      "implementation": [
+        "internal/telemetry/telemetry.go",
+        "internal/telemetry/render.go",
+        "internal/telemetry/kubernetes/adapter.go",
+        "telemetryprofiles/catalog.json",
+        "charts/kasim-runtime/templates/telemetry-deployment.yaml"
+      ],
+      "tests": [
+        "internal/telemetry/telemetry_test.go",
+        "internal/telemetry/kubernetes/adapter_test.go",
+        "test/packaging/chart_test.go"
+      ],
+      "evidence": [
+        ".github/workflows/ci.yml"
+      ]
+    },
+    {
+      "id": "TEL-005",
+      "implementation": [
+        "internal/telemetry/telemetry.go",
+        "internal/telemetry/render.go",
+        "internal/telemetry/kubernetes/adapter.go",
+        "telemetryprofiles/catalog.json",
+        "charts/kasim-runtime/templates/telemetry-deployment.yaml"
+      ],
+      "tests": [
+        "internal/telemetry/telemetry_test.go",
+        "internal/telemetry/kubernetes/adapter_test.go",
+        "test/packaging/chart_test.go"
+      ],
+      "evidence": [
+        ".github/workflows/ci.yml"
+      ]
+    },
+    {
+      "id": "TEL-006",
+      "implementation": [
+        "internal/telemetry/telemetry.go",
+        "internal/telemetry/render.go",
+        "internal/telemetry/kubernetes/adapter.go",
+        "telemetryprofiles/catalog.json",
+        "charts/kasim-runtime/templates/telemetry-deployment.yaml"
+      ],
+      "tests": [
+        "internal/telemetry/telemetry_test.go",
+        "internal/telemetry/kubernetes/adapter_test.go",
+        "test/packaging/chart_test.go"
+      ],
+      "evidence": [
+        ".github/workflows/ci.yml"
+      ]
+    },
+    {
+      "id": "TEL-007",
+      "implementation": [
+        "internal/telemetry/telemetry.go",
+        "internal/telemetry/render.go",
+        "internal/telemetry/kubernetes/adapter.go",
+        "telemetryprofiles/catalog.json",
+        "charts/kasim-runtime/templates/telemetry-deployment.yaml"
+      ],
+      "tests": [
+        "internal/telemetry/telemetry_test.go",
+        "internal/telemetry/kubernetes/adapter_test.go",
+        "test/packaging/chart_test.go"
+      ],
+      "evidence": [
+        ".github/workflows/ci.yml"
+      ]
+    },
+    {
+      "id": "TEL-008",
+      "implementation": [
+        "internal/telemetry/telemetry.go",
+        "internal/telemetry/render.go",
+        "internal/telemetry/kubernetes/adapter.go",
+        "telemetryprofiles/catalog.json",
+        "charts/kasim-runtime/templates/telemetry-deployment.yaml"
+      ],
+      "tests": [
+        "internal/telemetry/telemetry_test.go",
+        "internal/telemetry/kubernetes/adapter_test.go",
+        "test/packaging/chart_test.go"
+      ],
+      "evidence": [
+        ".github/workflows/ci.yml"
       ]
     },
     {

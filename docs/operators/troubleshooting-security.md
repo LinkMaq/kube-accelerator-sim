@@ -83,8 +83,8 @@ raw Kubernetes objects, generated device IDs, or arbitrary patches. Receipts
 redact credentials and report the canonical API endpoint, target fingerprint,
 and CA digest separately.
 
-The simulator does not provide device access, does not execute accelerator
-compute, does not install vendor drivers, does not provide vendor telemetry,
-does not simulate NUMA topology, and does not inject CDI devices. Treat all
-generated device identities as deterministic simulator identities, never
-vendor hardware serial numbers.
+The simulator does not provide device access, execute accelerator compute,
+install vendor drivers, observe physical vendor telemetry, simulate NUMA
+topology, or inject CDI devices. Its Prometheus surface contains explicitly
+simulated values and deterministic simulator identities, never vendor hardware
+serial numbers.

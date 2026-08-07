@@ -1,0 +1,25 @@
+{{- if and .Values.telemetry.enabled .Values.telemetry.serviceMonitor.enabled }}
+{{- if not (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1/ServiceMonitor") }}
+{{- fail "telemetry.serviceMonitor.enabled requires monitoring.coreos.com/v1 ServiceMonitor" }}
+{{- end }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "kasim-runtime.fullname" . }}-telemetry
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kasim-runtime.labels" . | nindent 4 }}
+    {{- with .Values.telemetry.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "kasim-runtime.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: telemetry
+  endpoints:
+    - port: telemetry
+      path: /metrics
+      interval: {{ .Values.telemetry.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.telemetry.serviceMonitor.scrapeTimeout }}
+{{- end }}

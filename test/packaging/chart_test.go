@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	productVersion = "0.3.0"
+	productVersion = "0.4.0"
 	chartPath      = "../../charts/kasim-runtime"
 )
 
@@ -112,10 +112,18 @@ func TestChartRendersOwnershipBoundedSecureRuntime(t *testing.T) {
 		"Deployment",
 		"contract-kasim-runtime-kwok-controller",
 	)
+	telemetryDeployment := requireObject(
+		t,
+		objects,
+		"Deployment",
+		"contract-kasim-runtime-telemetry",
+	)
 	assertSecureDeployment(t, controller)
 	assertSecureDeployment(t, kwok)
+	assertSecureDeployment(t, telemetryDeployment)
 	assertRealNodeAffinity(t, controller)
 	assertRealNodeAffinity(t, kwok)
+	assertRealNodeAffinity(t, telemetryDeployment)
 	for _, name := range []string{
 		"contract-kasim-runtime-stage-apply",
 		"contract-kasim-runtime-stage-delete",
@@ -129,6 +137,7 @@ func TestChartRendersOwnershipBoundedSecureRuntime(t *testing.T) {
 		"contract-kasim-runtime-observer",
 		"contract-kasim-runtime-operator",
 		"contract-kasim-runtime-controller",
+		"contract-kasim-runtime-telemetry",
 		"contract-kasim-runtime-kwok-controller",
 		"contract-kasim-runtime-stage-installer",
 	} {
@@ -149,6 +158,76 @@ func TestChartRendersOwnershipBoundedSecureRuntime(t *testing.T) {
 		"contract-kasim-runtime-operator",
 	)
 	assertOperatorObservationIsReadOnly(t, operatorRole)
+	telemetryRole := requireObject(
+		t,
+		objects,
+		"ClusterRole",
+		"contract-kasim-runtime-telemetry",
+	)
+	assertTelemetryObservationIsReadOnly(t, telemetryRole)
+	service := requireObject(
+		t,
+		objects,
+		"Service",
+		"contract-kasim-runtime-telemetry",
+	)
+	annotations := mapValue(t, service.Metadata, "annotations")
+	if annotations["prometheus.io/scrape"] != "true" ||
+		annotations["prometheus.io/path"] != "/metrics" ||
+		annotations["prometheus.io/port"] != "9400" {
+		t.Errorf("telemetry Service scrape annotations = %#v", annotations)
+	}
+}
+
+func TestTelemetryDeliveryModesFailClosed(t *testing.T) {
+	t.Parallel()
+
+	helm := requireHelm(t)
+	disabled := decodeManifests(t, run(
+		t,
+		helm,
+		"template",
+		"contract",
+		chartPath,
+		"--set",
+		"telemetry.enabled=false",
+	))
+	for _, kind := range []string{"Deployment", "Service", "ServiceAccount", "ClusterRole"} {
+		if objectByKindName(disabled, kind, "contract-kasim-runtime-telemetry") != nil {
+			t.Errorf("telemetry.enabled=false rendered %s", kind)
+		}
+	}
+
+	command := exec.Command(
+		helm,
+		"template",
+		"contract",
+		chartPath,
+		"--set",
+		"telemetry.serviceMonitor.enabled=true",
+	)
+	if output, err := command.CombinedOutput(); err == nil {
+		t.Fatalf("ServiceMonitor rendered without its CRD:\n%s", output)
+	}
+	withCRD := decodeManifests(t, run(
+		t,
+		helm,
+		"template",
+		"contract",
+		chartPath,
+		"--set",
+		"telemetry.serviceMonitor.enabled=true",
+		"--api-versions",
+		"monitoring.coreos.com/v1/ServiceMonitor",
+	))
+	if objectByKindName(withCRD, "ServiceMonitor", "contract-kasim-runtime-telemetry") == nil {
+		t.Fatal("ServiceMonitor did not render with advertised API")
+	}
+	service := requireObject(t, withCRD, "Service", "contract-kasim-runtime-telemetry")
+	if annotations, found := service.Metadata["annotations"].(map[string]any); found &&
+		annotations["prometheus.io/scrape"] == "true" {
+		t.Fatal("ServiceMonitor mode also rendered Prometheus scrape annotations")
+	}
 }
 
 func TestVendoredRuntimeAssetsMatchCanonicalLocks(t *testing.T) {
@@ -243,14 +322,16 @@ func TestChartVersionsAndImmutableRuntimeInputsStayExplicit(t *testing.T) {
 		)
 	}
 	for key, want := range map[string]string{
-		"simulation.kasim.io/schema-version":        "v1alpha1",
-		"simulation.kasim.io/product-crd-sha256":    "fc4162c4d9b3137fa5c195e22c6604c625abb55b8a29c839856e1120467d3bd4",
-		"simulation.kasim.io/catalog-revision":      "2026-08-03",
-		"simulation.kasim.io/kubernetes-range":      "1.30-1.36",
-		"simulation.kasim.io/kwok-version":          "v0.8.0",
-		"simulation.kasim.io/kwok-manifest-sha256":  "a4c16e6431e382dcb5c1903139344b7a68652f16a6460337fe17a678a426f405",
-		"simulation.kasim.io/kwok-stage-sha256":     "2f28d95564ec43056c0873f7a25ac7d2a5bba4c8496c72f8b3ee73fd4f54ee24",
-		"simulation.kasim.io/kwok-stage-crd-sha256": "7140ccc35f9e3733a013bd89ba34c9252e2444b6c2cc2275e632e4decd605bd6",
+		"simulation.kasim.io/schema-version":             "v1alpha1",
+		"simulation.kasim.io/product-crd-sha256":         "fc4162c4d9b3137fa5c195e22c6604c625abb55b8a29c839856e1120467d3bd4",
+		"simulation.kasim.io/catalog-revision":           "2026-08-03",
+		"simulation.kasim.io/telemetry-catalog-revision": "2026-08-07",
+		"simulation.kasim.io/telemetry-catalog-sha256":   "500ab769c3746e746b0bb880089052114f14f6894f6fe9c74c22bcb78dc2557e",
+		"simulation.kasim.io/kubernetes-range":           "1.30-1.36",
+		"simulation.kasim.io/kwok-version":               "v0.8.0",
+		"simulation.kasim.io/kwok-manifest-sha256":       "a4c16e6431e382dcb5c1903139344b7a68652f16a6460337fe17a678a426f405",
+		"simulation.kasim.io/kwok-stage-sha256":          "2f28d95564ec43056c0873f7a25ac7d2a5bba4c8496c72f8b3ee73fd4f54ee24",
+		"simulation.kasim.io/kwok-stage-crd-sha256":      "7140ccc35f9e3733a013bd89ba34c9252e2444b6c2cc2275e632e4decd605bd6",
 	} {
 		if got := chart.Annotations[key]; got != want {
 			t.Errorf("Chart annotation %q = %q, want %q", key, got, want)
@@ -329,6 +410,7 @@ func TestContainerBuildContract(t *testing.T) {
 		`org.opencontainers.image.version`,
 		`org.opencontainers.image.revision`,
 		`org.opencontainers.image.created`,
+		`COPY --from=build /out/kasim-telemetry /kasim-telemetry`,
 	} {
 		if !strings.Contains(source, required) {
 			t.Errorf("Dockerfile does not contain %q", required)
@@ -561,6 +643,34 @@ func assertOperatorObservationIsReadOnly(t *testing.T, role manifest) {
 	for resource, found := range required {
 		if !found {
 			t.Errorf("%s lacks observation resource %s", objectName(role), resource)
+		}
+	}
+}
+
+func assertTelemetryObservationIsReadOnly(t *testing.T, role manifest) {
+	t.Helper()
+	required := map[string]bool{
+		"simulation.kasim.io/scenarioinstances": false,
+		"/nodes":                                false,
+	}
+	for _, rule := range role.Rules {
+		for _, resource := range rule.Resources {
+			key := strings.Join(rule.APIGroups, ",") + "/" + resource
+			if _, expected := required[key]; !expected {
+				t.Errorf("%s grants unexpected resource %s", objectName(role), key)
+				continue
+			}
+			for _, verb := range rule.Verbs {
+				if !slices.Contains([]string{"get", "list", "watch"}, verb) {
+					t.Errorf("%s grants non-read verb %s on %s", objectName(role), verb, key)
+				}
+			}
+			required[key] = true
+		}
+	}
+	for resource, found := range required {
+		if !found {
+			t.Errorf("%s lacks %s", objectName(role), resource)
 		}
 	}
 }

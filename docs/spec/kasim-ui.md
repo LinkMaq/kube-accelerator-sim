@@ -340,7 +340,8 @@ Success means the page is truthful and navigable, not merely reachable: scalar r
 - a remotely reachable or persistent dashboard;
 - multi-cluster aggregation, accounts, or remote authorization;
 - UI mutations of Scenario state;
-- metrics-server or vendor telemetry;
+- metrics-server or physical vendor telemetry (the separate simulated
+  Prometheus endpoint is not a UI data source);
 - kubelet PodResources, `nodes/proxy`, logs, Secrets, or container environments;
 - physical device files, drivers, firmware, CUDA/ROCm/CANN runtime, CNI, RDMA fabric, or network data plane;
 - inferred vendor, model, topology, device identity, or health;

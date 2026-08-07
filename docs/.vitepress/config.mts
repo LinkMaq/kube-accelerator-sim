@@ -12,6 +12,7 @@ const documentationRoot = path.join(repositoryRoot, 'docs')
 const zhNav = [
   { text: '指南', link: '/zh/operators/quickstart' },
   { text: '清单 UI', link: '/zh/operators/cluster-inventory-ui' },
+  { text: '模拟遥测', link: '/zh/operators/simulated-vendor-telemetry' },
   { text: '场景', link: '/zh/operators/scenario-examples' },
   { text: '兼容性', link: '/zh/operators/kubernetes-compatibility' },
   { text: '设备档案', link: '/zh/operators/profile-evidence' },
@@ -27,6 +28,7 @@ const zhSidebar = [
       { text: '已有集群快速开始', link: '/zh/operators/quickstart' },
       { text: '运行时安装', link: '/zh/operators/runtime-installation' },
       { text: '只读集群清单 UI', link: '/zh/operators/cluster-inventory-ui' },
+      { text: '模拟厂商 Prometheus 遥测', link: '/zh/operators/simulated-vendor-telemetry' },
     ],
   },
   {
@@ -48,6 +50,7 @@ const zhSidebar = [
       { text: '设备档案契约（英文）', link: '/adr/0002-vendor-profile-and-model-contract' },
       { text: '场景生命周期（英文）', link: '/adr/0003-revisioned-scenario-instance-contract' },
       { text: '扩展边界（英文）', link: '/adr/0007-deep-modules-and-extension-seams' },
+      { text: '模拟遥测决策（英文）', link: '/adr/0008-simulated-vendor-telemetry' },
       { text: 'Kasim UI 提案', link: '/zh/spec/kasim-ui' },
     ],
   },
@@ -231,6 +234,7 @@ export default defineConfig({
     nav: [
       { text: 'Guide', link: '/operators/quickstart' },
       { text: 'Inventory UI', link: '/operators/cluster-inventory-ui' },
+      { text: 'Simulated telemetry', link: '/operators/simulated-vendor-telemetry' },
       { text: 'Scenarios', link: '/operators/scenario-examples' },
       { text: 'Compatibility', link: '/operators/kubernetes-compatibility' },
       { text: 'Profiles', link: '/operators/profile-evidence' },
@@ -245,6 +249,7 @@ export default defineConfig({
           { text: 'Existing-cluster quickstart', link: '/operators/quickstart' },
           { text: 'Runtime installation', link: '/operators/runtime-installation' },
           { text: 'Read-only cluster inventory UI', link: '/operators/cluster-inventory-ui' },
+          { text: 'Simulated vendor Prometheus telemetry', link: '/operators/simulated-vendor-telemetry' },
         ],
       },
       {
@@ -266,6 +271,7 @@ export default defineConfig({
           { text: 'Revisioned lifecycle', link: '/adr/0003-revisioned-scenario-instance-contract' },
           { text: 'Explicit targets and receipts', link: '/adr/0005-explicit-target-receipt-driven-cli' },
           { text: 'Extension seams', link: '/adr/0007-deep-modules-and-extension-seams' },
+          { text: 'Simulated vendor telemetry', link: '/adr/0008-simulated-vendor-telemetry' },
           { text: 'Kasim UI proposal', link: '/spec/kasim-ui' },
         ],
       },

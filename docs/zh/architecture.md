@@ -11,6 +11,7 @@ Node、Lease 以及可选的稳定版 DRA 资源。
 - `dra-control-plane` 模式在 Kubernetes 1.34–1.36 上投射稳定版
   `resource.k8s.io/v1` 清单和分配过程。
 - 运行时只管理带有准确实例 UID 和所有权标签的对象。
+- 独立只读遥测进程可保留有来源依据的原厂 Prometheus 结构，但所有值都明确标记为模拟。
 - 本项目不提供驱动、物理设备、容器设备注入或加速器计算能力。
 
 ## 主要模块
@@ -22,6 +23,8 @@ Node、Lease 以及可选的稳定版 DRA 资源。
 | API | 保存带修订号、目标指纹和生命周期状态的 Scenario Instance |
 | Controller | 调谐该实例准确拥有的 Kubernetes 控制平面对象 |
 | Vendor Profile 目录 | 保存不可变的厂商资源契约、型号、证据等级和摘要 |
+| Simulated Vendor Telemetry | 从准确归属清单生成确定性关联指标、不可变抓取缓冲区和过期诊断 |
+| Telemetry Contract 目录 | 独立保存原厂指标名、类型、单位、原生标签、证据状态和版本摘要 |
 | Helm Chart | 在已有集群安装共享运行时、KWOK 依赖和最小权限 RBAC |
 | 验证体系 | 对兼容版本、协议基准、规模和发布制品生成可追溯回执 |
 
@@ -34,6 +37,9 @@ Scenario
 Scenario Instance ── reconcile ──► Synthetic Nodes / Leases / DRA inventory
    │                                      │
    └──────────── status receipt ◄─────────┘
+                                          │ read-only observation
+                                          ▼
+                                kasim-telemetry /metrics
 ```
 
 `health` 和 `scale` 会创建类型化修订，而不是直接修改 Node。删除操作要求准确的
@@ -50,6 +56,7 @@ Scenario Instance ── reconcile ──► Synthetic Nodes / Leases / DRA inve
 - [修订化 Scenario Instance 契约](/adr/0003-revisioned-scenario-instance-contract)
 - [显式目标与回执驱动 CLI](/adr/0005-explicit-target-receipt-driven-cli)
 - [深模块与扩展边界](/adr/0007-deep-modules-and-extension-seams)
+- [模拟厂商遥测](/adr/0008-simulated-vendor-telemetry)
 
 中文操作文档会随产品行为同步更新；改变规范或架构时，必须先更新英文权威记录，
 并同步修订本导读中受影响的边界。

@@ -63,6 +63,12 @@ kind is an End-to-End Test Harness, not a product backend.
 
 The implementation may build an internal immutable plan for zero-write preflight, auditing, ordering, and stale-target checks. `Plan` is not a public operation until a second real caller demonstrates that need.
 
+Simulated Vendor Telemetry defined by ADR 0008 is an observation surface
+orthogonal to both Fidelity Modes. It may preserve source-backed Prometheus
+metric schemas while emitting explicitly synthetic values. It does not observe
+physical vendor telemetry, change Scenario readiness, or add a hardware,
+driver, sensor, or compute fidelity claim.
+
 ## Consequences
 
 - Users choose the Kubernetes behavior they need to test, not a backend.

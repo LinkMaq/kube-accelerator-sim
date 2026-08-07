@@ -26,12 +26,17 @@ Chart 定义了默认拒绝、职责分离的身份：
 | observer | 读取和观察 Scenario Instance | 不能 |
 | operator | 提交、更新、观察和删除准确实例；读取必要的目标身份和模拟器对象 | 不能 |
 | controller | 调谐准确归属于模拟器的资源 | 可以，但受应用层所有权检查约束 |
+| telemetry | 读取 Scenario Instance 和准确归属的 Synthetic Node；提供不可变模拟 Prometheus 样本 | 不能 |
 | KWOK controller | 维护固定版本的模拟 Node/Pod 表面 | 仅限其准确运行时表面 |
 | Stage installer | Helm hook 安装/删除五个固定名称 Stage | 仅限这五个 Stage |
 
 生成的 ClusterRole 名为 `<release>-kasim-runtime-observer` 和
 `<release>-kasim-runtime-operator`。CLI 提交者不应获得控制器、CRD/RBAC/Namespace
 变更、Secret、模拟身份、Pod 驱逐或 ServiceAccount token 权限。
+
+遥测默认以独立单副本只读 Deployment 和 ClusterIP Service 启用。它的
+ServiceAccount 只能对 Scenario Instance 和 Node 执行 `get/list/watch`。抓取发现、
+证据等级和过期行为见[模拟厂商 Prometheus 遥测](simulated-vendor-telemetry.md)。
 
 ## 所有权与卸载
 

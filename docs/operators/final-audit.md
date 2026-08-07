@@ -48,7 +48,7 @@ only when compatibility, protocol, and scale receipts all name the exact
 source revision being packaged.
 
 The final release claim is deliberately narrow: the simulator proves
-Kubernetes control-plane behavior. It does not provide device access, does not
-execute accelerator compute, does not install vendor drivers, does not provide
-vendor telemetry, does not simulate NUMA topology, and does not inject CDI
-devices.
+Kubernetes control-plane behavior and may generate explicitly simulated,
+source-backed Prometheus schemas. It does not provide device access, execute
+accelerator compute, install vendor drivers, observe physical vendor telemetry,
+simulate NUMA topology, or inject CDI devices.

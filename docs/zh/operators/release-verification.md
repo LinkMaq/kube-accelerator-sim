@@ -14,7 +14,7 @@ Linux amd64/arm64，并带 BuildKit SBOM 与来源证明；同一个 Chart TGZ �
 
 ```sh
 sha256sum --check checksums.txt
-gh attestation verify kasim_0.3.0_linux_amd64.tar.gz \
+gh attestation verify kasim_0.4.0_linux_amd64.tar.gz \
   --repo LinkMaq/kube-accelerator-sim
 cosign verify-blob \
   --bundle checksums.txt.sigstore.json \
@@ -44,7 +44,7 @@ cosign verify \
   ghcr.io/linkmaq/kube-accelerator-sim-controller@sha256:REPLACE_WITH_DIGEST
 
 helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.3.0
+  --version 0.4.0
 ```
 
 `release-receipt.json` 是公开表面和兼容性的权威回执。支持范围只对应其中兼容性锁

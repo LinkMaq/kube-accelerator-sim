@@ -21,8 +21,8 @@ go build -trimpath -o ./dist/kasim ./cmd/kasim
 Helm Chart 发布在 GitHub Packages：
 
 ```sh
-docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.3.0
-helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.3.0
+docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.4.0
+helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.4.0
 ```
 
 ## 2. 离线检查并编译
@@ -60,7 +60,7 @@ helm upgrade --install kasim-runtime ./charts/kasim-runtime \
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.3.0 \
+  --version 0.4.0 \
   --kubeconfig ./target.kubeconfig \
   --kube-context target \
   --namespace kasim-system \
@@ -78,6 +78,10 @@ helm status kasim-runtime \
 kubectl --kubeconfig ./target.kubeconfig --context target \
   --namespace kasim-system \
   rollout status deployment/kasim-runtime-kasim-runtime-controller
+
+kubectl --kubeconfig ./target.kubeconfig --context target \
+  --namespace kasim-system \
+  rollout status deployment/kasim-runtime-kasim-runtime-telemetry
 ```
 
 运行时安装与 `kasim apply` 有意分离。CLI 不调用 Helm，也不隐式安装集群级资源。
@@ -108,6 +112,19 @@ kubectl --kubeconfig ./target.kubeconfig --context target \
 
 状态回执是 readiness、期望/观察修订、实例 UID、解析后的档案、保真表面、诊断和
 对象数量的权威依据。
+
+转发默认只读 Prometheus 端点，可以检查这些节点的模拟原厂指标结构：
+
+```sh
+kubectl --kubeconfig ./target.kubeconfig --context target \
+  --namespace kasim-system \
+  port-forward service/kasim-runtime-kasim-runtime-telemetry 9400:9400
+
+curl --fail http://127.0.0.1:9400/metrics
+```
+
+证据覆盖、ServiceMonitor 发现、标签和数值语义见
+[模拟厂商 Prometheus 遥测](simulated-vendor-telemetry.md)。
 
 需要快速查看 Kasim 与真实节点上的设备信号时，启动本地只读清单：
 

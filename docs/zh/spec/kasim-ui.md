@@ -250,7 +250,7 @@ throwaway 原型的 HTML、JavaScript 和 CSS 总计 33,721 字节；其中 Java
 - 远程或长期运行的 Dashboard；
 - 多集群、账号或远程鉴权；
 - 从 UI 修改 Scenario；
-- metrics-server 或厂商遥测；
+- metrics-server 或物理厂商遥测（独立的模拟 Prometheus 端点不作为 UI 数据源）；
 - kubelet PodResources、`nodes/proxy`、日志、Secret 或容器环境；
 - 真实设备、驱动、固件、CUDA/ROCm/CANN、CNI、RDMA fabric 或网络数据面；
 - 猜测厂商、型号、拓扑、设备 ID 或健康；

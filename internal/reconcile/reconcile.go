@@ -2194,6 +2194,7 @@ func observedProjection(
 	fragment projection.ProjectionFragment,
 	observed cluster.ObservedGraph,
 ) (projection.ObservedGraph, error) {
+	desiredNodes := fragment.Nodes()
 	nodes := make(map[string]cluster.ObservedObject)
 	leases := make(map[string]cluster.ObservedObject)
 	for _, object := range observed.Objects {
@@ -2204,15 +2205,28 @@ func observedProjection(
 			leases[object.Key.Name()] = object
 		}
 	}
+	projectedResources := make(map[string]map[string]struct{}, len(desiredNodes))
+	for _, desired := range desiredNodes {
+		capacity := desired.Capacity()
+		resources := make(map[string]struct{}, len(capacity))
+		for resourceName := range capacity {
+			resources[resourceName] = struct{}{}
+		}
+		projectedResources[desired.Name()] = resources
+	}
 	requested := make(map[string]map[string]uint64)
 	for _, pod := range observed.Pods {
 		if pod.NodeName == "" || terminalPodPhase(pod.Phase) {
 			continue
 		}
-		if requested[pod.NodeName] == nil {
-			requested[pod.NodeName] = make(map[string]uint64)
+		resources, projectedNode := projectedResources[pod.NodeName]
+		if !projectedNode {
+			continue
 		}
 		for resourceName, encoded := range pod.Requested {
+			if _, projected := resources[resourceName]; !projected {
+				continue
+			}
 			value, err := strconv.ParseUint(encoded, 10, 64)
 			if err != nil {
 				return projection.ObservedGraph{}, fmt.Errorf(
@@ -2222,11 +2236,14 @@ func observedProjection(
 					resourceName,
 				)
 			}
+			if requested[pod.NodeName] == nil {
+				requested[pod.NodeName] = make(map[string]uint64)
+			}
 			requested[pod.NodeName][resourceName] += value
 		}
 	}
 	inputs := make([]projection.ObservedNodeInput, 0, len(nodes))
-	for _, desired := range fragment.Nodes() {
+	for _, desired := range desiredNodes {
 		actual, found := nodes[desired.Name()]
 		input := projection.ObservedNodeInput{
 			Name:      desired.Name(),
@@ -2264,7 +2281,7 @@ func observedProjection(
 	}
 	for name, actual := range nodes {
 		found := false
-		for _, desired := range fragment.Nodes() {
+		for _, desired := range desiredNodes {
 			if desired.Name() == name {
 				found = true
 				break

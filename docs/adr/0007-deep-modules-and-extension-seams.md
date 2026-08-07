@@ -4,12 +4,14 @@ Status: Accepted
 
 ## Context
 
-The product has two deployed processes and several distinct kinds of change:
+The product has three deployed processes and several distinct kinds of change:
 
 - a local CLI compiles files and shortcuts, performs explicit-target
   preflight, submits revisions, waits, and renders receipts;
 - an in-cluster controller reconciles Scenario Instances through partial
   failure, restart, update, and ownership-safe deletion;
+- an in-cluster read-only telemetry runtime turns exact owned inventory into
+  immutable, explicitly simulated Prometheus samples;
 - Vendor Profiles and Accelerator Models change as evidence-backed data;
 - scalar extended resources and stable DRA require different Kubernetes
   projections;
@@ -61,17 +63,19 @@ The initial Kubernetes dependency line is:
 projection, receipt, or public lifecycle Interfaces. It is an implementation
 choice at the controller delivery edge.
 
-The repository builds two release binaries:
+The repository builds three product binaries:
 
 - `kasim`, the local product CLI;
 - `kasim-controller`, the in-cluster reconciliation process.
+- `kasim-telemetry`, the in-cluster read-only Prometheus process.
 
-The End-to-End Test Harness is test code, not a third product binary. The
-release also publishes a multi-architecture Linux controller OCI image and a
+The End-to-End Test Harness is test code, not another product binary. The
+release publishes a multi-architecture Linux runtime OCI image containing both
+in-cluster binaries and a
 `kasim-runtime` Helm chart. The chart installs the product CRDs, controller,
-service accounts, explicit RBAC personas, hard real-Node placement rules, and
-the pinned minimal KWOK runtime into an existing cluster. It never creates,
-upgrades, or deletes the cluster itself.
+telemetry runtime, service accounts, explicit RBAC personas, hard real-Node
+placement rules, and the pinned minimal KWOK runtime into an existing cluster.
+It never creates, upgrades, or deletes the cluster itself.
 
 The chart vendors or renders exact pinned KWOK assets rather than following a
 floating Helm dependency. Installation refuses an incompatible pre-existing
@@ -380,6 +384,7 @@ The intended package and artifact layout is:
 api/simulation/v1alpha1/       generated Kubernetes transport types
 cmd/kasim/                     CLI delivery
 cmd/kasim-controller/          controller-runtime delivery
+cmd/kasim-telemetry/           read-only telemetry process composition
 internal/domain/               Scenario, identity, receipt and Snapshot values
 internal/scenario/             Scenario Compiler Module
 internal/catalog/              Profile Catalog Module
@@ -392,6 +397,8 @@ internal/cluster/              port, client-go and recording Adapters
 internal/runtime/kwok/         concrete pinned KWOK implementation
 internal/presentation/         human and machine rendering
 profiles/                      source-backed bundled catalog records
+internal/telemetry/            Simulated Vendor Telemetry Module and Kubernetes Adapter
+telemetryprofiles/             source-backed bundled Telemetry Contracts
 charts/kasim-runtime/          existing-cluster runtime installation
 test/e2e/                      kind, protocol and compatibility harnesses
 ```
@@ -409,6 +416,7 @@ The first release recognizes only these true seams:
 | Scenario Control Plane | owned remote controller transport varies from deterministic application tests | Kubernetes product-resource Adapter | in-memory |
 | Kubernetes Cluster | true external system behavior must be isolated and classified | client-go | recording/in-memory |
 | Resource Projection | two maintained Kubernetes representations have different support and assessment semantics | extended-resource, DRA v1 | contract fixtures for both |
+| Telemetry Snapshot Source | read-only Kubernetes ownership and inventory are true external state | controller-runtime client | deterministic memory observations |
 
 The following are sealed variants or concrete implementations, not seams:
 
@@ -468,6 +476,7 @@ versioned surfaces:
 - bundled catalog revision and digest;
 - compatibility matrix and dependency lock;
 - Helm chart and controller image.
+- Telemetry Catalog revision and digest.
 
 The initial product Kubernetes transport and machine output schemas are
 `v1alpha1`; their version does not weaken UID, generation, ownership, or
@@ -477,7 +486,8 @@ Release artifacts include:
 
 - checksummed CLI archives for Linux and macOS on amd64 and arm64, and Windows
   on amd64;
-- a Linux amd64/arm64 controller OCI image pinned by digest;
+- a Linux amd64/arm64 runtime OCI image containing controller and telemetry
+  processes, pinned by digest;
 - an OCI Helm chart and packaged `.tgz`;
 - SBOMs, source revision, dependency lock, and build provenance.
 
@@ -491,12 +501,11 @@ advertised as supported.
 
 ## Consequences
 
-- The two callers with inherently different responsibilities each receive one
-  deep lifecycle Module: Scenario Runtime locally and Instance Reconciler in
-  the controller.
+- The local lifecycle, controller reconciliation, and read-only telemetry
+  responsibilities each receive a separate deep Module and process boundary.
 - CLI, transport, Kubernetes, KWOK, DRA, catalog, and output changes remain
   local instead of spreading across command handlers or vendor branches.
-- Only three seams exist initially, and each has two justified Adapters or a
+- Only four seams exist initially, and each has two justified Adapters or a
   true external dependency with a deterministic test Adapter.
 - The public lifecycle stays at three operations while internal reconciliation
   can evolve without widening it.
