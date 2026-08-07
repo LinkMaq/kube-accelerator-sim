@@ -148,15 +148,14 @@ func TestRuntimeChartInstallUpgradeUninstall(t *testing.T) {
 			"--timeout=180s",
 		)
 	}
-	assertKubeOutput(
-		t,
-		ctx,
-		kubectlBinary,
-		kubeconfig,
-		"kasim_telemetry_catalog_info",
+	telemetryMetrics := kubeOutput(
+		t, ctx, kubectlBinary, kubeconfig,
 		"get",
 		"--raw=/api/v1/namespaces/kasim-system/services/http:contract-kasim-runtime-telemetry:9400/proxy/metrics",
 	)
+	if !strings.Contains(telemetryMetrics, "kasim_telemetry_catalog_info") {
+		t.Fatalf("telemetry metrics lack catalog identity:\n%s", telemetryMetrics)
+	}
 
 	syntheticNode := `apiVersion: v1
 kind: Node
