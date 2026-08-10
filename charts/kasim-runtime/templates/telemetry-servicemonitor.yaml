@@ -22,4 +22,7 @@ spec:
       path: /metrics
       interval: {{ .Values.telemetry.serviceMonitor.interval }}
       scrapeTimeout: {{ .Values.telemetry.serviceMonitor.scrapeTimeout }}
+      metricRelabelings:
+        - action: labeldrop
+          regex: "^(namespace|pod|container)$"
 {{- end }}

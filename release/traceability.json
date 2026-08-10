@@ -1783,10 +1783,14 @@
     {
       "id": "SCHED-001",
       "implementation": [
+        "internal/scenario/compiler.go",
+        "internal/projection/projection.go",
         "internal/projection/extended/extended.go",
         "internal/reconcile/reconcile.go"
       ],
       "tests": [
+        "internal/scenario/compile_test.go",
+        "internal/projection/projection_test.go",
         "internal/projection/extended/extended_test.go",
         "internal/projection/contract_test.go",
         "test/e2e/compatibility_test.go"
@@ -1798,10 +1802,14 @@
     {
       "id": "SCHED-002",
       "implementation": [
+        "internal/scenario/compiler.go",
+        "internal/projection/projection.go",
         "internal/projection/extended/extended.go",
         "internal/reconcile/reconcile.go"
       ],
       "tests": [
+        "internal/scenario/compile_test.go",
+        "internal/projection/projection_test.go",
         "internal/projection/extended/extended_test.go",
         "internal/projection/contract_test.go",
         "test/e2e/compatibility_test.go"
@@ -1813,10 +1821,14 @@
     {
       "id": "SCHED-003",
       "implementation": [
+        "internal/scenario/compiler.go",
+        "internal/projection/projection.go",
         "internal/projection/extended/extended.go",
         "internal/reconcile/reconcile.go"
       ],
       "tests": [
+        "internal/scenario/compile_test.go",
+        "internal/projection/projection_test.go",
         "internal/projection/extended/extended_test.go",
         "internal/projection/contract_test.go",
         "test/e2e/compatibility_test.go"
@@ -1828,10 +1840,14 @@
     {
       "id": "SCHED-004",
       "implementation": [
+        "internal/scenario/compiler.go",
+        "internal/projection/projection.go",
         "internal/projection/extended/extended.go",
         "internal/reconcile/reconcile.go"
       ],
       "tests": [
+        "internal/scenario/compile_test.go",
+        "internal/projection/projection_test.go",
         "internal/projection/extended/extended_test.go",
         "internal/projection/contract_test.go",
         "test/e2e/compatibility_test.go"
@@ -1843,10 +1859,33 @@
     {
       "id": "SCHED-005",
       "implementation": [
+        "internal/scenario/compiler.go",
+        "internal/projection/projection.go",
         "internal/projection/extended/extended.go",
         "internal/reconcile/reconcile.go"
       ],
       "tests": [
+        "internal/scenario/compile_test.go",
+        "internal/projection/projection_test.go",
+        "internal/projection/extended/extended_test.go",
+        "internal/projection/contract_test.go",
+        "test/e2e/compatibility_test.go"
+      ],
+      "evidence": [
+        ".github/workflows/compatibility.yml"
+      ]
+    },
+    {
+      "id": "SCHED-006",
+      "implementation": [
+        "internal/scenario/compiler.go",
+        "internal/projection/projection.go",
+        "internal/projection/extended/extended.go",
+        "internal/reconcile/reconcile.go"
+      ],
+      "tests": [
+        "internal/scenario/compile_test.go",
+        "internal/projection/projection_test.go",
         "internal/projection/extended/extended_test.go",
         "internal/projection/contract_test.go",
         "test/e2e/compatibility_test.go"
@@ -2357,7 +2396,8 @@
         "internal/telemetry/render.go",
         "internal/telemetry/kubernetes/adapter.go",
         "telemetryprofiles/catalog.json",
-        "charts/kasim-runtime/templates/telemetry-deployment.yaml"
+        "charts/kasim-runtime/templates/telemetry-deployment.yaml",
+        "charts/kasim-runtime/templates/telemetry-servicemonitor.yaml"
       ],
       "tests": [
         "internal/telemetry/telemetry_test.go",
@@ -2375,7 +2415,8 @@
         "internal/telemetry/render.go",
         "internal/telemetry/kubernetes/adapter.go",
         "telemetryprofiles/catalog.json",
-        "charts/kasim-runtime/templates/telemetry-deployment.yaml"
+        "charts/kasim-runtime/templates/telemetry-deployment.yaml",
+        "charts/kasim-runtime/templates/telemetry-servicemonitor.yaml"
       ],
       "tests": [
         "internal/telemetry/telemetry_test.go",
@@ -2393,7 +2434,8 @@
         "internal/telemetry/render.go",
         "internal/telemetry/kubernetes/adapter.go",
         "telemetryprofiles/catalog.json",
-        "charts/kasim-runtime/templates/telemetry-deployment.yaml"
+        "charts/kasim-runtime/templates/telemetry-deployment.yaml",
+        "charts/kasim-runtime/templates/telemetry-servicemonitor.yaml"
       ],
       "tests": [
         "internal/telemetry/telemetry_test.go",
@@ -2411,7 +2453,8 @@
         "internal/telemetry/render.go",
         "internal/telemetry/kubernetes/adapter.go",
         "telemetryprofiles/catalog.json",
-        "charts/kasim-runtime/templates/telemetry-deployment.yaml"
+        "charts/kasim-runtime/templates/telemetry-deployment.yaml",
+        "charts/kasim-runtime/templates/telemetry-servicemonitor.yaml"
       ],
       "tests": [
         "internal/telemetry/telemetry_test.go",
@@ -2429,7 +2472,8 @@
         "internal/telemetry/render.go",
         "internal/telemetry/kubernetes/adapter.go",
         "telemetryprofiles/catalog.json",
-        "charts/kasim-runtime/templates/telemetry-deployment.yaml"
+        "charts/kasim-runtime/templates/telemetry-deployment.yaml",
+        "charts/kasim-runtime/templates/telemetry-servicemonitor.yaml"
       ],
       "tests": [
         "internal/telemetry/telemetry_test.go",
@@ -2447,7 +2491,8 @@
         "internal/telemetry/render.go",
         "internal/telemetry/kubernetes/adapter.go",
         "telemetryprofiles/catalog.json",
-        "charts/kasim-runtime/templates/telemetry-deployment.yaml"
+        "charts/kasim-runtime/templates/telemetry-deployment.yaml",
+        "charts/kasim-runtime/templates/telemetry-servicemonitor.yaml"
       ],
       "tests": [
         "internal/telemetry/telemetry_test.go",
@@ -2465,7 +2510,8 @@
         "internal/telemetry/render.go",
         "internal/telemetry/kubernetes/adapter.go",
         "telemetryprofiles/catalog.json",
-        "charts/kasim-runtime/templates/telemetry-deployment.yaml"
+        "charts/kasim-runtime/templates/telemetry-deployment.yaml",
+        "charts/kasim-runtime/templates/telemetry-servicemonitor.yaml"
       ],
       "tests": [
         "internal/telemetry/telemetry_test.go",
@@ -2483,7 +2529,8 @@
         "internal/telemetry/render.go",
         "internal/telemetry/kubernetes/adapter.go",
         "telemetryprofiles/catalog.json",
-        "charts/kasim-runtime/templates/telemetry-deployment.yaml"
+        "charts/kasim-runtime/templates/telemetry-deployment.yaml",
+        "charts/kasim-runtime/templates/telemetry-servicemonitor.yaml"
       ],
       "tests": [
         "internal/telemetry/telemetry_test.go",

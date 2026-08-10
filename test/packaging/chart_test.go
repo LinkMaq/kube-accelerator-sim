@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	productVersion = "0.5.0"
+	productVersion = "0.5.1"
 	chartPath      = "../../charts/kasim-runtime"
 )
 
@@ -220,8 +220,27 @@ func TestTelemetryDeliveryModesFailClosed(t *testing.T) {
 		"--api-versions",
 		"monitoring.coreos.com/v1/ServiceMonitor",
 	))
-	if objectByKindName(withCRD, "ServiceMonitor", "contract-kasim-runtime-telemetry") == nil {
-		t.Fatal("ServiceMonitor did not render with advertised API")
+	serviceMonitor := requireObject(
+		t,
+		withCRD,
+		"ServiceMonitor",
+		"contract-kasim-runtime-telemetry",
+	)
+	endpoints := sliceValue(t, serviceMonitor.Spec, "endpoints")
+	if len(endpoints) != 1 {
+		t.Fatalf("ServiceMonitor endpoints = %d, want 1", len(endpoints))
+	}
+	endpoint, ok := endpoints[0].(map[string]any)
+	if !ok {
+		t.Fatalf("ServiceMonitor endpoint has type %T, want map", endpoints[0])
+	}
+	relabelings := sliceValue(t, endpoint, "metricRelabelings")
+	if len(relabelings) != 1 {
+		t.Fatalf("ServiceMonitor metricRelabelings = %#v, want one labeldrop rule", relabelings)
+	}
+	rule, ok := relabelings[0].(map[string]any)
+	if !ok || rule["action"] != "labeldrop" || rule["regex"] != "^(namespace|pod|container)$" {
+		t.Fatalf("ServiceMonitor metric relabeling = %#v", relabelings[0])
 	}
 	service := requireObject(t, withCRD, "Service", "contract-kasim-runtime-telemetry")
 	if annotations, found := service.Metadata["annotations"].(map[string]any); found &&
@@ -325,8 +344,8 @@ func TestChartVersionsAndImmutableRuntimeInputsStayExplicit(t *testing.T) {
 		"simulation.kasim.io/schema-version":             "v1alpha1",
 		"simulation.kasim.io/product-crd-sha256":         "fc4162c4d9b3137fa5c195e22c6604c625abb55b8a29c839856e1120467d3bd4",
 		"simulation.kasim.io/catalog-revision":           "2026-08-03",
-		"simulation.kasim.io/telemetry-catalog-revision": "2026-08-10",
-		"simulation.kasim.io/telemetry-catalog-sha256":   "226638cfe275c8c83f88b06a3d11b4c9bad3e5df9578da4eed392f64aed3a0f4",
+		"simulation.kasim.io/telemetry-catalog-revision": "2026-08-10.1",
+		"simulation.kasim.io/telemetry-catalog-sha256":   "817178bb388bf36a25c869b9c7e7352a0e3cba3a1a8465d21c7e8bb1e28914a0",
 		"simulation.kasim.io/kubernetes-range":           "1.30-1.36",
 		"simulation.kasim.io/kwok-version":               "v0.8.0",
 		"simulation.kasim.io/kwok-manifest-sha256":       "a4c16e6431e382dcb5c1903139344b7a68652f16a6460337fe17a678a426f405",

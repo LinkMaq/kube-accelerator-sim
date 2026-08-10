@@ -24,8 +24,8 @@ spec:
         {{- end }}
       annotations:
         simulation.kasim.io/product-version: {{ .Chart.AppVersion | quote }}
-        simulation.kasim.io/telemetry-catalog-revision: "2026-08-10"
-        simulation.kasim.io/telemetry-catalog-sha256: 226638cfe275c8c83f88b06a3d11b4c9bad3e5df9578da4eed392f64aed3a0f4
+        simulation.kasim.io/telemetry-catalog-revision: "2026-08-10.1"
+        simulation.kasim.io/telemetry-catalog-sha256: 817178bb388bf36a25c869b9c7e7352a0e3cba3a1a8465d21c7e8bb1e28914a0
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

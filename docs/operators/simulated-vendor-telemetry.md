@@ -14,7 +14,7 @@ Scenario file or any `kasim` command:
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.5.0 \
+  --version 0.5.1 \
   --namespace kasim-system \
   --create-namespace
 
@@ -31,7 +31,7 @@ duplicate targets:
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.5.0 \
+  --version 0.5.1 \
   --namespace kasim-system \
   --set telemetry.serviceMonitor.enabled=true
 ```
@@ -40,28 +40,40 @@ The ServiceMonitor option fails closed when
 `monitoring.coreos.com/v1/ServiceMonitor` is not available. To manage scraping
 entirely outside the chart, set
 `telemetry.service.prometheusScrape=false` and leave ServiceMonitor disabled.
+When ServiceMonitor mode is enabled, its metric relabeling drops the target
+labels `namespace`, `pod`, and `container`. This prevents the centralized
+`kasim-system` telemetry Pod from being mistaken for a user workload.
 
 ## What one sample means
 
 An H200 Scenario can expose a native NVIDIA family such as:
 
 ```text
-DCGM_FI_DEV_GPU_UTIL{gpu="0",UUID="GPU-...",pci_bus_id="00000000:af:00.0",device="nvidia0",modelName="NVIDIA H200",Hostname="kasim-node-...",DCGM_FI_DRIVER_VERSION="580.126.16"} 72.4
+DCGM_FI_DEV_GPU_UTIL{gpu="0",UUID="GPU-...",pci_bus_id="00000000:af:00.0",device="nvidia0",modelName="nvidia-h200",Hostname="kasim-node-...",DCGM_FI_DRIVER_VERSION="580.126.16",node="kasim-node-..."} 72.4
 ```
 
-The family name, `HELP`, `TYPE`, and complete label-key set come from the
-selected exporter contract. Vendor-native samples contain no `kasim_*` label
-and no generic `node` compatibility label unless `node` is itself a native key
-of that exporter. Family-specific labels are also preserved: for example,
-`DCGM_FI_DEV_XID_ERRORS` additionally carries `err_code` and `err_msg` in the
-supplied DCGM compatibility contract.
+The family name, `TYPE`, and native labels come from the selected exporter
+contract. `HELP` remains source-backed except where an explicit Kasim
+compatibility value convention is documented. Kasim adds one compatibility label, `node`, to every
+per-device family; it always names the Synthetic Node described by the sample.
+Vendor-native ownership labels such as DCGM `Hostname`, AMD `hostname`,
+Cambricon `node`, Iluvatar `node_name`, and Enflame `host` remain present and
+also describe that Synthetic Node. Vendor-native samples contain no `kasim_*` label.
+Family-specific labels are preserved; for example,
+`DCGM_FI_DEV_XID_ERRORS` additionally carries `err_code` and `err_msg`.
 
-Node ownership must be read from the exporter's native key, such as DCGM
-`Hostname`, AMD `hostname`, Cambricon `node`, Iluvatar `node_name`, Enflame
-`host`, or an exporter-supported optional hostname. Do not replace it with the
-real Node that hosts the centralized telemetry Pod, and do not enrich it from
-`kube_pod_info`. Synthetic Nodes remain series dimensions on this aggregate
-endpoint; Kasim does not create a fake exporter Pod or Service for every Node.
+Every Synthetic Node carries
+`feature.node.cloud.xiaoshiai.cn/accelerator-model.name=<catalog-model-id>`.
+Exporter model labels bound by the Telemetry Catalog use the same catalog model
+ID, so NVIDIA `modelName` is byte-for-byte equal to the Node label. Multiple
+pools on one Node Group may share a model, but different accelerator models in
+one Node Group are rejected because the Node label has only one value. Within
+one device, `gpu` and `UUID` remain identical across every metric family.
+
+Do not replace `node` with the real Node hosting the centralized telemetry Pod
+and do not enrich it from `kube_pod_info`. Synthetic Nodes remain series
+dimensions on this aggregate endpoint; Kasim does not create a fake exporter
+Pod or Service for every Node.
 
 Every owned Node also has `kasim_telemetry_node_info`. Every device has
 `kasim_telemetry_device_contract_available`; profiles without enough evidence
@@ -83,13 +95,14 @@ Kasim samples an immutable snapshot every 15 seconds. Repeated scrapes within
 one bucket return the same values, including after process restart. A stable
 device identity and time bucket drive one shared load state:
 
-- utilization changes smoothly within the contract range;
+- utilization changes smoothly in the inclusive `0` to `100` range; consumers
+  that require a ratio convert it to `0` to `1`;
 - used, free, and exporter-defined reserved memory stay non-negative and within
   the model envelope;
 - power, temperature, clocks, and traffic follow the same load instead of
   changing independently;
-- unhealthy simulated units suppress activity and use only a documented
-  vendor health representation;
+- health-like values use `0` for healthy and a non-zero value for faulty;
+  unhealthy simulated units also suppress activity;
 - counters increase monotonically from the documented simulator epoch.
 
 These curves are useful for Prometheus ingestion, dashboard, alert-rule, and
@@ -138,6 +151,9 @@ The telemetry ServiceAccount can only `get`, `list`, and `watch` Scenario
 Instances and Nodes. The process has no cluster write permission and is pinned
 to real Nodes by the same hard placement boundary as other runtime components.
 One snapshot is bounded to 1,000 Synthetic Nodes and 8,000 simulated devices.
+ServiceMonitor mode removes `namespace`, `pod`, and `container` after scraping;
+annotation-based or externally managed scraping must apply the same relabeling
+or classify the `kasim-system` telemetry target as infrastructure.
 
 ## Troubleshooting
 

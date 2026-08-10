@@ -97,13 +97,20 @@ record in `telemetryprofiles/catalog.json`. It is stricter than the baseline
 table above: a contract is exact only when its pinned first-party source proves
 the family name, Prometheus `TYPE`, `HELP`, and applicable native label keys.
 
-The `v1alpha2` catalog now stores `help`. This audit checks that each stored
+The `v1alpha2` catalog format stores `help`. This audit checks that each stored
 sentence is the exact exposition text from its pinned source rather than a
 Kasim-authored description. If exact text is not available, omit `HELP` or mark
 the family provisional; do not construct vendor-sounding prose from `semantic`
 and `unit`. A supplied runtime scrape can define an intentional compatibility
 overlay, but it must be identified separately when it conflicts with the
 pinned first-party implementation.
+
+Telemetry revision `2026-08-10.1` intentionally adds a runtime compatibility
+overlay that is not upstream exporter evidence: every per-device series gains
+`node=<Synthetic Node name>`, catalog-bound model labels use the stable catalog
+model ID, utilization uses 0–100, and health-like values use zero for healthy
+and non-zero for faulty. The Enflame health and Furiosa alive families therefore
+carry explicit compatibility `HELP`; the source facts below remain unchanged.
 
 ### Audit summary
 
@@ -115,8 +122,8 @@ pinned first-party implementation.
 | Huawei Ascend | All four families, gauge type, HELP strings, and seven labels are exact. | May remain verified. |
 | Cambricon | All five families, gauge type, HELP strings, and family-specific `vf` labels are exact under the official `mlu` prefix. | May remain verified. |
 | Iluvatar | All eight families, gauge types, HELP strings, and base labels are exact; Kubernetes workload labels are conditional. | May remain verified for the base schema. |
-| Enflame | All six names, gauge types, HELP strings, and the health-specific `healthmsg` label are exact. | May remain verified. |
-| Furiosa | All six families, types, HELP strings, required labels, and evidence links are exact. | May remain verified. |
+| Enflame | All six names, gauge types, and the health-specific `healthmsg` label are exact. The health family uses explicit compatibility HELP and 0/non-zero values. | Keep the source health semantics recorded and classify the runtime value mapping as a compatibility overlay. |
+| Furiosa | All six families, types, required labels, and evidence links are exact. The alive family uses explicit compatibility HELP and 0/non-zero values. | Keep the source alive semantics recorded and classify the runtime value mapping as a compatibility overlay. |
 | RDMA / InfiniBand | All seven families, types, HELP strings, and labels are exact. | May remain verified. |
 
 ### NVIDIA DCGM Exporter

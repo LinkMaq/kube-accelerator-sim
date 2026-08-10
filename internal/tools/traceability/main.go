@@ -220,9 +220,9 @@ func buildRoutes() map[string]route {
 		tests:          []string{"internal/reconcile/reconcile_test.go", "internal/cluster/kubernetes/adapter_test.go", "test/e2e/compatibility_test.go"},
 		evidence:       append(append([]string{}, compatibility...), scale...),
 	})
-	add(requirementRange("SCHED", 1, 5), route{
-		implementation: []string{"internal/projection/extended/extended.go", "internal/reconcile/reconcile.go"},
-		tests:          []string{"internal/projection/extended/extended_test.go", "internal/projection/contract_test.go", "test/e2e/compatibility_test.go"},
+	add(requirementRange("SCHED", 1, 6), route{
+		implementation: []string{"internal/scenario/compiler.go", "internal/projection/projection.go", "internal/projection/extended/extended.go", "internal/reconcile/reconcile.go"},
+		tests:          []string{"internal/scenario/compile_test.go", "internal/projection/projection_test.go", "internal/projection/extended/extended_test.go", "internal/projection/contract_test.go", "test/e2e/compatibility_test.go"},
 		evidence:       compatibility,
 	})
 	add(requirementRange("SCN", 1, 8), route{
@@ -282,6 +282,7 @@ func buildRoutes() map[string]route {
 			"internal/telemetry/kubernetes/adapter.go",
 			"telemetryprofiles/catalog.json",
 			"charts/kasim-runtime/templates/telemetry-deployment.yaml",
+			"charts/kasim-runtime/templates/telemetry-servicemonitor.yaml",
 		},
 		tests: []string{
 			"internal/telemetry/telemetry_test.go",

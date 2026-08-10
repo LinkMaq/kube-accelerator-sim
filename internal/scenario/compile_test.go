@@ -329,7 +329,7 @@ func TestCompileRejectsScalarResourceCollisionOnOneNode(t *testing.T) {
             id: nvidia
             revision: 2026-08-03
             digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
-          model: nvidia-h200
+          model: nvidia-h100
           contract: device-plugin
           resource: gpu
           variant: {}
@@ -347,6 +347,36 @@ func TestCompileRejectsScalarResourceCollisionOnOneNode(t *testing.T) {
 	_, _, err = scenario.Compile(input, catalogSnapshot)
 	if err == nil || !strings.Contains(err.Error(), `scalar resource "nvidia.com/gpu"`) {
 		t.Fatalf("Compile() error = %v, want scalar resource collision", err)
+	}
+}
+
+func TestCompileRejectsMultipleAcceleratorModelsOnOneNodeGroup(t *testing.T) {
+	t.Parallel()
+
+	secondPool := `
+        - name: inference
+          profile:
+            id: amd
+            revision: 2026-08-03
+            digest: sha256:c165c4b0616a2f4064e6a1805e14d97ed76b66d632a9c050fda89cd8b15d2bea
+          model: amd-mi300x
+          contract: device-plugin
+          resource: gpu
+          variant: {}
+          count: 2
+          healthy: 2`
+	document := validScenarioDocument + secondPool + "\n"
+	catalogSnapshot, err := catalog.LoadBundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	input, err := scenario.Document([]byte(document))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = scenario.Compile(input, catalogSnapshot)
+	if err == nil || !strings.Contains(err.Error(), "accelerator model label conflicts") {
+		t.Fatalf("Compile() error = %v, want accelerator model label conflict", err)
 	}
 }
 

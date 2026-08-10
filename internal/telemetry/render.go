@@ -135,7 +135,6 @@ func addSample(
 }
 
 // diagnosticLabels is deliberately confined to kasim_telemetry_* families.
-// Vendor-native families are rendered exclusively from catalog bindings.
 func diagnosticLabels(device Device, state string) map[string]string {
 	result := map[string]string{
 		"kasim_device":       syntheticIdentity(device),
@@ -203,7 +202,7 @@ func nativeLabels(profile profileRecord, metric metricFamily, device Device) map
 				result[label.Name] = "unhealthy"
 			}
 		case "model-name":
-			result[label.Name] = nativeModelName(profile, device.ModelID)
+			result[label.Name] = device.ModelID
 		case "node-name":
 			result[label.Name] = device.NodeName
 		case "pci-bdf":
@@ -216,16 +215,11 @@ func nativeLabels(profile profileRecord, metric metricFamily, device Device) map
 			result[label.Name] = label.Prefix + strings.ToUpper(shortHash(deviceIdentityKey(device)))
 		}
 	}
+	// node is the sole Kasim compatibility overlay on source-backed exporter
+	// schemas. It names the Synthetic Node described by the device sample, not
+	// the real Node hosting the centralized telemetry Pod.
+	result["node"] = device.NodeName
 	return result
-}
-
-func nativeModelName(profile profileRecord, modelID string) string {
-	for _, model := range profile.Models {
-		if model.ID == modelID && model.NativeName != "" {
-			return model.NativeName
-		}
-	}
-	return modelID
 }
 
 func limitsFor(profile profileRecord, modelID string) simulationLimits {
@@ -251,7 +245,7 @@ func metricValue(
 			return 1, true
 		}
 		if metric.Semantic == "health-binary" {
-			return 0, true
+			return 1, true
 		}
 		if metric.Semantic != "info" && metric.Semantic != "memory-total" {
 			latent = 0
@@ -268,7 +262,7 @@ func metricValue(
 		activity := math.Max(0, latent-0.45) * (25 + 35*seedUnit(deviceIdentityKey(device)+metric.Name))
 		return clamp(activity, 0, 100), true
 	case "utilization-ratio":
-		return clamp(latent, 0, 1), true
+		return clamp(100*latent, 0, 100), true
 	case "memory-ratio":
 		return clamp(0.08+0.82*latent, 0, 1), true
 	case "memory-used":
@@ -306,14 +300,8 @@ func metricValue(
 		rate := 3e8 + 1.2e9*seedUnit(deviceIdentityKey(device)+metric.Name)
 		return counterBuckets(now) * sampleInterval.Seconds() * rate, true
 	case "health-enflame":
-		if device.Healthy {
-			return 2, true
-		}
-		return 1, true
+		return 0, true
 	case "health-binary":
-		if device.Healthy {
-			return 1, true
-		}
 		return 0, true
 	case "last-error":
 		if device.Healthy {

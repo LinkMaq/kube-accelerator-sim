@@ -1,6 +1,6 @@
 # ADR 0008: Isolate source-backed Simulated Vendor Telemetry
 
-Status: Accepted
+Status: Accepted; compatibility contract amended 2026-08-10
 
 ## Context
 
@@ -50,13 +50,22 @@ The runtime exposes `GET` and `HEAD` only:
 - `/readyz` after a fresh Kubernetes observation and successful render.
 
 Synthetic Nodes are metric-series dimensions, not scrape targets or fake
-exporter Pods. Every vendor-native sample carries only the selected exporter's
-exact `HELP`, `TYPE`, and native label set. Kasim never injects `kasim_*` or a
-generic compatibility `node` label into a vendor family. Device ownership uses
-the exporter's native Node key where one exists; it is never replaced by the
-real Node that schedules the centralized telemetry Pod. Separate
-`kasim_telemetry_*` diagnostic families carry Scenario, Synthetic Node,
-profile, catalog, source, and simulation provenance.
+exporter Pods. Every enabled family preserves the selected exporter's exact
+name, `TYPE`, and native labels. `HELP` is also exact unless a documented Kasim
+value convention requires compatibility `HELP`. Each family then adds one compatibility label:
+`node=<Synthetic Node name>`. Kasim never injects a `kasim_*` label into a
+vendor family. Native Node identity labels remain present and describe the
+same Synthetic Node; neither they nor `node` are replaced by the real Node that
+schedules the centralized telemetry Pod. Separate `kasim_telemetry_*`
+diagnostic families carry Scenario, Synthetic Node, profile, catalog, source,
+and simulation provenance.
+
+Every Synthetic Node publishes the singular label
+`feature.node.cloud.xiaoshiai.cn/accelerator-model.name` with its stable
+catalog model ID. Catalog-bound metric model labels use exactly that value.
+Node Groups containing different accelerator models fail closed. UUID and
+device-index bindings derive from the same stable device identity across all
+metric families.
 
 ### Deep Module and seams
 
@@ -105,11 +114,12 @@ and semantic. The same input and bucket produce identical values across
 repeated scrapes and restarts.
 
 One per-device latent load drives utilization, memory use, power, temperature,
-clock, and throughput. Values are bounded by the Telemetry Contract envelope;
-used and free memory cannot exceed total memory. Unhealthy devices use the
-contract's supported health representation and suppress activity. Counters are
-monotonic from a documented simulator epoch. Static identity and capacity do
-not drift within an observed topology.
+clock, and throughput. Utilization is emitted in the inclusive 0-to-100 range.
+Values are bounded by the Telemetry Contract envelope; used and free memory
+cannot exceed total memory. Health-like values use zero for healthy and a
+non-zero value for faulty, while unhealthy devices suppress activity. Counters
+are monotonic from a documented simulator epoch. Static identity and capacity
+do not drift within an observed topology.
 
 These curves are suitable for Prometheus ingestion, dashboards, alert rules,
 and platform adaptation tests. They are not performance, capacity, thermal,
@@ -143,8 +153,10 @@ observe or reproduce physical vendor telemetry.
 - Telemetry failure cannot stop scheduling reconciliation.
 - Adding or promoting a vendor is usually a catalog and golden-fixture change.
 - The central endpoint does not reproduce a real vendor DaemonSet's one-target-
-  per-node topology; queries group by each exporter's native Node label where
-  available and use separate Kasim diagnostics for simulator provenance.
+  per-node topology; queries group by `node` while exporter-native Node labels
+  remain available and separate Kasim diagnostics carry simulator provenance.
+- ServiceMonitor mode drops `namespace`, `pod`, and `container` from scraped
+  series so the centralized telemetry target is not classified as a workload.
 - Provisional and unavailable vendors remain visible without fabricated data.
 - The image contains one additional internal runtime binary and the chart owns
   one additional read-only Pod, Service, ServiceAccount, Role, and Binding.

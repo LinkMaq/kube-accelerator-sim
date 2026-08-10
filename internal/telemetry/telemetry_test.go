@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -29,7 +30,7 @@ func TestBundledCatalogHasEvidenceGatedCoverage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadBundled() error = %v", err)
 	}
-	if catalog.Revision() != "2026-08-10" || !strings.HasPrefix(catalog.Digest(), "sha256:") {
+	if catalog.Revision() != "2026-08-10.1" || !strings.HasPrefix(catalog.Digest(), "sha256:") {
 		t.Fatalf("unexpected catalog identity: %s %s", catalog.Revision(), catalog.Digest())
 	}
 	states := catalog.ProfileStates()
@@ -127,10 +128,11 @@ func TestRenderIsDeterministicCorrelatedAndParseable(t *testing.T) {
 		labels := metricLabels(sample)
 		assertLabelKeys(t, labels, []string{
 			"gpu", "UUID", "pci_bus_id", "device", "modelName", "Hostname",
-			"DCGM_FI_DRIVER_VERSION",
+			"DCGM_FI_DRIVER_VERSION", "node",
 		})
-		if labels["Hostname"] != "kasim-node-a" || labels["device"] != "nvidia"+labels["gpu"] ||
-			labels["modelName"] != "NVIDIA H200" || labels["DCGM_FI_DRIVER_VERSION"] != "580.126.16" ||
+		if labels["Hostname"] != "kasim-node-a" || labels["node"] != "kasim-node-a" ||
+			labels["device"] != "nvidia"+labels["gpu"] ||
+			labels["modelName"] != "nvidia-h200" || labels["DCGM_FI_DRIVER_VERSION"] != "580.126.16" ||
 			!strings.HasPrefix(labels["UUID"], "GPU-") ||
 			!strings.HasPrefix(labels["pci_bus_id"], "00000000:") {
 			t.Errorf("DCGM native label values = %#v", labels)
@@ -139,7 +141,7 @@ func TestRenderIsDeterministicCorrelatedAndParseable(t *testing.T) {
 	xidLabels := metricLabels(families["DCGM_FI_DEV_XID_ERRORS"].Metric[0])
 	assertLabelKeys(t, xidLabels, []string{
 		"gpu", "UUID", "pci_bus_id", "device", "modelName", "Hostname",
-		"DCGM_FI_DRIVER_VERSION", "err_code", "err_msg",
+		"DCGM_FI_DRIVER_VERSION", "err_code", "err_msg", "node",
 	})
 	if xidLabels["err_code"] != "0" || xidLabels["err_msg"] != "No Error" {
 		t.Errorf("DCGM XID labels = %#v", xidLabels)
@@ -214,11 +216,11 @@ func TestNVIDIARenderMatchesSuppliedDCGMExpositionSchema(t *testing.T) {
 		for label := range wantLabels {
 			wantKeys = append(wantKeys, label)
 		}
-		assertLabelKeys(t, metricLabels(got.Metric[0]), wantKeys)
+		assertLabelKeys(t, metricLabels(got.Metric[0]), append(wantKeys, "node"))
 	}
 }
 
-func TestCentralizedEndpointUsesNativeHostnameWithoutPodNodeOrKasimLabels(t *testing.T) {
+func TestCentralizedEndpointAttributesEveryDeviceToItsSyntheticNode(t *testing.T) {
 	t.Parallel()
 
 	module := testModule(t)
@@ -248,11 +250,11 @@ func TestCentralizedEndpointUsesNativeHostnameWithoutPodNodeOrKasimLabels(t *tes
 	}
 	for _, sample := range samples {
 		labels := metricLabels(sample)
-		if labels["Hostname"] == "" {
+		if labels["Hostname"] == "" || labels["node"] != labels["Hostname"] {
 			t.Errorf("device native node identity labels = %#v", labels)
 		}
 		for name := range labels {
-			if name == "node" || strings.HasPrefix(name, "kasim_") {
+			if strings.HasPrefix(name, "kasim_") {
 				t.Errorf("vendor-native sample leaked non-native label %q: %#v", name, labels)
 			}
 		}
@@ -288,12 +290,15 @@ func TestEveryVerifiedProfileEmitsOnlyCatalogDeclaredNativeLabels(t *testing.T) 
 			if len(samples) != 1 {
 				t.Fatalf("profile %s family %s sample count = %d", profileID, family.Name, len(samples))
 			}
-			want := make([]string, 0, len(profile.DeviceLabels)+len(family.Labels))
+			want := make([]string, 0, len(profile.DeviceLabels)+len(family.Labels)+1)
 			for _, label := range profile.DeviceLabels {
 				want = append(want, label.Name)
 			}
 			for _, label := range family.Labels {
 				want = append(want, label.Name)
+			}
+			if !slices.Contains(want, "node") {
+				want = append(want, "node")
 			}
 			assertLabelKeys(t, metricLabels(samples[0]), want)
 		}
@@ -329,10 +334,76 @@ func TestNativeRDMADeviceLabelsRemainUniqueAcrossSyntheticNodes(t *testing.T) {
 	}
 	left := metricLabels(samples[0])
 	right := metricLabels(samples[1])
-	assertLabelKeys(t, left, []string{"device", "port"})
-	assertLabelKeys(t, right, []string{"device", "port"})
+	assertLabelKeys(t, left, []string{"device", "port", "node"})
+	assertLabelKeys(t, right, []string{"device", "port", "node"})
 	if left["device"] == right["device"] {
 		t.Fatalf("aggregate endpoint produced duplicate native RDMA series labels: %#v", left)
+	}
+	if left["node"] == right["node"] {
+		t.Fatalf("aggregate endpoint collapsed distinct Synthetic Nodes: %#v %#v", left, right)
+	}
+}
+
+func TestNVIDIAIdentityLabelsStayStableAcrossAllDeviceMetricFamilies(t *testing.T) {
+	t.Parallel()
+
+	families := parseExpositionAt(
+		t,
+		testModule(t),
+		testObservation("nvidia", "nvidia-h200", 2, 2),
+		time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC),
+	)
+	identities := map[string]string{}
+	for name, family := range families {
+		if !strings.HasPrefix(name, "DCGM_FI_DEV_") {
+			continue
+		}
+		for _, sample := range family.Metric {
+			labels := metricLabels(sample)
+			gpu := labels["gpu"]
+			if gpu == "" || labels["UUID"] == "" {
+				t.Fatalf("%s lacks stable device identity labels: %#v", name, labels)
+			}
+			identity := strings.Join([]string{
+				labels["UUID"], labels["node"], labels["Hostname"], labels["modelName"],
+			}, "|")
+			if previous, found := identities[gpu]; found && previous != identity {
+				t.Fatalf("GPU %s identity changed across metric families: %q != %q", gpu, previous, identity)
+			}
+			identities[gpu] = identity
+		}
+	}
+	if len(identities) != 2 {
+		t.Fatalf("stable GPU identities = %#v, want two devices", identities)
+	}
+}
+
+func TestCompatibilityValueConventions(t *testing.T) {
+	t.Parallel()
+
+	percentage, supported := metricValue(
+		metricFamily{Semantic: "utilization-ratio"},
+		Device{Healthy: true},
+		simulationLimits{},
+		0.75,
+		time.Time{},
+	)
+	if !supported || percentage != 75 {
+		t.Fatalf("utilization-ratio = %v supported=%t, want 75/true", percentage, supported)
+	}
+	for _, semantic := range []string{"health-enflame", "health-binary", "last-error"} {
+		healthy, healthySupported := metricValue(
+			metricFamily{Semantic: semantic}, Device{Healthy: true}, simulationLimits{}, 0.5, time.Time{},
+		)
+		unhealthy, unhealthySupported := metricValue(
+			metricFamily{Semantic: semantic}, Device{Healthy: false}, simulationLimits{}, 0.5, time.Time{},
+		)
+		if !healthySupported || healthy != 0 {
+			t.Errorf("%s healthy = %v supported=%t, want 0/true", semantic, healthy, healthySupported)
+		}
+		if !unhealthySupported || unhealthy == 0 {
+			t.Errorf("%s unhealthy = %v supported=%t, want non-zero/true", semantic, unhealthy, unhealthySupported)
+		}
 	}
 }
 

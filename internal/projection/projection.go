@@ -14,9 +14,10 @@ import (
 )
 
 const (
-	ScenarioLabel     = "simulation.kasim.io/scenario"
-	NodeGroupLabel    = "simulation.kasim.io/node-group"
-	ReplicaIndexLabel = "simulation.kasim.io/replica-index"
+	ScenarioLabel             = "simulation.kasim.io/scenario"
+	NodeGroupLabel            = "simulation.kasim.io/node-group"
+	ReplicaIndexLabel         = "simulation.kasim.io/replica-index"
+	AcceleratorModelNameLabel = "feature.node.cloud.xiaoshiai.cn/accelerator-model.name"
 )
 
 // ResourceProjection is the internal behavior seam between backend-neutral
@@ -229,6 +230,10 @@ func Build(input BuildInput) (DesiredGraph, error) {
 				associatedAcceleratorPools: associations,
 			})
 		}
+		acceleratorModel, err := singleAcceleratorModel(pools)
+		if err != nil {
+			return DesiredGraph{}, fmt.Errorf("Node Group %q: %w", group.Name(), err)
+		}
 
 		for replica := uint64(0); replica < group.Replicas().Value(); replica++ {
 			name, err := domain.SyntheticNodeName(
@@ -248,6 +253,7 @@ func Build(input BuildInput) (DesiredGraph, error) {
 			labels[ScenarioLabel] = input.InstanceName.String()
 			labels[NodeGroupLabel] = group.Name().String()
 			labels[ReplicaIndexLabel] = strconv.FormatUint(replica, 10)
+			labels[AcceleratorModelNameLabel] = acceleratorModel
 			if zone := group.Node().Placement()["zone"]; zone != "" {
 				labels["topology.kubernetes.io/zone"] = zone
 			}
@@ -277,6 +283,23 @@ func Build(input BuildInput) (DesiredGraph, error) {
 		generation:   input.Generation,
 		nodes:        nodes,
 	}, nil
+}
+
+func singleAcceleratorModel(pools []DesiredPool) (string, error) {
+	if len(pools) == 0 || pools[0].modelID == "" {
+		return "", fmt.Errorf("requires one accelerator model")
+	}
+	model := pools[0].modelID
+	for _, pool := range pools[1:] {
+		if pool.modelID != model {
+			return "", fmt.Errorf(
+				"cannot project accelerator model label from models %q and %q",
+				model,
+				pool.modelID,
+			)
+		}
+	}
+	return model, nil
 }
 
 func verifyResolution(

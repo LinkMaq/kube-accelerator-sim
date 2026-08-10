@@ -636,6 +636,8 @@ func compileGroup(
 		pool  string
 	}
 	identitySignals := make(map[string]identityOwner)
+	acceleratorModel := ""
+	acceleratorModelOwner := ""
 	for _, rawPool := range rawPools {
 		pool, canonicalPool, resolved, err := compilePool(
 			rawPool,
@@ -691,6 +693,19 @@ func compileGroup(
 					)
 				}
 			}
+		}
+		if acceleratorModel == "" {
+			acceleratorModel = resolved.ModelID()
+			acceleratorModelOwner = rawPool.Name
+		} else if acceleratorModel != resolved.ModelID() {
+			return domain.NodeGroup{}, canonicalNodeGroup{}, nil, nil, fmt.Errorf(
+				"Node Group %q accelerator model label conflicts between models %q and %q in Accelerator Pools %q and %q",
+				raw.Name,
+				acceleratorModel,
+				resolved.ModelID(),
+				acceleratorModelOwner,
+				rawPool.Name,
+			)
 		}
 		pools = append(pools, pool)
 		canonicalPools = append(canonicalPools, canonicalPool)

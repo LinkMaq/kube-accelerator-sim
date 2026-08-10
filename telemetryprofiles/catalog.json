@@ -1,6 +1,6 @@
 {
   "schemaVersion": "v1alpha2",
-  "revision": "2026-08-10",
+  "revision": "2026-08-10.1",
   "profiles": [
     {
       "id": "nvidia",
@@ -109,7 +109,7 @@
         {"name": "pci_bdf", "valueFrom": "pci-bdf"}, {"name": "src", "valueFrom": "fixed", "value": "direct"}
       ],
       "metricFamilies": [
-        {"name": "xpum_engine_group_ratio", "type": "gauge", "help": "Avg utilization of engine group (in %), per GPU tile", "semantic": "utilization-ratio", "unit": "ratio", "labels": [{"name": "type", "valueFrom": "fixed", "value": "compute"}]},
+        {"name": "xpum_engine_group_ratio", "type": "gauge", "help": "Avg utilization of engine group (in %), per GPU tile", "semantic": "utilization-ratio", "unit": "percent", "labels": [{"name": "type", "valueFrom": "fixed", "value": "compute"}]},
         {"name": "xpum_memory_used_bytes", "type": "gauge", "help": "Used GPU memory (in bytes), per GPU tile", "semantic": "memory-used", "unit": "bytes"},
         {"name": "xpum_memory_ratio", "type": "gauge", "help": "Used GPU memory / Total used GPU memory (in %), per GPU tile", "semantic": "memory-ratio", "unit": "ratio"},
         {"name": "xpum_power_watts", "type": "gauge", "help": "Avg GPU power (in watts), per GPU and per card", "semantic": "power", "unit": "watts"},
@@ -192,7 +192,7 @@
         {"name": "enflame_gcu_memory_total_bytes", "type": "gauge", "help": "Total memory size as reorted by the device", "semantic": "memory-total", "unit": "bytes"},
         {"name": "enflame_gcu_power_usage", "type": "gauge", "help": "Power usage as reported by the device, -1 means not supported", "semantic": "power", "unit": "vendor-value"},
         {"name": "enflame_gcu_temperatures", "type": "gauge", "help": "Temperature as reported by the device, -1 means not supported", "semantic": "temperature", "unit": "vendor-value"},
-        {"name": "enflame_gcu_health", "type": "gauge", "help": "Gcu health as reported by the device (2:healthy,1:unhealthy,0:unknown)", "semantic": "health-enflame", "unit": "state", "labels": [{"name": "healthmsg", "valueFrom": "health-message"}]}
+        {"name": "enflame_gcu_health", "type": "gauge", "help": "Kasim compatibility health value (0: healthy, non-zero: faulty)", "semantic": "health-enflame", "unit": "state", "labels": [{"name": "healthmsg", "valueFrom": "health-message"}]}
       ]
     },
     {
@@ -207,7 +207,7 @@
         {"name": "hostname", "valueFrom": "node-name"}
       ],
       "metricFamilies": [
-        {"name": "furiosa_npu_alive", "type": "gauge", "help": "The liveness of NPU device", "semantic": "health-binary", "unit": "state"},
+        {"name": "furiosa_npu_alive", "type": "gauge", "help": "Kasim compatibility health value (0: healthy, non-zero: faulty)", "semantic": "health-binary", "unit": "state"},
         {"name": "furiosa_npu_core_utilization", "type": "gauge", "help": "The current core utilization of NPU device", "semantic": "utilization", "unit": "vendor-value"},
         {"name": "furiosa_npu_core_frequency", "type": "gauge", "help": "The current core frequency of NPU device (MHz)", "semantic": "clock-core", "unit": "MHz"},
         {"name": "furiosa_npu_dram_total", "type": "gauge", "help": "The total dram of NPU device (Bytes)", "semantic": "memory-total", "unit": "bytes"},

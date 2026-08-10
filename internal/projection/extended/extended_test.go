@@ -107,6 +107,7 @@ func TestProjectionRendersExactSourceBackedCapacityAndSchedulingGate(t *testing.
 	if len(desiredNodes) != 1 ||
 		desiredNodes[0].Labels()[projection.NodeGroupLabel] != "nodes" ||
 		desiredNodes[0].Labels()[projection.ReplicaIndexLabel] != "0" ||
+		desiredNodes[0].Labels()[projection.AcceleratorModelNameLabel] != "nvidia-h100" ||
 		!desiredNodes[0].SchedulingInitiallyClosed() {
 		t.Fatalf("desired graph lost Node identity or scheduling gate: %#v", desiredNodes)
 	}

@@ -141,7 +141,7 @@ spec:
           variant: {}
           count: 8
           healthy: 8
-    - name: ascend-generations
+    - name: ascend-310
       replicas: 1
       node:
         capacity:
@@ -164,6 +164,18 @@ spec:
           variant: {}
           count: 8
           healthy: 8
+    - name: ascend-310p
+      replicas: 1
+      node:
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: signal-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
         - name: ascend310p
           profile:
             id: huawei-ascend
