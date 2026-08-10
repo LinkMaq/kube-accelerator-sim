@@ -381,6 +381,16 @@ spec:
 		"node/"+syntheticNode,
 		"-o=jsonpath={.status.allocatable.nvidia\\.com/gpu}",
 	)
+	assertKubeOutput(
+		t,
+		ctx,
+		kubectlBinary,
+		adminKubeconfig,
+		"nvidia-h100",
+		"get",
+		"node/"+syntheticNode,
+		"-o=jsonpath={.metadata.labels.feature\\.node\\.cloud\\.xiaoshiai\\.cn/accelerator-model\\.name}",
+	)
 	telemetryPodNode := kubeOutput(
 		t,
 		ctx,
@@ -409,12 +419,7 @@ spec:
 			"--raw=/api/v1/namespaces/kasim-system/services/http:compat-kasim-runtime-telemetry:9400/proxy/metrics",
 		)
 		for _, line := range strings.Split(metrics, "\n") {
-			if strings.HasPrefix(line, "DCGM_FI_DEV_GPU_UTIL{") &&
-				prometheusLineHasLabel(line, "Hostname", syntheticNode) &&
-				prometheusLineHasLabel(line, "device", "nvidia0") &&
-				prometheusLineHasLabel(line, "DCGM_FI_DRIVER_VERSION", "580.126.16") &&
-				!strings.Contains(line, "kasim_") &&
-				!strings.Contains(line, `node="`) {
+			if compatibilityTelemetryLineMatches(line, syntheticNode) {
 				return true
 			}
 		}
@@ -812,6 +817,37 @@ spec:
 		controllerImage,
 		time.Since(startedAt),
 	)
+}
+
+func compatibilityTelemetryLineMatches(line, syntheticNode string) bool {
+	return strings.HasPrefix(line, "DCGM_FI_DEV_GPU_UTIL{") &&
+		prometheusLineHasLabel(line, "Hostname", syntheticNode) &&
+		prometheusLineHasLabel(line, "node", syntheticNode) &&
+		prometheusLineHasLabel(line, "device", "nvidia0") &&
+		prometheusLineHasLabel(line, "modelName", "nvidia-h100") &&
+		prometheusLineHasLabel(line, "DCGM_FI_DRIVER_VERSION", "580.126.16") &&
+		!strings.Contains(line, "kasim_")
+}
+
+func TestCompatibilityTelemetryLineMatcherRequiresSyntheticNodeCompatibilityLabel(t *testing.T) {
+	t.Parallel()
+
+	const syntheticNode = "compat-workers-0"
+	valid := `DCGM_FI_DEV_GPU_UTIL{gpu="0",UUID="GPU-1234",pci_bus_id="00000000:00:00.0",device="nvidia0",modelName="nvidia-h100",Hostname="compat-workers-0",DCGM_FI_DRIVER_VERSION="580.126.16",node="compat-workers-0"} 42`
+	if !compatibilityTelemetryLineMatches(valid, syntheticNode) {
+		t.Fatalf("matcher rejected telemetry attributed to Synthetic Node: %s", valid)
+	}
+	for name, invalid := range map[string]string{
+		"missing compatibility label": strings.ReplaceAll(valid, `,node="compat-workers-0"`, ""),
+		"real Node attribution":       strings.ReplaceAll(valid, `node="compat-workers-0"`, `node="kind-control-plane"`),
+		"model mismatch":              strings.ReplaceAll(valid, `modelName="nvidia-h100"`, `modelName="NVIDIA H100 80GB HBM3"`),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if compatibilityTelemetryLineMatches(invalid, syntheticNode) {
+				t.Fatalf("matcher accepted incompatible telemetry: %s", invalid)
+			}
+		})
+	}
 }
 
 type productCLIResult struct {
