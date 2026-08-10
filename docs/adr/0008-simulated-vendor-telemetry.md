@@ -50,12 +50,13 @@ The runtime exposes `GET` and `HEAD` only:
 - `/readyz` after a fresh Kubernetes observation and successful render.
 
 Synthetic Nodes are metric-series dimensions, not scrape targets or fake
-exporter Pods. Every native sample carries exact source-backed native labels
-plus `node=<Synthetic Node>` and `kasim_*` provenance including
-`kasim_simulated="true"`, Scenario Instance, Synthetic Node, pool, profile,
-model, and stable simulated device identity. The compatibility `node` label is
-device ownership, never the real Node that schedules the centralized telemetry
-Pod.
+exporter Pods. Every vendor-native sample carries only the selected exporter's
+exact `HELP`, `TYPE`, and native label set. Kasim never injects `kasim_*` or a
+generic compatibility `node` label into a vendor family. Device ownership uses
+the exporter's native Node key where one exists; it is never replaced by the
+real Node that schedules the centralized telemetry Pod. Separate
+`kasim_telemetry_*` diagnostic families carry Scenario, Synthetic Node,
+profile, catalog, source, and simulation provenance.
 
 ### Deep Module and seams
 
@@ -80,8 +81,9 @@ registry, catalog network seam, per-node goroutine, or per-device goroutine.
 
 The bundled Telemetry Catalog is immutable and versioned independently of the
 scheduling catalog. A Telemetry Contract records the exporter, evidence source
-and revision, state, native label bindings, exact metric family, Prometheus
-type, unit, sealed value semantic, and optional model envelope.
+and revision, state, common native label bindings, family-specific native
+label bindings, exact metric family and `HELP`, Prometheus type, unit, sealed
+value semantic, and optional model envelope.
 
 States are:
 
@@ -119,8 +121,8 @@ Prometheus scrapes perform no Kubernetes I/O; they read an immutable encoded
 snapshot. A failed refresh never replaces the last successful buffer. After
 the stale interval, native series are removed and the endpoint retains only
 Kasim source/error diagnostics while readiness fails. Invalid catalog records,
-family type conflicts, label conflicts, observation ownership errors, and
-invariant violations fail closed.
+family `HELP`/type/label conflicts, observation ownership errors, and invariant
+violations fail closed.
 
 One snapshot supports at most 1,000 Synthetic Nodes and 8,000 simulated
 devices. Rendering is `O(nodes + devices * enabled families)` with no hidden
@@ -141,8 +143,8 @@ observe or reproduce physical vendor telemetry.
 - Telemetry failure cannot stop scheduling reconciliation.
 - Adding or promoting a vendor is usually a catalog and golden-fixture change.
 - The central endpoint does not reproduce a real vendor DaemonSet's one-target-
-  per-node topology; queries should group by native Node labels, `kasim_node`,
-  or the common `node` compatibility label rather than Pod placement.
+  per-node topology; queries group by each exporter's native Node label where
+  available and use separate Kasim diagnostics for simulator provenance.
 - Provisional and unavailable vendors remain visible without fabricated data.
 - The image contains one additional internal runtime binary and the chart owns
   one additional read-only Pod, Service, ServiceAccount, Role, and Binding.

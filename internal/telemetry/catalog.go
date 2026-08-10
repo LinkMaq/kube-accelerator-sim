@@ -17,7 +17,7 @@ import (
 	"github.com/LinkMaq/kube-accelerator-sim/telemetryprofiles"
 )
 
-const telemetryCatalogSchema = "v1alpha1"
+const telemetryCatalogSchema = "v1alpha2"
 
 var metricNamePattern = regexp.MustCompile(`^[a-zA-Z_:][a-zA-Z0-9_:]*$`)
 var labelNamePattern = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
@@ -47,8 +47,9 @@ type evidenceRecord struct {
 }
 
 type modelEnvelope struct {
-	ID        string  `json:"id"`
-	MemoryMiB float64 `json:"memoryMiB,omitempty"`
+	ID         string  `json:"id"`
+	NativeName string  `json:"nativeName,omitempty"`
+	MemoryMiB  float64 `json:"memoryMiB,omitempty"`
 }
 
 type simulationLimits struct {
@@ -62,16 +63,24 @@ type simulationLimits struct {
 }
 
 type metricFamily struct {
-	Name     string `json:"name"`
-	Type     string `json:"type"`
-	Semantic string `json:"semantic"`
-	Unit     string `json:"unit"`
+	Name     string        `json:"name"`
+	Type     string        `json:"type"`
+	Help     string        `json:"help"`
+	Semantic string        `json:"semantic"`
+	Unit     string        `json:"unit"`
+	Labels   []nativeLabel `json:"labels,omitempty"`
 }
 
 type nativeLabel struct {
 	Name      string `json:"name"`
 	ValueFrom string `json:"valueFrom"`
 	Value     string `json:"value,omitempty"`
+	Prefix    string `json:"prefix,omitempty"`
+}
+
+type validatedFamily struct {
+	metric metricFamily
+	labels []nativeLabel
 }
 
 // Catalog is one immutable validated telemetry-contract snapshot.
@@ -104,7 +113,7 @@ func loadCatalog(encoded []byte) (Catalog, error) {
 		return Catalog{}, fmt.Errorf("telemetry catalog requires revision and profiles")
 	}
 	profiles := make(map[string]profileRecord, len(file.Profiles))
-	families := make(map[string]metricFamily)
+	families := make(map[string]validatedFamily)
 	for _, profile := range file.Profiles {
 		if err := validateProfileRecord(profile, families); err != nil {
 			return Catalog{}, fmt.Errorf("telemetry profile %q: %w", profile.ID, err)
@@ -124,7 +133,7 @@ func loadCatalog(encoded []byte) (Catalog, error) {
 
 func validateProfileRecord(
 	profile profileRecord,
-	families map[string]metricFamily,
+	families map[string]validatedFamily,
 ) error {
 	if profile.ID == "" || profile.DisplayName == "" {
 		return fmt.Errorf("id and displayName are required")
@@ -148,33 +157,44 @@ func validateProfileRecord(
 		}
 	}
 	seenLabels := make(map[string]struct{}, len(profile.DeviceLabels))
-	for _, label := range profile.DeviceLabels {
-		if !labelNamePattern.MatchString(label.Name) || strings.HasPrefix(label.Name, "kasim_") {
-			return fmt.Errorf("invalid or reserved native label %q", label.Name)
-		}
-		if _, duplicate := seenLabels[label.Name]; duplicate {
-			return fmt.Errorf("duplicate native label %q", label.Name)
-		}
-		seenLabels[label.Name] = struct{}{}
-		if !supportedLabelSource(label.ValueFrom) {
-			return fmt.Errorf("native label %q has unsupported value source %q", label.Name, label.ValueFrom)
-		}
+	if err := validateNativeLabels(profile.DeviceLabels, seenLabels); err != nil {
+		return err
 	}
+	seenFamilies := make(map[string]struct{}, len(profile.MetricFamily))
 	for _, family := range profile.MetricFamily {
 		if !metricNamePattern.MatchString(family.Name) {
 			return fmt.Errorf("invalid metric name %q", family.Name)
 		}
+		if _, duplicate := seenFamilies[family.Name]; duplicate {
+			return fmt.Errorf("duplicate metric family %q", family.Name)
+		}
+		seenFamilies[family.Name] = struct{}{}
 		if family.Type != "gauge" && family.Type != "counter" {
 			return fmt.Errorf("metric %q has unsupported type %q", family.Name, family.Type)
+		}
+		if strings.TrimSpace(family.Help) == "" || strings.ContainsAny(family.Help, "\r\n") {
+			return fmt.Errorf("metric %q requires one exact single-line HELP string", family.Name)
 		}
 		if !supportedSemantic(family.Semantic) {
 			return fmt.Errorf("metric %q has unsupported semantic %q", family.Name, family.Semantic)
 		}
+		familyLabels := make(map[string]struct{}, len(seenLabels)+len(family.Labels))
+		for name := range seenLabels {
+			familyLabels[name] = struct{}{}
+		}
+		if err := validateNativeLabels(family.Labels, familyLabels); err != nil {
+			return fmt.Errorf("metric %q: %w", family.Name, err)
+		}
+		completeLabels := make([]nativeLabel, 0, len(profile.DeviceLabels)+len(family.Labels))
+		completeLabels = append(completeLabels, profile.DeviceLabels...)
+		completeLabels = append(completeLabels, family.Labels...)
 		if previous, exists := families[family.Name]; exists &&
-			(previous.Type != family.Type || previous.Semantic != family.Semantic || previous.Unit != family.Unit) {
+			(previous.metric.Type != family.Type || previous.metric.Help != family.Help ||
+				previous.metric.Semantic != family.Semantic || previous.metric.Unit != family.Unit ||
+				!slices.Equal(previous.labels, completeLabels)) {
 			return fmt.Errorf("metric family %q conflicts across profiles", family.Name)
 		}
-		families[family.Name] = family
+		families[family.Name] = validatedFamily{metric: family, labels: completeLabels}
 	}
 	modelIDs := make(map[string]struct{}, len(profile.Models))
 	for _, model := range profile.Models {
@@ -194,21 +214,46 @@ func validateProfileRecord(
 	return nil
 }
 
+func validateNativeLabels(labels []nativeLabel, seen map[string]struct{}) error {
+	for _, label := range labels {
+		if !labelNamePattern.MatchString(label.Name) || strings.HasPrefix(label.Name, "kasim_") {
+			return fmt.Errorf("invalid or reserved native label %q", label.Name)
+		}
+		if _, duplicate := seen[label.Name]; duplicate {
+			return fmt.Errorf("duplicate native label %q", label.Name)
+		}
+		seen[label.Name] = struct{}{}
+		if !supportedLabelSource(label.ValueFrom) {
+			return fmt.Errorf("native label %q has unsupported value source %q", label.Name, label.ValueFrom)
+		}
+		if label.ValueFrom == "fixed" && label.Value == "" {
+			return fmt.Errorf("fixed native label %q requires value", label.Name)
+		}
+		if label.Prefix != "" && label.ValueFrom != "device-name" &&
+			label.ValueFrom != "device-name-node-hash" && label.ValueFrom != "device-uuid" &&
+			label.ValueFrom != "serial" {
+			return fmt.Errorf("native label %q cannot prefix value source %q", label.Name, label.ValueFrom)
+		}
+	}
+	return nil
+}
+
 func supportedLabelSource(source string) bool {
 	return slices.Contains([]string{
-		"device-index", "device-name", "device-uuid", "empty", "fixed",
-		"model-name", "node-name", "pci-bdf", "profile-name", "serial",
+		"device-index", "device-name", "device-name-node-hash", "device-uuid", "empty", "fixed",
+		"health-error-code", "health-error-message", "health-message", "model-name",
+		"node-name", "pci-bdf", "pci-bdf-domain8", "profile-name", "serial",
 	}, source)
 }
 
 func supportedSemantic(semantic string) bool {
 	return slices.Contains([]string{
-		"clock-core", "clock-memory", "cycle-counter", "energy", "health-binary", "health-enflame",
+		"clock-core", "clock-memory", "constant-zero", "cycle-counter", "energy", "health-binary", "health-enflame",
 		"ib-physical-state", "ib-state", "info", "link-rate", "memory-free",
-		"memory-ratio", "memory-total", "memory-used", "packet-rx-counter",
+		"memory-free-reserved", "memory-ratio", "memory-reserved", "memory-total", "memory-used", "packet-rx-counter",
 		"packet-tx-counter", "power", "temperature",
 		"traffic-rx-counter", "traffic-tx-counter", "throughput-rx", "throughput-tx",
-		"utilization", "utilization-ratio",
+		"utilization", "utilization-ratio", "utilization-sparse", "last-error",
 	}, semantic)
 }
 
@@ -216,6 +261,9 @@ func cloneProfileRecord(input profileRecord) profileRecord {
 	input.Evidence = append([]evidenceRecord(nil), input.Evidence...)
 	input.Models = append([]modelEnvelope(nil), input.Models...)
 	input.MetricFamily = append([]metricFamily(nil), input.MetricFamily...)
+	for index := range input.MetricFamily {
+		input.MetricFamily[index].Labels = append([]nativeLabel(nil), input.MetricFamily[index].Labels...)
+	}
 	input.DeviceLabels = append([]nativeLabel(nil), input.DeviceLabels...)
 	return input
 }

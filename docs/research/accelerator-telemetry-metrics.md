@@ -1,6 +1,6 @@
 # Accelerator telemetry metric evidence
 
-Checked: 2026-08-07
+Checked: 2026-08-10
 
 ## Question and evidence rule
 
@@ -33,18 +33,19 @@ declared/emitted by the cited implementation.
 
 | Profile | Exact metric family | Type | Unit/value contract | Native labels relevant to a Synthetic Node | Constraints |
 | --- | --- | --- | --- | --- | --- |
-| NVIDIA | `DCGM_FI_DEV_GPU_UTIL` | gauge | percent | `gpu`, `UUID`, `device`, `modelName`, `Hostname`; Kubernetes enrichment can add `container`, `namespace`, `pod` | DCGM field support depends on GPU and driver. |
+| NVIDIA | `DCGM_FI_DEV_GPU_UTIL`, `DCGM_FI_DEV_MEM_COPY_UTIL`, `DCGM_FI_DEV_ENC_UTIL`, `DCGM_FI_DEV_DEC_UTIL` | gauge | percent | pinned exporter: `gpu`, `UUID`, `pci_bus_id`, `device`, `modelName`, optional lowercase `hostname`; the supplied compatibility sample instead has uppercase `Hostname` and `DCGM_FI_DRIVER_VERSION` | DCGM field support depends on GPU and driver. |
 | NVIDIA | `DCGM_FI_DEV_FB_USED`, `DCGM_FI_DEV_FB_FREE`, `DCGM_FI_DEV_FB_RESERVED` | gauge | MiB | same as above | Preserve `used + free + reserved <= model capacity`; some fields can be unsupported. |
 | NVIDIA | `DCGM_FI_DEV_GPU_TEMP`, `DCGM_FI_DEV_MEMORY_TEMP` | gauge | Celsius | same as above | Memory temperature is not available on every product. |
 | NVIDIA | `DCGM_FI_DEV_POWER_USAGE` | gauge | watts | same as above | Device-dependent. |
 | NVIDIA | `DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION` | counter | millijoules | same as above | Must be monotonic within one simulated exporter epoch. |
 | NVIDIA | `DCGM_FI_DEV_SM_CLOCK`, `DCGM_FI_DEV_MEM_CLOCK` | gauge | MHz | same as above | Device-dependent. |
-| NVIDIA | `DCGM_FI_PROF_PCIE_RX_BYTES`, `DCGM_FI_PROF_PCIE_TX_BYTES` | gauge | bytes/second | same as above | Profiling fields have DCGM/device prerequisites. |
+| NVIDIA | `DCGM_FI_DEV_PCIE_REPLAY_COUNTER`, row-remap counters, `DCGM_FI_DEV_XID_ERRORS`, `DCGM_FI_DEV_ROW_REMAP_FAILURE`, `DCGM_FI_DEV_VGPU_LICENSE_STATUS` | counter or gauge as declared below | counts/codes/states | same core labels; the supplied sample adds `err_code` and `err_msg` only to XID | Some fields are unsupported on some products. |
+| NVIDIA | `DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL` | gauge in pinned first-party CSV; counter in supplied runtime sample | vendor counter aggregate | same as above | The two evidence sources conflict; this family is not first-party exact until one contract is selected. |
 | AMD | `gpu_gfx_activity`, `gpu_umc_activity` | gauge | percent, 0–100 | `gpu_id`, `card_model`, `gpu_partition_id`, `gpu_compute_partition_type`, `gpu_memory_partition_type`, `deployment_mode`, `serial_number`, `hostname`; optional workload labels | The optional `MetricsFieldPrefix` changes the exposed name; the official ConfigMap example uses `amd_`. |
 | AMD | `gpu_used_vram`, `gpu_total_vram`, `gpu_free_vram` | gauge | MB | same as above | Partition mode and SR-IOV can change which physical values are available. |
-| AMD | `gpu_power_usage`, `gpu_package_power` | gauge | watts | same as above | Some fields are MI2xx/MI3xx-specific. |
-| AMD | `gpu_temperature`, `gpu_junction_temperature`, `gpu_memory_temperature` | gauge | Celsius | same as above | Product-dependent. |
-| AMD | `gpu_gfx_clock`, `gpu_memory_clock` | gauge | MHz | same as above | Product-dependent. |
+| AMD | `gpu_power_usage` | gauge | watts | same as above | Product-dependent. |
+| AMD | `gpu_edge_temperature` | gauge | Celsius | same as above | Product-dependent. |
+| AMD | `gpu_clock` | gauge | MHz | same as above, plus `clock_index`, `clock_type` | Source-supported `clock_type` values include lowercase `data`, `system`, `memory`, `video`, and `soc`. |
 | Intel GPU (XPU Manager) | `xpum_engine_ratio`, `xpum_engine_group_ratio` | gauge | ratio, exporter scales percentage by `0.01`; group label `type` identifies engine group | `uuid`, `dev_name`, `pci_dev`, `vendor`, `pci_bdf`; optional `dev_file`, `node`, `kube_pod`, `kube_namespace`, `kube_container`, `sub_dev`, `card` | Evidence is from the maintained `master` exporter source; pin before catalog import. |
 | Intel GPU (XPU Manager) | `xpum_memory_used_bytes` | gauge | bytes | same as above | Device/tile scope comes from labels. |
 | Intel GPU (XPU Manager) | `xpum_memory_ratio` | gauge | ratio | same as above | Same ratio scaling applies. |
@@ -61,7 +62,7 @@ declared/emitted by the cited implementation.
 | Iluvatar | `ix_gpu_utilization` | gauge | percent | `name`, `gpu`, `uuid`, `driver`, `ixml`, `serial`, `node_name`; Kubernetes enrichment adds `namespace`, `pod`, `container` | Metric list and labels are YAML-driven; unsupported fields are omitted. |
 | Iluvatar | `ix_mem_total`, `ix_mem_used`, `ix_mem_free` | gauge | MiB | same as above | Preserve memory arithmetic. |
 | Iluvatar | `ix_power_usage`, `ix_gpu_temperature`, `ix_mem_temperature`, `ix_fan_speed` | gauge | watts, Celsius, RPM | same as above | Product-dependent. |
-| Iluvatar | `ix_gpu_clock`, `ix_mem_clock`, `ix_pcie_throughput` | gauge | MHz; PCIe throughput KB/s | same as above | Exporter delays briefly to obtain profiling metrics. |
+| Iluvatar | `ix_sm_clock`, `ix_mem_clock` | gauge | MHz | same as above | Product-dependent. |
 | Enflame | `enflame_gcu_usage` | gauge | exporter help does not fix the unit | `host`, `minor_number`, `uuid`, `busid`, `slot`, `name`, `pod_name`, `pod_namespace`, `container_name` | `-1` means unsupported. |
 | Enflame | `enflame_gcu_memory_used_bytes`, `enflame_gcu_memory_total_bytes` | gauge | bytes | same as above | Physical collectors emit no samples when virtual devices are present. |
 | Enflame | `enflame_gcu_power_usage`, `enflame_gcu_temperatures` | gauge | units not fixed in cited help | same as above | `-1` means unsupported. |
@@ -88,6 +89,255 @@ declared/emitted by the cited implementation.
 - Enflame: the official [namespace/typed emission code](https://github.com/EnflameTechnology/gcu-exporter/blob/0e6e15c9cb8034e85b70959cc30f702ac56114ed/collector/collector.go), [usage collector](https://github.com/EnflameTechnology/gcu-exporter/blob/0e6e15c9cb8034e85b70959cc30f702ac56114ed/collector/gcu_usage.go), and [repository README](https://github.com/EnflameTechnology/gcu-exporter/blob/0e6e15c9cb8034e85b70959cc30f702ac56114ed/README.md) at `0e6e15c`.
 - Furiosa: the [official metric/type/label table at `e24b600`](https://github.com/furiosa-ai/furiosa-metrics-exporter/blob/e24b60086ea42d81ebf92adbabd5f595ac4ecdab/README.rst), plus the pinned [frequency](https://github.com/furiosa-ai/furiosa-metrics-exporter/blob/e24b60086ea42d81ebf92adbabd5f595ac4ecdab/internal/collector/frequency.go) and [DRAM](https://github.com/furiosa-ai/furiosa-metrics-exporter/blob/e24b60086ea42d81ebf92adbabd5f595ac4ecdab/internal/collector/memory.go) collectors for units.
 - RDMA/InfiniBand: upstream Prometheus [node_exporter InfiniBand collector at `ac83e37`](https://github.com/prometheus/node_exporter/blob/ac83e377f04d53fd2683480337a0283d46204a33/collector/infiniband_linux.go). This is vendor-neutral host telemetry, not a Device Plugin metric contract.
+
+## Exact exposition audit of enabled verified contracts
+
+This section audits every metric currently enabled by a `state: verified`
+record in `telemetryprofiles/catalog.json`. It is stricter than the baseline
+table above: a contract is exact only when its pinned first-party source proves
+the family name, Prometheus `TYPE`, `HELP`, and applicable native label keys.
+
+The `v1alpha2` catalog now stores `help`. This audit checks that each stored
+sentence is the exact exposition text from its pinned source rather than a
+Kasim-authored description. If exact text is not available, omit `HELP` or mark
+the family provisional; do not construct vendor-sounding prose from `semantic`
+and `unit`. A supplied runtime scrape can define an intentional compatibility
+overlay, but it must be identified separately when it conflicts with the
+pinned first-party implementation.
+
+### Audit summary
+
+| Profile currently marked verified | Exact result at the catalog revision | Recommendation |
+| --- | --- | --- |
+| NVIDIA | Nineteen of 20 catalog families match the pinned CSV's names, types, and HELP. `DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL` conflicts: pinned first-party type is gauge, supplied sample type is counter. Core labels also mix the sample's uppercase `Hostname` and XID detail labels with a newer pinned renderer. | Treat the sample-only differences as an explicit compatibility overlay, or change NVLink to gauge and the schema to pinned-source labels before calling the whole profile first-party exact. |
+| AMD | All eight catalog names, gauge types, HELP strings, label keys, and selected `clock_type="system"` value match the pinned source. | May remain verified. |
+| Intel GPU | All seven names, types, HELP strings, required selected-device label keys, and `src="direct"` match the pinned source; additional labels remain conditional. | May remain verified for the selected device-level shape. |
+| Huawei Ascend | All four families, gauge type, HELP strings, and seven labels are exact. | May remain verified. |
+| Cambricon | All five families, gauge type, HELP strings, and family-specific `vf` labels are exact under the official `mlu` prefix. | May remain verified. |
+| Iluvatar | All eight families, gauge types, HELP strings, and base labels are exact; Kubernetes workload labels are conditional. | May remain verified for the base schema. |
+| Enflame | All six names, gauge types, HELP strings, and the health-specific `healthmsg` label are exact. | May remain verified. |
+| Furiosa | All six families, types, HELP strings, required labels, and evidence links are exact. | May remain verified. |
+| RDMA / InfiniBand | All seven families, types, HELP strings, and labels are exact. | May remain verified. |
+
+### NVIDIA DCGM Exporter
+
+Pinned first-party evidence: [`default-counters.csv` at `181290c`](https://github.com/NVIDIA/dcgm-exporter/blob/181290c399d46a9b905e083d0204348be63cb436/etc/default-counters.csv), the [CSV parser](https://github.com/NVIDIA/dcgm-exporter/blob/181290c399d46a9b905e083d0204348be63cb436/internal/pkg/counters/counter_config.go#L168-L187), and the [Prometheus renderer](https://github.com/NVIDIA/dcgm-exporter/blob/181290c399d46a9b905e083d0204348be63cb436/internal/pkg/rendermetrics/render_metrics.go#L192-L227).
+
+| Family | Pinned first-party TYPE | Exact first-party HELP | Catalog/sample verdict |
+| --- | --- | --- | --- |
+| `DCGM_FI_DEV_SM_CLOCK` | gauge | `SM clock frequency (in MHz).` | exact |
+| `DCGM_FI_DEV_MEM_CLOCK` | gauge | `Memory clock frequency (in MHz).` | exact |
+| `DCGM_FI_DEV_MEMORY_TEMP` | gauge | `Memory temperature (in C).` | exact |
+| `DCGM_FI_DEV_GPU_TEMP` | gauge | `GPU temperature (in C).` | exact |
+| `DCGM_FI_DEV_POWER_USAGE` | gauge | `Power draw (in W).` | exact |
+| `DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION` | counter | `Total energy consumption since boot (in mJ).` | exact |
+| `DCGM_FI_DEV_PCIE_REPLAY_COUNTER` | counter | `Total number of PCIe retries.` | exact |
+| `DCGM_FI_DEV_GPU_UTIL` | gauge | `GPU utilization (in %).` | exact |
+| `DCGM_FI_DEV_MEM_COPY_UTIL` | gauge | `Memory utilization (in %).` | exact |
+| `DCGM_FI_DEV_ENC_UTIL` | gauge | `Encoder utilization (in %).` | exact |
+| `DCGM_FI_DEV_DEC_UTIL` | gauge | `Decoder utilization (in %).` | exact |
+| `DCGM_FI_DEV_XID_ERRORS` | gauge | `Value of the last XID error encountered.` | name/type/HELP exact; `err_code` and `err_msg` are sample-only labels |
+| `DCGM_FI_DEV_FB_FREE` | gauge | `Framebuffer memory free (in MiB).` | exact |
+| `DCGM_FI_DEV_FB_USED` | gauge | `Framebuffer memory used (in MiB).` | exact |
+| `DCGM_FI_DEV_FB_RESERVED` | gauge | `Framebuffer memory reserved (in MiB).` | exact |
+| `DCGM_FI_DEV_UNCORRECTABLE_REMAPPED_ROWS` | counter | `Number of remapped rows for uncorrectable errors` | exact |
+| `DCGM_FI_DEV_CORRECTABLE_REMAPPED_ROWS` | counter | `Number of remapped rows for correctable errors` | exact |
+| `DCGM_FI_DEV_ROW_REMAP_FAILURE` | gauge | `Whether remapping of rows has failed` | exact |
+| `DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL` | **gauge** | `Total number of NVLink bandwidth counters for all lanes.` | conflict: supplied sample and catalog declare counter |
+| `DCGM_FI_DEV_VGPU_LICENSE_STATUS` | gauge | `vGPU License status` | exact |
+
+The pinned [GPU label renderer](https://github.com/NVIDIA/dcgm-exporter/blob/181290c399d46a9b905e083d0204348be63cb436/internal/pkg/rendermetrics/render_metrics.go#L308-L352)
+uses core labels `gpu`, normally `UUID`, `pci_bus_id`, `device`, and
+`modelName`, plus optional lowercase `hostname`. Kubernetes enrichment can add
+`pod`, `namespace`, and `container`; MIG can add `GPU_I_PROFILE` and `GPU_I_ID`;
+configured label fields such as `DCGM_FI_DRIVER_VERSION` can add further keys.
+The catalog includes `pci_bus_id` but uses the supplied sample's uppercase
+`Hostname`, which does not match this pinned revision. NVIDIA changed the native
+key to lowercase in
+[`d5e5f510`](https://github.com/NVIDIA/dcgm-exporter/commit/d5e5f510a1b6b393f39a43293ccd9dc985defc79),
+an ancestor of `181290c`.
+
+The supplied compatibility scrape is preserved as
+[`internal/telemetry/testdata/dcgm-exporter-runtime.prom`](../../internal/telemetry/testdata/dcgm-exporter-runtime.prom).
+It proves the intended sample contract, including uppercase `Hostname`,
+`DCGM_FI_DRIVER_VERSION`, and XID-only `err_code`/`err_msg`. It does **not** turn
+those keys into first-party facts for `181290c`. It also declares
+`DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL` as counter while the pinned first-party CSV
+declares gauge. Kasim must label this as a sample-compatibility overlay or choose
+one source of truth; it cannot describe both schemas as one exact exporter
+revision.
+
+### AMD Device Metrics Exporter
+
+Pinned first-party evidence: [gauge declarations at `4642bb4`](https://github.com/ROCm/device-metrics-exporter/blob/4642bb460926b531cefed17b5ad997be81b891f2/pkg/amdgpu/gpuagent/gpuagent_gpu_metrics.go#L779-L945) and [label configuration](https://github.com/ROCm/device-metrics-exporter/blob/4642bb460926b531cefed17b5ad997be81b891f2/docs/configuration/configmap.md).
+
+| Catalog family | TYPE | Exact first-party HELP | Verdict |
+| --- | --- | --- | --- |
+| `gpu_gfx_activity` | gauge | `Graphics engine usage in Percentage (0-100)` | exact |
+| `gpu_umc_activity` | gauge | `Memory engine usage in Percentage (0-100)` | exact |
+| `gpu_used_vram` | gauge | `Used VRAM memory of the GPU (in MB)` | exact |
+| `gpu_total_vram` | gauge | `Total VRAM memory of the GPU (in MB)` | exact |
+| `gpu_free_vram` | gauge | `Free VRAM memory of the GPU (in MB)` | exact |
+| `gpu_power_usage` | gauge | `GPU Power usage in Watts` | exact |
+| `gpu_edge_temperature` | gauge | `Current edge temperature in Celsius` | exact |
+| `gpu_clock` | gauge | `List of current GPU clock frequencies in MHz` | exact, including `clock_index` and selected `clock_type="system"` |
+
+The pinned exporter adds `clock_index` and `clock_type` to `gpu_clock`.
+Documented `clock_type` values are lowercase `data`, `system`, `memory`,
+`video`, and `soc`; the catalog selects the supported `system` value.
+
+The exact default mandatory label set, lowercased at exposition, is
+`gpu_id`, `card_model`, `gpu_partition_id`,
+`gpu_compute_partition_type`, `gpu_memory_partition_type`, `deployment_mode`,
+`serial_number`, `pod`, `namespace`, `container`, `job_id`, `job_user`,
+`job_partition`, and `hostname`. The catalog now contains this mandatory set.
+Optional `gpu_uuid`, `pod_uuid`, process, custom, and extra Pod labels can add
+keys. `MetricsFieldPrefix` can also change every metric name, so the unprefixed
+names are exact only for an empty prefix.
+
+### Intel XPU Manager
+
+Pinned first-party evidence: [metric declarations at `57e44f5`](https://github.com/intel/xpumanager/blob/57e44f558a3c3f4e7ec3cdfae6ccd8739ffb3be5/rest/prometheus_exporter/prometheus_exporter_types.py) and the [exporter label/type implementation](https://github.com/intel/xpumanager/blob/57e44f558a3c3f4e7ec3cdfae6ccd8739ffb3be5/rest/prometheus_exporter/prometheus_exporter.py#L335-L479).
+
+| Family | TYPE | Exact first-party HELP | Family labels beyond common labels |
+| --- | --- | --- | --- |
+| `xpum_engine_group_ratio` | gauge | `Avg utilization of engine group (in %), per GPU tile` | `type` |
+| `xpum_memory_used_bytes` | gauge | `Used GPU memory (in bytes), per GPU tile` | none |
+| `xpum_memory_ratio` | gauge | `Used GPU memory / Total used GPU memory (in %), per GPU tile` | none |
+| `xpum_power_watts` | gauge | `Avg GPU power (in watts), per GPU and per card` | none |
+| `xpum_temperature_celsius` | gauge | `Avg GPU temperature (in Celsius degree), per tile` | `location` |
+| `xpum_frequency_mhz` | gauge | `Avg (GPU) frequency (in MHz), per GPU tile` | `location`, `type` |
+| `xpum_energy_joules` | counter | `Total GPU energy consumption since boot (in Joules), per GPU` | none |
+
+Common labels are `uuid`, `dev_name`, `pci_dev`, `vendor`, and `pci_bdf`, with
+conditional `dev_file`, `node`, `kube_pod`, `kube_namespace`,
+`kube_container`, `sub_dev`, and `card`. The exporter also appends `src` to
+every selected family. The catalog now contains the base keys, `src`, and the
+family-specific `type`/`location` keys; omitting conditional keys is faithful
+for a device-level sample when their runtime conditions are absent. The catalog
+uses the source-supported `src="direct"`; aggregated samples would instead use
+the actual aggregation-function name. The source scales percentage inputs by
+`0.01`; consequently the
+`*_ratio` sample is a ratio even though the original HELP text says `%`.
+
+### Huawei Ascend npu-exporter
+
+Pinned first-party evidence: the [four descriptors at `97641a5`](https://gitee.com/ascend/mind-cluster/blob/97641a5566914158b9c0eb227c05a223d275e68d/component/npu-exporter/collector/metrics/collector_for_npu.go#L43-L51), [common label descriptor](https://gitee.com/ascend/mind-cluster/blob/97641a5566914158b9c0eb227c05a223d275e68d/component/npu-exporter/collector/common/metrics_collector.go#L30-L53), and [common gauge emission](https://gitee.com/ascend/mind-cluster/blob/97641a5566914158b9c0eb227c05a223d275e68d/component/npu-exporter/collector/metrics/common_utils.go#L70-L105).
+
+| Family | TYPE | Exact first-party HELP |
+| --- | --- | --- |
+| `npu_chip_info_utilization` | gauge | `the ai core utilization` |
+| `npu_chip_info_temperature` | gauge | `the npu temperature` |
+| `npu_chip_info_power` | gauge | `the npu power` |
+| `npu_chip_info_aicore_current_freq` | gauge | `the npu ai core current frequency, unit is 'MHz'` |
+
+All four use exactly `id`, `model_name`, `vdie_id`, `pcie_bus_info`,
+`namespace`, `pod_name`, and `container_name`. The catalog matches this schema.
+
+### Cambricon mlu-exporter
+
+Pinned first-party evidence: [metric configuration at `613459d`](https://github.com/Cambricon/mlu-exporter/blob/613459d6b730cad3caf4c08aa3dcf28f523bf1c1/examples/metrics.yaml), [descriptor/prefix construction](https://github.com/Cambricon/mlu-exporter/blob/613459d6b730cad3caf4c08aa3dcf28f523bf1c1/pkg/metrics/metrics.go#L45-L68), [gauge emission](https://github.com/Cambricon/mlu-exporter/blob/613459d6b730cad3caf4c08aa3dcf28f523bf1c1/pkg/collector/cndev.go), and the official [Kubernetes prefix argument](https://github.com/Cambricon/mlu-exporter/blob/613459d6b730cad3caf4c08aa3dcf28f523bf1c1/depolys/helm/mlu-exporter/values.yaml#L61).
+
+| Family with official `mlu` prefix | TYPE | Exact first-party HELP | Native labels |
+| --- | --- | --- | --- |
+| `mlu_utilization` | gauge | `The utilization of Cambricon MLU, unit is '%'` | common plus `vf` |
+| `mlu_memory_used` | gauge | `The used physical memory of Cambricon MLU, unit is 'B'` | common |
+| `mlu_memory_total` | gauge | `The total physical memory of Cambricon MLU, unit is 'B'` | common |
+| `mlu_power_usage` | gauge | `The power usage of Cambricon MLU, unit is 'w'` | common plus `vf` |
+| `mlu_temperature` | gauge | `The board temperature of Cambricon MLU, unit is 'celsius'` | common |
+
+The common label set is `driver`, `mcu`, `mlu`, `model`, `node`, `node_ip`,
+`sn`, `type`, and `uuid`. The catalog matches it and now adds `vf` to
+utilization and power. Metric names and labels are configuration-driven; the
+bare executable has no fixed prefix, while the official Kubernetes deployment
+uses `mlu`.
+
+### Iluvatar / DeepSpark ix-exporter
+
+Pinned first-party evidence: [`metrics.yaml` at `7f169d7`](https://gitee.com/deep-spark/ix-exporter/blob/7f169d7f1c0b66cc809ecba28f6d520e8f28ff2c/etc/metrics.yaml) and [gauge emission](https://gitee.com/deep-spark/ix-exporter/blob/7f169d7f1c0b66cc809ecba28f6d520e8f28ff2c/pkg/collector/collector.go#L78-L122).
+
+| Catalog family | TYPE | Exact first-party HELP | Verdict |
+| --- | --- | --- | --- |
+| `ix_gpu_utilization` | gauge | `Utilization of iluvatar GPU (%).` | exact |
+| `ix_mem_total` | gauge | `Total physical memory of iluvatar GPU (MiB).` | exact |
+| `ix_mem_used` | gauge | `Used physical memory of iluvatar GPU (MiB).` | exact |
+| `ix_mem_free` | gauge | `Free physical memory of iluvatar GPU (MiB).` | exact |
+| `ix_power_usage` | gauge | `Power usage of iluvatar GPU (W).` | exact |
+| `ix_gpu_temperature` | gauge | `GPU temperature of iluvatar GPU (C).` | exact |
+| `ix_sm_clock` | gauge | `Sm clock of iluvatar GPU (MHz).` | exact |
+| `ix_mem_clock` | gauge | `Mem clock of iluvatar GPU (MHz).` | exact |
+
+Base labels are exactly `name`, `gpu`, `uuid`, `driver`, `ixml`, `serial`, and
+`node_name`. When Kubernetes enrichment is enabled, the same configuration adds
+`namespace`, `pod`, and `container`. The catalog accurately represents the base
+set; omission of conditional Kubernetes keys is exact when that enrichment is
+disabled.
+
+### Enflame gcu-exporter
+
+Pinned first-party evidence: the per-family collectors at `0e6e15c` for
+[`usage`](https://github.com/EnflameTechnology/gcu-exporter/blob/0e6e15c9cb8034e85b70959cc30f702ac56114ed/collector/gcu_usage.go),
+[`memory used`](https://github.com/EnflameTechnology/gcu-exporter/blob/0e6e15c9cb8034e85b70959cc30f702ac56114ed/collector/gcu_memory_used_bytes.go),
+[`memory total`](https://github.com/EnflameTechnology/gcu-exporter/blob/0e6e15c9cb8034e85b70959cc30f702ac56114ed/collector/gcu_memory_total_bytes.go),
+[`power`](https://github.com/EnflameTechnology/gcu-exporter/blob/0e6e15c9cb8034e85b70959cc30f702ac56114ed/collector/gcu_power_usage.go),
+[`temperature`](https://github.com/EnflameTechnology/gcu-exporter/blob/0e6e15c9cb8034e85b70959cc30f702ac56114ed/collector/gcu_tempertures.go), and
+[`health`](https://github.com/EnflameTechnology/gcu-exporter/blob/0e6e15c9cb8034e85b70959cc30f702ac56114ed/collector/gcu_health.go).
+
+| Family | TYPE | Exact first-party HELP | Native labels |
+| --- | --- | --- | --- |
+| `enflame_gcu_usage` | gauge | `Gcu usage as reported by the device, -1 means not supported` | common |
+| `enflame_gcu_memory_used_bytes` | gauge | `Memory used size as reported by the device` | common |
+| `enflame_gcu_memory_total_bytes` | gauge | `Total memory size as reorted by the device` | common; preserve the source typo if exact HELP is required |
+| `enflame_gcu_power_usage` | gauge | `Power usage as reported by the device, -1 means not supported` | common |
+| `enflame_gcu_temperatures` | gauge | `Temperature as reported by the device, -1 means not supported` | common |
+| `enflame_gcu_health` | gauge | `Gcu health as reported by the device (2:healthy,1:unhealthy,0:unknown)` | common plus `healthmsg` |
+
+Common labels are exactly `host`, `minor_number`, `uuid`, `busid`, `slot`,
+`name`, `pod_name`, `pod_namespace`, and `container_name`. The catalog matches
+them and now includes the health-only `healthmsg`. Its evidence points to the
+pinned first-party `collector` tree containing the individual sources above.
+
+### Furiosa metrics exporter
+
+Pinned first-party evidence: the `e24b600` collectors for
+[`alive`](https://github.com/furiosa-ai/furiosa-metrics-exporter/blob/e24b60086ea42d81ebf92adbabd5f595ac4ecdab/internal/collector/liveness.go),
+[`utilization`](https://github.com/furiosa-ai/furiosa-metrics-exporter/blob/e24b60086ea42d81ebf92adbabd5f595ac4ecdab/internal/collector/core_utilization.go),
+[`frequency`](https://github.com/furiosa-ai/furiosa-metrics-exporter/blob/e24b60086ea42d81ebf92adbabd5f595ac4ecdab/internal/collector/frequency.go),
+[`memory`](https://github.com/furiosa-ai/furiosa-metrics-exporter/blob/e24b60086ea42d81ebf92adbabd5f595ac4ecdab/internal/collector/memory.go), and
+[`cycles`](https://github.com/furiosa-ai/furiosa-metrics-exporter/blob/e24b60086ea42d81ebf92adbabd5f595ac4ecdab/internal/collector/cycle.go), plus its [label filter](https://github.com/furiosa-ai/furiosa-metrics-exporter/blob/e24b60086ea42d81ebf92adbabd5f595ac4ecdab/internal/collector/label_filter_collector.go).
+
+| Family | TYPE | Exact first-party HELP |
+| --- | --- | --- |
+| `furiosa_npu_alive` | gauge | `The liveness of NPU device` |
+| `furiosa_npu_core_utilization` | gauge | `The current core utilization of NPU device` |
+| `furiosa_npu_core_frequency` | gauge | `The current core frequency of NPU device (MHz)` |
+| `furiosa_npu_dram_total` | gauge | `The total dram of NPU device (Bytes)` |
+| `furiosa_npu_dram_usage` | gauge | `The current used dram of NPU device (Bytes)` |
+| `furiosa_npu_total_cycle_count` | counter | `The current total cycle count of NPU device` |
+
+Required non-empty labels are `arch`, `core`, `device`, `uuid`, `pci_bus_id`,
+`firmware_version`, and `driver_version`, matching the catalog. The exporter can
+also populate `hostname`, `namespace`, `pod`, and `container`; its label filter
+omits those keys when their values are empty. The catalog now cites the pinned
+[`README.rst`](https://github.com/furiosa-ai/furiosa-metrics-exporter/blob/e24b60086ea42d81ebf92adbabd5f595ac4ecdab/README.rst).
+
+### Prometheus node_exporter InfiniBand collector
+
+Pinned first-party evidence: the [descriptor map and emission code at `ac83e37`](https://github.com/prometheus/node_exporter/blob/ac83e377f04d53fd2683480337a0283d46204a33/collector/infiniband_linux.go#L50-L225).
+
+| Family | TYPE | Exact first-party HELP | Labels |
+| --- | --- | --- | --- |
+| `node_infiniband_port_data_received_bytes_total` | counter | `Number of data octets received on all links` | `device`, `port` |
+| `node_infiniband_port_data_transmitted_bytes_total` | counter | `Number of data octets transmitted on all links` | `device`, `port` |
+| `node_infiniband_port_packets_received_total` | counter | `Number of packets received on all VLs by this port (including errors)` | `device`, `port` |
+| `node_infiniband_port_packets_transmitted_total` | counter | `Number of packets transmitted on all VLs from this port (including errors)` | `device`, `port` |
+| `node_infiniband_rate_bytes_per_second` | gauge | `Maximum signal transfer rate` | `device`, `port` |
+| `node_infiniband_state_id` | gauge | `State of the InfiniBand port (0: no change, 1: down, 2: init, 3: armed, 4: active, 5: act defer)` | `device`, `port` |
+| `node_infiniband_physical_state_id` | gauge | `Physical state of the InfiniBand port (0: no change, 1: sleep, 2: polling, 3: disable, 4: shift, 5: link up, 6: link error recover, 7: phytest)` | `device`, `port` |
+
+All seven catalog declarations match the pinned upstream collector. This
+profile remains vendor-neutral host telemetry rather than an RDMA Device Plugin
+metric namespace.
 
 ## First-party names that remain provisional
 

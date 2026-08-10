@@ -93,8 +93,9 @@ cleanup.
 ## Deliberate fidelity boundary
 
 The simulator writes Kubernetes control-plane objects and can generate
-source-backed Prometheus schemas with explicit `kasim_simulated="true"`
-values. It does not provide device access, execute accelerator compute,
+source-backed Prometheus schemas. Vendor families keep their original labels;
+separate `kasim_telemetry_*` diagnostics identify the generated source. It does
+not provide device access, execute accelerator compute,
 install vendor drivers, observe or reproduce physical vendor telemetry,
 simulate NUMA topology, or inject CDI devices. It also does not claim CUDA,
 ROCm, CANN, firmware, device-file, collective-communication, or Pod runtime
@@ -125,12 +126,12 @@ fidelity claim.
 
 ## Published packages
 
-The evidence-gated `v0.4.1` release publishes native CLI archives as GitHub
+The evidence-gated `v0.5.0` release publishes native CLI archives as GitHub
 Release assets and publishes both runtime artifacts through GitHub Packages:
 
 ```sh
-docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.4.1
-helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.4.1
+docker pull ghcr.io/linkmaq/kube-accelerator-sim-controller:0.5.0
+helm pull oci://ghcr.io/linkmaq/charts/kasim-runtime --version 0.5.0
 ```
 
 Use the chart directly from its OCI package:
@@ -138,7 +139,7 @@ Use the chart directly from its OCI package:
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.4.1 \
+  --version 0.5.0 \
   --kubeconfig ./target.kubeconfig \
   --kube-context target \
   --namespace kasim-system \
@@ -147,7 +148,7 @@ helm upgrade --install kasim-runtime \
 ```
 
 Download and verify the appropriate CLI archive and checksums from the
-[`v0.4.1` release](https://github.com/LinkMaq/kube-accelerator-sim/releases/tag/v0.4.1).
+[`v0.5.0` release](https://github.com/LinkMaq/kube-accelerator-sim/releases/tag/v0.5.0).
 The verification steps are documented in
 [Release verification](docs/operators/release-verification.md).
 

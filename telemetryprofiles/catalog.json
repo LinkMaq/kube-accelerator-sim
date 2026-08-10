@@ -1,37 +1,59 @@
 {
-  "schemaVersion": "v1alpha1",
-  "revision": "2026-08-07",
+  "schemaVersion": "v1alpha2",
+  "revision": "2026-08-10",
   "profiles": [
     {
       "id": "nvidia",
       "displayName": "NVIDIA",
       "state": "verified",
       "exporter": "NVIDIA DCGM Exporter",
-      "evidence": [{"source": "https://github.com/NVIDIA/dcgm-exporter/blob/181290c399d46a9b905e083d0204348be63cb436/etc/default-counters.csv", "revision": "181290c399d46a9b905e083d0204348be63cb436", "checkedAt": "2026-08-07"}],
+      "evidence": [
+        {"source": "https://github.com/NVIDIA/dcgm-exporter/blob/181290c399d46a9b905e083d0204348be63cb436/etc/default-counters.csv", "revision": "181290c399d46a9b905e083d0204348be63cb436", "checkedAt": "2026-08-10"},
+        {"source": "internal/telemetry/testdata/dcgm-exporter-runtime.prom", "revision": "user-supplied-2026-08-10", "checkedAt": "2026-08-10"}
+      ],
       "defaults": {"memoryMiB": 81920, "idlePowerW": 65, "maxPowerW": 700, "idleTempC": 31, "maxTempC": 84, "coreClockMHz": 1830, "memoryClockMHz": 3200},
       "models": [
-        {"id": "nvidia-a100-40gb", "memoryMiB": 40960}, {"id": "nvidia-a100-80gb", "memoryMiB": 81920},
-        {"id": "nvidia-h100", "memoryMiB": 81920}, {"id": "nvidia-h200", "memoryMiB": 144384},
-        {"id": "nvidia-l40s", "memoryMiB": 49152}, {"id": "nvidia-b200", "memoryMiB": 184320},
-        {"id": "nvidia-b300", "memoryMiB": 294912}, {"id": "nvidia-a800", "memoryMiB": 81920},
-        {"id": "nvidia-h800", "memoryMiB": 81920}, {"id": "nvidia-h20", "memoryMiB": 98304}
+        {"id": "nvidia-a100-40gb", "nativeName": "NVIDIA A100 40GB PCIe", "memoryMiB": 40960},
+        {"id": "nvidia-a100-80gb", "nativeName": "NVIDIA A100-SXM4-80GB", "memoryMiB": 81920},
+        {"id": "nvidia-h100", "nativeName": "NVIDIA H100 80GB HBM3", "memoryMiB": 81920},
+        {"id": "nvidia-h200", "nativeName": "NVIDIA H200", "memoryMiB": 144384},
+        {"id": "nvidia-l40s", "nativeName": "NVIDIA L40S", "memoryMiB": 49152},
+        {"id": "nvidia-b200", "nativeName": "NVIDIA B200", "memoryMiB": 184320},
+        {"id": "nvidia-b300", "nativeName": "NVIDIA B300", "memoryMiB": 294912},
+        {"id": "nvidia-a800", "nativeName": "NVIDIA A800 80GB PCIe", "memoryMiB": 81920},
+        {"id": "nvidia-h800", "nativeName": "NVIDIA H800", "memoryMiB": 81920},
+        {"id": "nvidia-h20", "nativeName": "NVIDIA H20", "memoryMiB": 98304}
       ],
       "deviceLabels": [
-        {"name": "gpu", "valueFrom": "device-index"}, {"name": "UUID", "valueFrom": "device-uuid"},
-        {"name": "device", "valueFrom": "device-name"}, {"name": "modelName", "valueFrom": "model-name"},
-        {"name": "Hostname", "valueFrom": "node-name"}
+        {"name": "gpu", "valueFrom": "device-index"},
+        {"name": "UUID", "valueFrom": "device-uuid", "prefix": "GPU-"},
+        {"name": "pci_bus_id", "valueFrom": "pci-bdf-domain8"},
+        {"name": "device", "valueFrom": "device-name", "prefix": "nvidia"},
+        {"name": "modelName", "valueFrom": "model-name"},
+        {"name": "Hostname", "valueFrom": "node-name"},
+        {"name": "DCGM_FI_DRIVER_VERSION", "valueFrom": "fixed", "value": "580.126.16"}
       ],
       "metricFamilies": [
-        {"name": "DCGM_FI_DEV_GPU_UTIL", "type": "gauge", "semantic": "utilization", "unit": "percent"},
-        {"name": "DCGM_FI_DEV_FB_USED", "type": "gauge", "semantic": "memory-used", "unit": "MiB"},
-        {"name": "DCGM_FI_DEV_FB_FREE", "type": "gauge", "semantic": "memory-free", "unit": "MiB"},
-        {"name": "DCGM_FI_DEV_GPU_TEMP", "type": "gauge", "semantic": "temperature", "unit": "Celsius"},
-        {"name": "DCGM_FI_DEV_POWER_USAGE", "type": "gauge", "semantic": "power", "unit": "watts"},
-        {"name": "DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION", "type": "counter", "semantic": "energy", "unit": "millijoules"},
-        {"name": "DCGM_FI_DEV_SM_CLOCK", "type": "gauge", "semantic": "clock-core", "unit": "MHz"},
-        {"name": "DCGM_FI_DEV_MEM_CLOCK", "type": "gauge", "semantic": "clock-memory", "unit": "MHz"},
-        {"name": "DCGM_FI_PROF_PCIE_RX_BYTES", "type": "gauge", "semantic": "throughput-rx", "unit": "bytes/second"},
-        {"name": "DCGM_FI_PROF_PCIE_TX_BYTES", "type": "gauge", "semantic": "throughput-tx", "unit": "bytes/second"}
+        {"name": "DCGM_FI_DEV_SM_CLOCK", "type": "gauge", "help": "SM clock frequency (in MHz).", "semantic": "clock-core", "unit": "MHz"},
+        {"name": "DCGM_FI_DEV_MEM_CLOCK", "type": "gauge", "help": "Memory clock frequency (in MHz).", "semantic": "clock-memory", "unit": "MHz"},
+        {"name": "DCGM_FI_DEV_MEMORY_TEMP", "type": "gauge", "help": "Memory temperature (in C).", "semantic": "temperature", "unit": "Celsius"},
+        {"name": "DCGM_FI_DEV_GPU_TEMP", "type": "gauge", "help": "GPU temperature (in C).", "semantic": "temperature", "unit": "Celsius"},
+        {"name": "DCGM_FI_DEV_POWER_USAGE", "type": "gauge", "help": "Power draw (in W).", "semantic": "power", "unit": "watts"},
+        {"name": "DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION", "type": "counter", "help": "Total energy consumption since boot (in mJ).", "semantic": "energy", "unit": "millijoules"},
+        {"name": "DCGM_FI_DEV_PCIE_REPLAY_COUNTER", "type": "counter", "help": "Total number of PCIe retries.", "semantic": "constant-zero", "unit": "count"},
+        {"name": "DCGM_FI_DEV_GPU_UTIL", "type": "gauge", "help": "GPU utilization (in %).", "semantic": "utilization", "unit": "percent"},
+        {"name": "DCGM_FI_DEV_MEM_COPY_UTIL", "type": "gauge", "help": "Memory utilization (in %).", "semantic": "utilization", "unit": "percent"},
+        {"name": "DCGM_FI_DEV_ENC_UTIL", "type": "gauge", "help": "Encoder utilization (in %).", "semantic": "utilization-sparse", "unit": "percent"},
+        {"name": "DCGM_FI_DEV_DEC_UTIL", "type": "gauge", "help": "Decoder utilization (in %).", "semantic": "utilization-sparse", "unit": "percent"},
+        {"name": "DCGM_FI_DEV_XID_ERRORS", "type": "gauge", "help": "Value of the last XID error encountered.", "semantic": "last-error", "unit": "code", "labels": [{"name": "err_code", "valueFrom": "health-error-code"}, {"name": "err_msg", "valueFrom": "health-error-message"}]},
+        {"name": "DCGM_FI_DEV_FB_FREE", "type": "gauge", "help": "Framebuffer memory free (in MiB).", "semantic": "memory-free-reserved", "unit": "MiB"},
+        {"name": "DCGM_FI_DEV_FB_USED", "type": "gauge", "help": "Framebuffer memory used (in MiB).", "semantic": "memory-used", "unit": "MiB"},
+        {"name": "DCGM_FI_DEV_FB_RESERVED", "type": "gauge", "help": "Framebuffer memory reserved (in MiB).", "semantic": "memory-reserved", "unit": "MiB"},
+        {"name": "DCGM_FI_DEV_UNCORRECTABLE_REMAPPED_ROWS", "type": "counter", "help": "Number of remapped rows for uncorrectable errors", "semantic": "constant-zero", "unit": "count"},
+        {"name": "DCGM_FI_DEV_CORRECTABLE_REMAPPED_ROWS", "type": "counter", "help": "Number of remapped rows for correctable errors", "semantic": "constant-zero", "unit": "count"},
+        {"name": "DCGM_FI_DEV_ROW_REMAP_FAILURE", "type": "gauge", "help": "Whether remapping of rows has failed", "semantic": "constant-zero", "unit": "state"},
+        {"name": "DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL", "type": "counter", "help": "Total number of NVLink bandwidth counters for all lanes.", "semantic": "constant-zero", "unit": "count"},
+        {"name": "DCGM_FI_DEV_VGPU_LICENSE_STATUS", "type": "gauge", "help": "vGPU License status", "semantic": "constant-zero", "unit": "state"}
       ]
     },
     {
@@ -39,10 +61,13 @@
       "evidence": [{"source": "https://github.com/ROCm/device-metrics-exporter/blob/4642bb460926b531cefed17b5ad997be81b891f2/docs/configuration/metricslist.md", "revision": "4642bb460926b531cefed17b5ad997be81b891f2", "checkedAt": "2026-08-07"}],
       "defaults": {"memoryMiB": 196608, "idlePowerW": 70, "maxPowerW": 1000, "idleTempC": 32, "maxTempC": 90, "coreClockMHz": 2100, "memoryClockMHz": 1300},
       "models": [
-        {"id": "amd-mi210", "memoryMiB": 65536}, {"id": "amd-mi250x", "memoryMiB": 131072},
-        {"id": "amd-mi300a", "memoryMiB": 131072}, {"id": "amd-mi300x", "memoryMiB": 196608},
-        {"id": "amd-mi325x", "memoryMiB": 262144}, {"id": "amd-mi350x", "memoryMiB": 294912},
-        {"id": "amd-mi355x", "memoryMiB": 294912}
+        {"id": "amd-mi210", "nativeName": "AMD Instinct MI210", "memoryMiB": 65536},
+        {"id": "amd-mi250x", "nativeName": "AMD Instinct MI250X", "memoryMiB": 131072},
+        {"id": "amd-mi300a", "nativeName": "AMD Instinct MI300A", "memoryMiB": 131072},
+        {"id": "amd-mi300x", "nativeName": "AMD Instinct MI300X", "memoryMiB": 196608},
+        {"id": "amd-mi325x", "nativeName": "AMD Instinct MI325X", "memoryMiB": 262144},
+        {"id": "amd-mi350x", "nativeName": "AMD Instinct MI350X", "memoryMiB": 294912},
+        {"id": "amd-mi355x", "nativeName": "AMD Instinct MI355X", "memoryMiB": 294912}
       ],
       "deviceLabels": [
         {"name": "gpu_id", "valueFrom": "device-index"}, {"name": "card_model", "valueFrom": "model-name"},
@@ -50,18 +75,21 @@
         {"name": "gpu_compute_partition_type", "valueFrom": "fixed", "value": "SPX"},
         {"name": "gpu_memory_partition_type", "valueFrom": "fixed", "value": "NPS1"},
         {"name": "deployment_mode", "valueFrom": "fixed", "value": "baremetal"},
-        {"name": "serial_number", "valueFrom": "serial"}, {"name": "hostname", "valueFrom": "node-name"}
+        {"name": "serial_number", "valueFrom": "serial", "prefix": "AMD"},
+        {"name": "pod", "valueFrom": "empty"}, {"name": "namespace", "valueFrom": "empty"},
+        {"name": "container", "valueFrom": "empty"}, {"name": "job_id", "valueFrom": "empty"},
+        {"name": "job_user", "valueFrom": "empty"}, {"name": "job_partition", "valueFrom": "empty"},
+        {"name": "hostname", "valueFrom": "node-name"}
       ],
       "metricFamilies": [
-        {"name": "gpu_gfx_activity", "type": "gauge", "semantic": "utilization", "unit": "percent"},
-        {"name": "gpu_umc_activity", "type": "gauge", "semantic": "utilization", "unit": "percent"},
-        {"name": "gpu_used_vram", "type": "gauge", "semantic": "memory-used", "unit": "MB"},
-        {"name": "gpu_total_vram", "type": "gauge", "semantic": "memory-total", "unit": "MB"},
-        {"name": "gpu_free_vram", "type": "gauge", "semantic": "memory-free", "unit": "MB"},
-        {"name": "gpu_power_usage", "type": "gauge", "semantic": "power", "unit": "watts"},
-        {"name": "gpu_temperature", "type": "gauge", "semantic": "temperature", "unit": "Celsius"},
-        {"name": "gpu_gfx_clock", "type": "gauge", "semantic": "clock-core", "unit": "MHz"},
-        {"name": "gpu_memory_clock", "type": "gauge", "semantic": "clock-memory", "unit": "MHz"}
+        {"name": "gpu_gfx_activity", "type": "gauge", "help": "Graphics engine usage in Percentage (0-100)", "semantic": "utilization", "unit": "percent"},
+        {"name": "gpu_umc_activity", "type": "gauge", "help": "Memory engine usage in Percentage (0-100)", "semantic": "utilization", "unit": "percent"},
+        {"name": "gpu_used_vram", "type": "gauge", "help": "Used VRAM memory of the GPU (in MB)", "semantic": "memory-used", "unit": "MB"},
+        {"name": "gpu_total_vram", "type": "gauge", "help": "Total VRAM memory of the GPU (in MB)", "semantic": "memory-total", "unit": "MB"},
+        {"name": "gpu_free_vram", "type": "gauge", "help": "Free VRAM memory of the GPU (in MB)", "semantic": "memory-free", "unit": "MB"},
+        {"name": "gpu_power_usage", "type": "gauge", "help": "GPU Power usage in Watts", "semantic": "power", "unit": "watts"},
+        {"name": "gpu_edge_temperature", "type": "gauge", "help": "Current edge temperature in Celsius", "semantic": "temperature", "unit": "Celsius"},
+        {"name": "gpu_clock", "type": "gauge", "help": "List of current GPU clock frequencies in MHz", "semantic": "clock-core", "unit": "MHz", "labels": [{"name": "clock_index", "valueFrom": "fixed", "value": "0"}, {"name": "clock_type", "valueFrom": "fixed", "value": "system"}]}
       ]
     },
     {
@@ -69,23 +97,25 @@
       "evidence": [{"source": "https://github.com/intel/xpumanager/blob/57e44f558a3c3f4e7ec3cdfae6ccd8739ffb3be5/doc/Prometheus_Exported_Metrics.csv", "revision": "57e44f558a3c3f4e7ec3cdfae6ccd8739ffb3be5", "checkedAt": "2026-08-07"}],
       "defaults": {"memoryMiB": 49152, "idlePowerW": 45, "maxPowerW": 600, "idleTempC": 30, "maxTempC": 85, "coreClockMHz": 1600, "memoryClockMHz": 1200},
       "models": [
-        {"id": "intel-flex-140", "memoryMiB": 12288}, {"id": "intel-flex-170", "memoryMiB": 16384},
-        {"id": "intel-flex-170v", "memoryMiB": 16384}, {"id": "intel-max-1100", "memoryMiB": 49152},
-        {"id": "intel-max-1550", "memoryMiB": 131072}
+        {"id": "intel-flex-140", "nativeName": "Intel Data Center GPU Flex 140", "memoryMiB": 12288},
+        {"id": "intel-flex-170", "nativeName": "Intel Data Center GPU Flex 170", "memoryMiB": 16384},
+        {"id": "intel-flex-170v", "nativeName": "Intel Data Center GPU Flex 170V", "memoryMiB": 16384},
+        {"id": "intel-max-1100", "nativeName": "Intel Data Center GPU Max 1100", "memoryMiB": 49152},
+        {"id": "intel-max-1550", "nativeName": "Intel Data Center GPU Max 1550", "memoryMiB": 131072}
       ],
       "deviceLabels": [
-        {"name": "uuid", "valueFrom": "device-uuid"}, {"name": "dev_name", "valueFrom": "device-name"},
+        {"name": "uuid", "valueFrom": "device-uuid"}, {"name": "dev_name", "valueFrom": "device-name", "prefix": "card"},
         {"name": "pci_dev", "valueFrom": "pci-bdf"}, {"name": "vendor", "valueFrom": "profile-name"},
-        {"name": "pci_bdf", "valueFrom": "pci-bdf"}
+        {"name": "pci_bdf", "valueFrom": "pci-bdf"}, {"name": "src", "valueFrom": "fixed", "value": "direct"}
       ],
       "metricFamilies": [
-        {"name": "xpum_engine_group_ratio", "type": "gauge", "semantic": "utilization-ratio", "unit": "ratio"},
-        {"name": "xpum_memory_used_bytes", "type": "gauge", "semantic": "memory-used", "unit": "bytes"},
-        {"name": "xpum_memory_ratio", "type": "gauge", "semantic": "memory-ratio", "unit": "ratio"},
-        {"name": "xpum_power_watts", "type": "gauge", "semantic": "power", "unit": "watts"},
-        {"name": "xpum_temperature_celsius", "type": "gauge", "semantic": "temperature", "unit": "Celsius"},
-        {"name": "xpum_frequency_mhz", "type": "gauge", "semantic": "clock-core", "unit": "MHz"},
-        {"name": "xpum_energy_joules", "type": "counter", "semantic": "energy", "unit": "joules"}
+        {"name": "xpum_engine_group_ratio", "type": "gauge", "help": "Avg utilization of engine group (in %), per GPU tile", "semantic": "utilization-ratio", "unit": "ratio", "labels": [{"name": "type", "valueFrom": "fixed", "value": "compute"}]},
+        {"name": "xpum_memory_used_bytes", "type": "gauge", "help": "Used GPU memory (in bytes), per GPU tile", "semantic": "memory-used", "unit": "bytes"},
+        {"name": "xpum_memory_ratio", "type": "gauge", "help": "Used GPU memory / Total used GPU memory (in %), per GPU tile", "semantic": "memory-ratio", "unit": "ratio"},
+        {"name": "xpum_power_watts", "type": "gauge", "help": "Avg GPU power (in watts), per GPU and per card", "semantic": "power", "unit": "watts"},
+        {"name": "xpum_temperature_celsius", "type": "gauge", "help": "Avg GPU temperature (in Celsius degree), per tile", "semantic": "temperature", "unit": "Celsius", "labels": [{"name": "location", "valueFrom": "fixed", "value": "gpu"}]},
+        {"name": "xpum_frequency_mhz", "type": "gauge", "help": "Avg (GPU) frequency (in MHz), per GPU tile", "semantic": "clock-core", "unit": "MHz", "labels": [{"name": "location", "valueFrom": "fixed", "value": "gpu"}, {"name": "type", "valueFrom": "fixed", "value": "actual"}]},
+        {"name": "xpum_energy_joules", "type": "counter", "help": "Total GPU energy consumption since boot (in Joules), per GPU", "semantic": "energy", "unit": "joules"}
       ]
     },
     {
@@ -99,10 +129,10 @@
         {"name": "container_name", "valueFrom": "empty"}
       ],
       "metricFamilies": [
-        {"name": "npu_chip_info_utilization", "type": "gauge", "semantic": "utilization", "unit": "vendor-value"},
-        {"name": "npu_chip_info_temperature", "type": "gauge", "semantic": "temperature", "unit": "vendor-value"},
-        {"name": "npu_chip_info_power", "type": "gauge", "semantic": "power", "unit": "vendor-value"},
-        {"name": "npu_chip_info_aicore_current_freq", "type": "gauge", "semantic": "clock-core", "unit": "MHz"}
+        {"name": "npu_chip_info_utilization", "type": "gauge", "help": "the ai core utilization", "semantic": "utilization", "unit": "vendor-value"},
+        {"name": "npu_chip_info_temperature", "type": "gauge", "help": "the npu temperature", "semantic": "temperature", "unit": "vendor-value"},
+        {"name": "npu_chip_info_power", "type": "gauge", "help": "the npu power", "semantic": "power", "unit": "vendor-value"},
+        {"name": "npu_chip_info_aicore_current_freq", "type": "gauge", "help": "the npu ai core current frequency, unit is 'MHz'", "semantic": "clock-core", "unit": "MHz"}
       ]
     },
     {
@@ -110,18 +140,18 @@
       "evidence": [{"source": "https://github.com/Cambricon/mlu-exporter/blob/613459d6b730cad3caf4c08aa3dcf28f523bf1c1/examples/metrics.yaml", "revision": "613459d6b730cad3caf4c08aa3dcf28f523bf1c1", "checkedAt": "2026-08-07"}],
       "defaults": {"memoryMiB": 49152, "idlePowerW": 45, "maxPowerW": 550, "idleTempC": 30, "maxTempC": 88, "coreClockMHz": 1500, "memoryClockMHz": 1200},
       "deviceLabels": [
-        {"name": "driver", "valueFrom": "fixed", "value": "kasim-simulated"}, {"name": "mcu", "valueFrom": "fixed", "value": "kasim-simulated"},
+        {"name": "driver", "valueFrom": "fixed", "value": "5.10.22"}, {"name": "mcu", "valueFrom": "fixed", "value": "1.1.0"},
         {"name": "mlu", "valueFrom": "device-index"}, {"name": "model", "valueFrom": "model-name"},
         {"name": "node", "valueFrom": "node-name"}, {"name": "node_ip", "valueFrom": "empty"},
-        {"name": "sn", "valueFrom": "serial"}, {"name": "type", "valueFrom": "fixed", "value": "physical"},
+        {"name": "sn", "valueFrom": "serial", "prefix": "MLU"}, {"name": "type", "valueFrom": "fixed", "value": "physical"},
         {"name": "uuid", "valueFrom": "device-uuid"}
       ],
       "metricFamilies": [
-        {"name": "mlu_utilization", "type": "gauge", "semantic": "utilization", "unit": "percent"},
-        {"name": "mlu_memory_used", "type": "gauge", "semantic": "memory-used", "unit": "bytes"},
-        {"name": "mlu_memory_total", "type": "gauge", "semantic": "memory-total", "unit": "bytes"},
-        {"name": "mlu_power_usage", "type": "gauge", "semantic": "power", "unit": "watts"},
-        {"name": "mlu_temperature", "type": "gauge", "semantic": "temperature", "unit": "Celsius"}
+        {"name": "mlu_utilization", "type": "gauge", "help": "The utilization of Cambricon MLU, unit is '%'", "semantic": "utilization", "unit": "percent", "labels": [{"name": "vf", "valueFrom": "fixed", "value": "0"}]},
+        {"name": "mlu_memory_used", "type": "gauge", "help": "The used physical memory of Cambricon MLU, unit is 'B'", "semantic": "memory-used", "unit": "bytes"},
+        {"name": "mlu_memory_total", "type": "gauge", "help": "The total physical memory of Cambricon MLU, unit is 'B'", "semantic": "memory-total", "unit": "bytes"},
+        {"name": "mlu_power_usage", "type": "gauge", "help": "The power usage of Cambricon MLU, unit is 'w'", "semantic": "power", "unit": "watts", "labels": [{"name": "vf", "valueFrom": "fixed", "value": "0"}]},
+        {"name": "mlu_temperature", "type": "gauge", "help": "The board temperature of Cambricon MLU, unit is 'celsius'", "semantic": "temperature", "unit": "Celsius"}
       ]
     },
     {
@@ -130,24 +160,24 @@
       "defaults": {"memoryMiB": 32768, "idlePowerW": 40, "maxPowerW": 450, "idleTempC": 30, "maxTempC": 87, "coreClockMHz": 1700, "memoryClockMHz": 1400},
       "deviceLabels": [
         {"name": "name", "valueFrom": "device-name"}, {"name": "gpu", "valueFrom": "device-index"},
-        {"name": "uuid", "valueFrom": "device-uuid"}, {"name": "driver", "valueFrom": "fixed", "value": "kasim-simulated"},
-        {"name": "ixml", "valueFrom": "fixed", "value": "kasim-simulated"}, {"name": "serial", "valueFrom": "serial"},
+        {"name": "uuid", "valueFrom": "device-uuid"}, {"name": "driver", "valueFrom": "fixed", "value": "4.3.0"},
+        {"name": "ixml", "valueFrom": "fixed", "value": "1.17.0"}, {"name": "serial", "valueFrom": "serial", "prefix": "IX"},
         {"name": "node_name", "valueFrom": "node-name"}
       ],
       "metricFamilies": [
-        {"name": "ix_gpu_utilization", "type": "gauge", "semantic": "utilization", "unit": "percent"},
-        {"name": "ix_mem_total", "type": "gauge", "semantic": "memory-total", "unit": "MiB"},
-        {"name": "ix_mem_used", "type": "gauge", "semantic": "memory-used", "unit": "MiB"},
-        {"name": "ix_mem_free", "type": "gauge", "semantic": "memory-free", "unit": "MiB"},
-        {"name": "ix_power_usage", "type": "gauge", "semantic": "power", "unit": "watts"},
-        {"name": "ix_gpu_temperature", "type": "gauge", "semantic": "temperature", "unit": "Celsius"},
-        {"name": "ix_gpu_clock", "type": "gauge", "semantic": "clock-core", "unit": "MHz"},
-        {"name": "ix_mem_clock", "type": "gauge", "semantic": "clock-memory", "unit": "MHz"}
+        {"name": "ix_gpu_utilization", "type": "gauge", "help": "Utilization of iluvatar GPU (%).", "semantic": "utilization", "unit": "percent"},
+        {"name": "ix_mem_total", "type": "gauge", "help": "Total physical memory of iluvatar GPU (MiB).", "semantic": "memory-total", "unit": "MiB"},
+        {"name": "ix_mem_used", "type": "gauge", "help": "Used physical memory of iluvatar GPU (MiB).", "semantic": "memory-used", "unit": "MiB"},
+        {"name": "ix_mem_free", "type": "gauge", "help": "Free physical memory of iluvatar GPU (MiB).", "semantic": "memory-free", "unit": "MiB"},
+        {"name": "ix_power_usage", "type": "gauge", "help": "Power usage of iluvatar GPU (W).", "semantic": "power", "unit": "watts"},
+        {"name": "ix_gpu_temperature", "type": "gauge", "help": "GPU temperature of iluvatar GPU (C).", "semantic": "temperature", "unit": "Celsius"},
+        {"name": "ix_sm_clock", "type": "gauge", "help": "Sm clock of iluvatar GPU (MHz).", "semantic": "clock-core", "unit": "MHz"},
+        {"name": "ix_mem_clock", "type": "gauge", "help": "Mem clock of iluvatar GPU (MHz).", "semantic": "clock-memory", "unit": "MHz"}
       ]
     },
     {
       "id": "enflame", "displayName": "Enflame", "state": "verified", "exporter": "Enflame gcu-exporter",
-      "evidence": [{"source": "https://github.com/EnflameTechnology/gcu-exporter/blob/0e6e15c9cb8034e85b70959cc30f702ac56114ed/collectors/gcu_collector.go", "revision": "0e6e15c9cb8034e85b70959cc30f702ac56114ed", "checkedAt": "2026-08-07"}],
+      "evidence": [{"source": "https://github.com/EnflameTechnology/gcu-exporter/tree/0e6e15c9cb8034e85b70959cc30f702ac56114ed/collector", "revision": "0e6e15c9cb8034e85b70959cc30f702ac56114ed", "checkedAt": "2026-08-10"}],
       "defaults": {"memoryMiB": 65536, "idlePowerW": 45, "maxPowerW": 500, "idleTempC": 30, "maxTempC": 88, "coreClockMHz": 1600, "memoryClockMHz": 1200},
       "deviceLabels": [
         {"name": "host", "valueFrom": "node-name"}, {"name": "minor_number", "valueFrom": "device-index"},
@@ -157,46 +187,47 @@
         {"name": "container_name", "valueFrom": "empty"}
       ],
       "metricFamilies": [
-        {"name": "enflame_gcu_usage", "type": "gauge", "semantic": "utilization", "unit": "vendor-value"},
-        {"name": "enflame_gcu_memory_used_bytes", "type": "gauge", "semantic": "memory-used", "unit": "bytes"},
-        {"name": "enflame_gcu_memory_total_bytes", "type": "gauge", "semantic": "memory-total", "unit": "bytes"},
-        {"name": "enflame_gcu_power_usage", "type": "gauge", "semantic": "power", "unit": "vendor-value"},
-        {"name": "enflame_gcu_temperatures", "type": "gauge", "semantic": "temperature", "unit": "vendor-value"},
-        {"name": "enflame_gcu_health", "type": "gauge", "semantic": "health-enflame", "unit": "state"}
+        {"name": "enflame_gcu_usage", "type": "gauge", "help": "Gcu usage as reported by the device, -1 means not supported", "semantic": "utilization", "unit": "vendor-value"},
+        {"name": "enflame_gcu_memory_used_bytes", "type": "gauge", "help": "Memory used size as reported by the device", "semantic": "memory-used", "unit": "bytes"},
+        {"name": "enflame_gcu_memory_total_bytes", "type": "gauge", "help": "Total memory size as reorted by the device", "semantic": "memory-total", "unit": "bytes"},
+        {"name": "enflame_gcu_power_usage", "type": "gauge", "help": "Power usage as reported by the device, -1 means not supported", "semantic": "power", "unit": "vendor-value"},
+        {"name": "enflame_gcu_temperatures", "type": "gauge", "help": "Temperature as reported by the device, -1 means not supported", "semantic": "temperature", "unit": "vendor-value"},
+        {"name": "enflame_gcu_health", "type": "gauge", "help": "Gcu health as reported by the device (2:healthy,1:unhealthy,0:unknown)", "semantic": "health-enflame", "unit": "state", "labels": [{"name": "healthmsg", "valueFrom": "health-message"}]}
       ]
     },
     {
       "id": "furiosa", "displayName": "FuriosaAI", "state": "verified", "exporter": "Furiosa metrics exporter",
-      "evidence": [{"source": "https://github.com/furiosa-ai/furiosa-metrics-exporter/blob/e24b60086ea42d81ebf92adbabd5f595ac4ecdab/README.md", "revision": "e24b60086ea42d81ebf92adbabd5f595ac4ecdab", "checkedAt": "2026-08-07"}],
+      "evidence": [{"source": "https://github.com/furiosa-ai/furiosa-metrics-exporter/blob/e24b60086ea42d81ebf92adbabd5f595ac4ecdab/README.rst", "revision": "e24b60086ea42d81ebf92adbabd5f595ac4ecdab", "checkedAt": "2026-08-10"}],
       "defaults": {"memoryMiB": 49152, "idlePowerW": 35, "maxPowerW": 350, "idleTempC": 29, "maxTempC": 85, "coreClockMHz": 1400, "memoryClockMHz": 1100},
       "deviceLabels": [
         {"name": "arch", "valueFrom": "fixed", "value": "rngd"}, {"name": "core", "valueFrom": "device-index"},
-        {"name": "device", "valueFrom": "device-name"}, {"name": "uuid", "valueFrom": "device-uuid"},
-        {"name": "pci_bus_id", "valueFrom": "pci-bdf"}, {"name": "firmware_version", "valueFrom": "fixed", "value": "kasim-simulated"},
-        {"name": "driver_version", "valueFrom": "fixed", "value": "kasim-simulated"}
+        {"name": "device", "valueFrom": "device-name", "prefix": "npu"}, {"name": "uuid", "valueFrom": "device-uuid"},
+        {"name": "pci_bus_id", "valueFrom": "pci-bdf"}, {"name": "firmware_version", "valueFrom": "fixed", "value": "2025.1.0+696efad"},
+        {"name": "driver_version", "valueFrom": "fixed", "value": "2025.1.0+f09a8d8"},
+        {"name": "hostname", "valueFrom": "node-name"}
       ],
       "metricFamilies": [
-        {"name": "furiosa_npu_alive", "type": "gauge", "semantic": "health-binary", "unit": "state"},
-        {"name": "furiosa_npu_core_utilization", "type": "gauge", "semantic": "utilization", "unit": "vendor-value"},
-        {"name": "furiosa_npu_core_frequency", "type": "gauge", "semantic": "clock-core", "unit": "MHz"},
-        {"name": "furiosa_npu_dram_total", "type": "gauge", "semantic": "memory-total", "unit": "bytes"},
-        {"name": "furiosa_npu_dram_usage", "type": "gauge", "semantic": "memory-used", "unit": "bytes"},
-        {"name": "furiosa_npu_total_cycle_count", "type": "counter", "semantic": "cycle-counter", "unit": "cycles"}
+        {"name": "furiosa_npu_alive", "type": "gauge", "help": "The liveness of NPU device", "semantic": "health-binary", "unit": "state"},
+        {"name": "furiosa_npu_core_utilization", "type": "gauge", "help": "The current core utilization of NPU device", "semantic": "utilization", "unit": "vendor-value"},
+        {"name": "furiosa_npu_core_frequency", "type": "gauge", "help": "The current core frequency of NPU device (MHz)", "semantic": "clock-core", "unit": "MHz"},
+        {"name": "furiosa_npu_dram_total", "type": "gauge", "help": "The total dram of NPU device (Bytes)", "semantic": "memory-total", "unit": "bytes"},
+        {"name": "furiosa_npu_dram_usage", "type": "gauge", "help": "The current used dram of NPU device (Bytes)", "semantic": "memory-used", "unit": "bytes"},
+        {"name": "furiosa_npu_total_cycle_count", "type": "counter", "help": "The current total cycle count of NPU device", "semantic": "cycle-counter", "unit": "cycles"}
       ]
     },
     {
       "id": "rdma-shared-device-plugin", "displayName": "RDMA Shared Device Plugin", "state": "verified", "exporter": "Prometheus node_exporter InfiniBand collector",
       "evidence": [{"source": "https://github.com/prometheus/node_exporter/blob/ac83e377f04d53fd2683480337a0283d46204a33/collector/infiniband_linux.go", "revision": "ac83e377f04d53fd2683480337a0283d46204a33", "checkedAt": "2026-08-07"}],
       "defaults": {"memoryMiB": 1, "idlePowerW": 1, "maxPowerW": 1, "idleTempC": 1, "maxTempC": 1},
-      "deviceLabels": [{"name": "device", "valueFrom": "device-name"}, {"name": "port", "valueFrom": "fixed", "value": "1"}],
+      "deviceLabels": [{"name": "device", "valueFrom": "device-name-node-hash", "prefix": "mlx5_"}, {"name": "port", "valueFrom": "fixed", "value": "1"}],
       "metricFamilies": [
-        {"name": "node_infiniband_port_data_received_bytes_total", "type": "counter", "semantic": "traffic-rx-counter", "unit": "bytes"},
-        {"name": "node_infiniband_port_data_transmitted_bytes_total", "type": "counter", "semantic": "traffic-tx-counter", "unit": "bytes"},
-        {"name": "node_infiniband_port_packets_received_total", "type": "counter", "semantic": "packet-rx-counter", "unit": "packets"},
-        {"name": "node_infiniband_port_packets_transmitted_total", "type": "counter", "semantic": "packet-tx-counter", "unit": "packets"},
-        {"name": "node_infiniband_rate_bytes_per_second", "type": "gauge", "semantic": "link-rate", "unit": "bytes/second"},
-        {"name": "node_infiniband_state_id", "type": "gauge", "semantic": "ib-state", "unit": "state"},
-        {"name": "node_infiniband_physical_state_id", "type": "gauge", "semantic": "ib-physical-state", "unit": "state"}
+        {"name": "node_infiniband_port_data_received_bytes_total", "type": "counter", "help": "Number of data octets received on all links", "semantic": "traffic-rx-counter", "unit": "bytes"},
+        {"name": "node_infiniband_port_data_transmitted_bytes_total", "type": "counter", "help": "Number of data octets transmitted on all links", "semantic": "traffic-tx-counter", "unit": "bytes"},
+        {"name": "node_infiniband_port_packets_received_total", "type": "counter", "help": "Number of packets received on all VLs by this port (including errors)", "semantic": "packet-rx-counter", "unit": "packets"},
+        {"name": "node_infiniband_port_packets_transmitted_total", "type": "counter", "help": "Number of packets transmitted on all VLs from this port (including errors)", "semantic": "packet-tx-counter", "unit": "packets"},
+        {"name": "node_infiniband_rate_bytes_per_second", "type": "gauge", "help": "Maximum signal transfer rate", "semantic": "link-rate", "unit": "bytes/second"},
+        {"name": "node_infiniband_state_id", "type": "gauge", "help": "State of the InfiniBand port (0: no change, 1: down, 2: init, 3: armed, 4: active, 5: act defer)", "semantic": "ib-state", "unit": "state"},
+        {"name": "node_infiniband_physical_state_id", "type": "gauge", "help": "Physical state of the InfiniBand port (0: no change, 1: sleep, 2: polling, 3: disable, 4: shift, 5: link up, 6: link error recover, 7: phytest)", "semantic": "ib-physical-state", "unit": "state"}
       ]
     },
     {"id": "intel-gaudi", "displayName": "Intel Gaudi", "state": "provisional", "exporter": "Gaudi Prometheus Metric Exporter", "evidence": [{"source": "https://docs.habana.ai/en/latest/Orchestration/Prometheus_Metric_Exporter.html", "revision": "unversioned-public-documentation", "checkedAt": "2026-08-07"}]},

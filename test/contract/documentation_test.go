@@ -146,7 +146,7 @@ func TestOperatorDocumentationIsExplicitAndCapabilityBounded(t *testing.T) {
 		"physical vendor telemetry",
 		"simulate NUMA topology",
 		"inject CDI devices",
-		`kasim_simulated="true"`,
+		"Vendor-native samples contain no `kasim_*` label",
 	} {
 		if !strings.Contains(docs, requiredText) {
 			t.Errorf("operator documentation is missing boundary or explicit target text %q", requiredText)

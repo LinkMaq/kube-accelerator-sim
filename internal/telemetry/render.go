@@ -75,18 +75,12 @@ func (module *Module) render(observation Observation, now time.Time) ([]byte, er
 			}
 			addSample(families, "kasim_telemetry_device_contract_available", "gauge",
 				"Whether one simulated device has an enabled source-backed native telemetry contract.",
-				provenanceLabels(device, state), 0)
+				diagnosticLabels(device, state), 0)
 			continue
 		}
 		addSample(families, "kasim_telemetry_device_contract_available", "gauge",
 			"Whether one simulated device has an enabled source-backed native telemetry contract.",
-			provenanceLabels(device, profile.State), 1)
-		labels := nativeLabels(profile, device)
-		for key, value := range provenanceLabels(device, "") {
-			if key != "state" {
-				labels[key] = value
-			}
-		}
+			diagnosticLabels(device, profile.State), 1)
 		limits := limitsFor(profile, device.ModelID)
 		latent := deviceLatent(device, now)
 		for _, metric := range profile.MetricFamily {
@@ -94,12 +88,8 @@ func (module *Module) render(observation Observation, now time.Time) ([]byte, er
 			if !supported {
 				continue
 			}
-			help := fmt.Sprintf(
-				"Explicitly simulated Kasim value using the source-backed %s schema (%s).",
-				metric.Name,
-				metric.Unit,
-			)
-			addSample(families, metric.Name, metric.Type, help, labels, value)
+			labels := nativeLabels(profile, metric, device)
+			addSample(families, metric.Name, metric.Type, metric.Help, labels, value)
 		}
 	}
 	return encodeExposition(families), nil
@@ -144,7 +134,9 @@ func addSample(
 	})
 }
 
-func provenanceLabels(device Device, state string) map[string]string {
+// diagnosticLabels is deliberately confined to kasim_telemetry_* families.
+// Vendor-native families are rendered exclusively from catalog bindings.
+func diagnosticLabels(device Device, state string) map[string]string {
 	result := map[string]string{
 		"kasim_device":       syntheticIdentity(device),
 		"kasim_instance":     device.InstanceName,
@@ -164,33 +156,76 @@ func provenanceLabels(device Device, state string) map[string]string {
 	return result
 }
 
-func nativeLabels(profile profileRecord, device Device) map[string]string {
-	result := make(map[string]string, len(profile.DeviceLabels))
-	for _, label := range profile.DeviceLabels {
+func nativeLabels(profile profileRecord, metric metricFamily, device Device) map[string]string {
+	bindings := make([]nativeLabel, 0, len(profile.DeviceLabels)+len(metric.Labels))
+	bindings = append(bindings, profile.DeviceLabels...)
+	bindings = append(bindings, metric.Labels...)
+	result := make(map[string]string, len(bindings))
+	for _, label := range bindings {
 		switch label.ValueFrom {
 		case "device-index":
 			result[label.Name] = strconv.FormatUint(device.Ordinal, 10)
 		case "device-name":
-			result[label.Name] = "kasim" + strconv.FormatUint(device.Ordinal, 10)
+			prefix := label.Prefix
+			if prefix == "" {
+				prefix = "device"
+			}
+			result[label.Name] = prefix + strconv.FormatUint(device.Ordinal, 10)
+		case "device-name-node-hash":
+			prefix := label.Prefix
+			if prefix == "" {
+				prefix = "device"
+			}
+			result[label.Name] = prefix + shortHash(device.InstanceUID + "|" + device.NodeName)[:4] +
+				"_" + strconv.FormatUint(device.Ordinal, 10)
 		case "device-uuid":
-			result[label.Name] = syntheticIdentity(device)
+			result[label.Name] = label.Prefix + syntheticNativeUUID(device)
 		case "empty":
 			result[label.Name] = ""
 		case "fixed":
 			result[label.Name] = label.Value
+		case "health-error-code":
+			if device.Healthy {
+				result[label.Name] = "0"
+			} else {
+				result[label.Name] = "79"
+			}
+		case "health-error-message":
+			if device.Healthy {
+				result[label.Name] = "No Error"
+			} else {
+				result[label.Name] = "GPU has fallen off the bus"
+			}
+		case "health-message":
+			if device.Healthy {
+				result[label.Name] = "healthy"
+			} else {
+				result[label.Name] = "unhealthy"
+			}
 		case "model-name":
-			result[label.Name] = device.ModelID
+			result[label.Name] = nativeModelName(profile, device.ModelID)
 		case "node-name":
 			result[label.Name] = device.NodeName
 		case "pci-bdf":
 			result[label.Name] = syntheticPCIBDF(device)
+		case "pci-bdf-domain8":
+			result[label.Name] = syntheticPCIBDFDomain8(device)
 		case "profile-name":
 			result[label.Name] = profile.DisplayName
 		case "serial":
-			result[label.Name] = "kasim-serial-" + shortHash(deviceIdentityKey(device))
+			result[label.Name] = label.Prefix + strings.ToUpper(shortHash(deviceIdentityKey(device)))
 		}
 	}
 	return result
+}
+
+func nativeModelName(profile profileRecord, modelID string) string {
+	for _, model := range profile.Models {
+		if model.ID == modelID && model.NativeName != "" {
+			return model.NativeName
+		}
+	}
+	return modelID
 }
 
 func limitsFor(profile profileRecord, modelID string) simulationLimits {
@@ -224,8 +259,14 @@ func metricValue(
 	}
 	memoryUsed := limits.MemoryMiB * (0.08 + 0.82*latent)
 	switch metric.Semantic {
+	case "constant-zero":
+		return 0, true
 	case "utilization":
-		return clamp(100*latent, 0, 100), true
+		scale := 0.75 + 0.25*seedUnit(deviceIdentityKey(device)+metric.Name)
+		return clamp(100*latent*scale, 0, 100), true
+	case "utilization-sparse":
+		activity := math.Max(0, latent-0.45) * (25 + 35*seedUnit(deviceIdentityKey(device)+metric.Name))
+		return clamp(activity, 0, 100), true
 	case "utilization-ratio":
 		return clamp(latent, 0, 1), true
 	case "memory-ratio":
@@ -234,6 +275,11 @@ func metricValue(
 		return convertMemory(memoryUsed, metric.Unit)
 	case "memory-free":
 		return convertMemory(math.Max(0, limits.MemoryMiB-memoryUsed), metric.Unit)
+	case "memory-free-reserved":
+		reserved := limits.MemoryMiB * 0.02
+		return convertMemory(math.Max(0, limits.MemoryMiB-memoryUsed-reserved), metric.Unit)
+	case "memory-reserved":
+		return convertMemory(limits.MemoryMiB*0.02, metric.Unit)
 	case "memory-total":
 		return convertMemory(limits.MemoryMiB, metric.Unit)
 	case "power":
@@ -269,6 +315,11 @@ func metricValue(
 			return 1, true
 		}
 		return 0, true
+	case "last-error":
+		if device.Healthy {
+			return 0, true
+		}
+		return 79, true
 	case "traffic-rx-counter", "traffic-tx-counter":
 		rate := 2.5e9 + 22.5e9*seedUnit(deviceIdentityKey(device)+metric.Semantic)
 		return counterBuckets(now) * sampleInterval.Seconds() * rate, true
@@ -331,6 +382,18 @@ func syntheticPCIBDF(device Device) string {
 	hash := sha256.Sum256([]byte(deviceIdentityKey(device)))
 	bus := 1 + int(hash[0])%0xfe
 	return fmt.Sprintf("0000:%02x:00.%d", bus, device.Ordinal%8)
+}
+
+func syntheticPCIBDFDomain8(device Device) string {
+	return "0000" + syntheticPCIBDF(device)
+}
+
+func syntheticNativeUUID(device Device) string {
+	hash := sha256.Sum256([]byte(deviceIdentityKey(device)))
+	hash[6] = (hash[6] & 0x0f) | 0x40
+	hash[8] = (hash[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+		hash[0:4], hash[4:6], hash[6:8], hash[8:10], hash[10:16])
 }
 
 func deviceIdentityKey(device Device) string {

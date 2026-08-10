@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	productVersion = "0.4.1"
+	productVersion = "0.5.0"
 	chartPath      = "../../charts/kasim-runtime"
 )
 
@@ -325,8 +325,8 @@ func TestChartVersionsAndImmutableRuntimeInputsStayExplicit(t *testing.T) {
 		"simulation.kasim.io/schema-version":             "v1alpha1",
 		"simulation.kasim.io/product-crd-sha256":         "fc4162c4d9b3137fa5c195e22c6604c625abb55b8a29c839856e1120467d3bd4",
 		"simulation.kasim.io/catalog-revision":           "2026-08-03",
-		"simulation.kasim.io/telemetry-catalog-revision": "2026-08-07",
-		"simulation.kasim.io/telemetry-catalog-sha256":   "500ab769c3746e746b0bb880089052114f14f6894f6fe9c74c22bcb78dc2557e",
+		"simulation.kasim.io/telemetry-catalog-revision": "2026-08-10",
+		"simulation.kasim.io/telemetry-catalog-sha256":   "226638cfe275c8c83f88b06a3d11b4c9bad3e5df9578da4eed392f64aed3a0f4",
 		"simulation.kasim.io/kubernetes-range":           "1.30-1.36",
 		"simulation.kasim.io/kwok-version":               "v0.8.0",
 		"simulation.kasim.io/kwok-manifest-sha256":       "a4c16e6431e382dcb5c1903139344b7a68652f16a6460337fe17a678a426f405",

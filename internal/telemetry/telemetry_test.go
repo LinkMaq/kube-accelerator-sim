@@ -8,6 +8,9 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -26,7 +29,7 @@ func TestBundledCatalogHasEvidenceGatedCoverage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadBundled() error = %v", err)
 	}
-	if catalog.Revision() != "2026-08-07" || !strings.HasPrefix(catalog.Digest(), "sha256:") {
+	if catalog.Revision() != "2026-08-10" || !strings.HasPrefix(catalog.Digest(), "sha256:") {
 		t.Fatalf("unexpected catalog identity: %s %s", catalog.Revision(), catalog.Digest())
 	}
 	states := catalog.ProfileStates()
@@ -97,8 +100,15 @@ func TestRenderIsDeterministicCorrelatedAndParseable(t *testing.T) {
 
 	families := parseExposition(t, first)
 	for _, required := range []string{
-		"DCGM_FI_DEV_GPU_UTIL", "DCGM_FI_DEV_FB_USED", "DCGM_FI_DEV_FB_FREE",
-		"DCGM_FI_DEV_POWER_USAGE", "DCGM_FI_DEV_GPU_TEMP",
+		"DCGM_FI_DEV_SM_CLOCK", "DCGM_FI_DEV_MEM_CLOCK", "DCGM_FI_DEV_MEMORY_TEMP",
+		"DCGM_FI_DEV_GPU_TEMP", "DCGM_FI_DEV_POWER_USAGE",
+		"DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION", "DCGM_FI_DEV_PCIE_REPLAY_COUNTER",
+		"DCGM_FI_DEV_GPU_UTIL", "DCGM_FI_DEV_MEM_COPY_UTIL", "DCGM_FI_DEV_ENC_UTIL",
+		"DCGM_FI_DEV_DEC_UTIL", "DCGM_FI_DEV_XID_ERRORS", "DCGM_FI_DEV_FB_FREE",
+		"DCGM_FI_DEV_FB_USED", "DCGM_FI_DEV_FB_RESERVED",
+		"DCGM_FI_DEV_UNCORRECTABLE_REMAPPED_ROWS", "DCGM_FI_DEV_CORRECTABLE_REMAPPED_ROWS",
+		"DCGM_FI_DEV_ROW_REMAP_FAILURE", "DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL",
+		"DCGM_FI_DEV_VGPU_LICENSE_STATUS",
 		"kasim_telemetry_node_info", "kasim_telemetry_device_contract_available",
 	} {
 		if families[required] == nil {
@@ -115,14 +125,36 @@ func TestRenderIsDeterministicCorrelatedAndParseable(t *testing.T) {
 			t.Errorf("utilization = %v, want [0,100]", value)
 		}
 		labels := metricLabels(sample)
-		if labels["kasim_simulated"] != "true" || labels["Hostname"] != "kasim-node-a" {
-			t.Errorf("native/provenance labels = %#v", labels)
+		assertLabelKeys(t, labels, []string{
+			"gpu", "UUID", "pci_bus_id", "device", "modelName", "Hostname",
+			"DCGM_FI_DRIVER_VERSION",
+		})
+		if labels["Hostname"] != "kasim-node-a" || labels["device"] != "nvidia"+labels["gpu"] ||
+			labels["modelName"] != "NVIDIA H200" || labels["DCGM_FI_DRIVER_VERSION"] != "580.126.16" ||
+			!strings.HasPrefix(labels["UUID"], "GPU-") ||
+			!strings.HasPrefix(labels["pci_bus_id"], "00000000:") {
+			t.Errorf("DCGM native label values = %#v", labels)
 		}
+	}
+	xidLabels := metricLabels(families["DCGM_FI_DEV_XID_ERRORS"].Metric[0])
+	assertLabelKeys(t, xidLabels, []string{
+		"gpu", "UUID", "pci_bus_id", "device", "modelName", "Hostname",
+		"DCGM_FI_DRIVER_VERSION", "err_code", "err_msg",
+	})
+	if xidLabels["err_code"] != "0" || xidLabels["err_msg"] != "No Error" {
+		t.Errorf("DCGM XID labels = %#v", xidLabels)
+	}
+	if got := families["DCGM_FI_DEV_SM_CLOCK"].GetHelp(); got != "SM clock frequency (in MHz)." {
+		t.Errorf("DCGM HELP = %q", got)
+	}
+	if got := families["DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION"].GetType(); got != dto.MetricType_COUNTER {
+		t.Errorf("DCGM energy TYPE = %s, want COUNTER", got)
 	}
 	used := families["DCGM_FI_DEV_FB_USED"].Metric[0].GetGauge().GetValue()
 	free := families["DCGM_FI_DEV_FB_FREE"].Metric[0].GetGauge().GetValue()
-	if used < 0 || free < 0 || used+free > 144384.000001 {
-		t.Errorf("H200 memory invariant failed: used=%v free=%v", used, free)
+	reserved := families["DCGM_FI_DEV_FB_RESERVED"].Metric[0].GetGauge().GetValue()
+	if used < 0 || free < 0 || reserved < 0 || used+free+reserved > 144384.000001 {
+		t.Errorf("H200 memory invariant failed: used=%v free=%v reserved=%v", used, free, reserved)
 	}
 	if unavailable := metricValueByLabel(
 		t,
@@ -134,7 +166,59 @@ func TestRenderIsDeterministicCorrelatedAndParseable(t *testing.T) {
 	}
 }
 
-func TestCentralizedEndpointAttributesDevicesToSyntheticNodes(t *testing.T) {
+func TestNVIDIAUnhealthyDeviceUsesNativeXIDErrorSchema(t *testing.T) {
+	t.Parallel()
+
+	families := parseExpositionAt(
+		t,
+		testModule(t),
+		testObservation("nvidia", "nvidia-h200", 1, 0),
+		time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC),
+	)
+	sample := families["DCGM_FI_DEV_XID_ERRORS"].Metric[0]
+	labels := metricLabels(sample)
+	if labels["err_code"] != "79" || labels["err_msg"] != "GPU has fallen off the bus" ||
+		sample.GetGauge().GetValue() != 79 {
+		t.Errorf("unhealthy XID sample = labels %#v value %v", labels, sample.GetGauge().GetValue())
+	}
+}
+
+func TestNVIDIARenderMatchesSuppliedDCGMExpositionSchema(t *testing.T) {
+	t.Parallel()
+
+	referenceBody, err := os.ReadFile("testdata/dcgm-exporter-runtime.prom")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reference := parseExposition(t, referenceBody)
+	actual := parseExpositionAt(
+		t,
+		testModule(t),
+		testObservation("nvidia", "nvidia-h200", 1, 1),
+		time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC),
+	)
+	for name, want := range reference {
+		got := actual[name]
+		if got == nil {
+			t.Errorf("rendered exposition lacks supplied DCGM family %s", name)
+			continue
+		}
+		if got.GetType() != want.GetType() {
+			t.Errorf("%s TYPE = %s, want %s", name, got.GetType(), want.GetType())
+		}
+		if got.GetHelp() != want.GetHelp() {
+			t.Errorf("%s HELP = %q, want %q", name, got.GetHelp(), want.GetHelp())
+		}
+		wantLabels := metricLabels(want.Metric[0])
+		wantKeys := make([]string, 0, len(wantLabels))
+		for label := range wantLabels {
+			wantKeys = append(wantKeys, label)
+		}
+		assertLabelKeys(t, metricLabels(got.Metric[0]), wantKeys)
+	}
+}
+
+func TestCentralizedEndpointUsesNativeHostnameWithoutPodNodeOrKasimLabels(t *testing.T) {
 	t.Parallel()
 
 	module := testModule(t)
@@ -164,10 +248,91 @@ func TestCentralizedEndpointAttributesDevicesToSyntheticNodes(t *testing.T) {
 	}
 	for _, sample := range samples {
 		labels := metricLabels(sample)
-		if labels["node"] == "" || labels["node"] != labels["Hostname"] ||
-			labels["node"] != labels["kasim_node"] {
-			t.Errorf("device node identity labels = %#v", labels)
+		if labels["Hostname"] == "" {
+			t.Errorf("device native node identity labels = %#v", labels)
 		}
+		for name := range labels {
+			if name == "node" || strings.HasPrefix(name, "kasim_") {
+				t.Errorf("vendor-native sample leaked non-native label %q: %#v", name, labels)
+			}
+		}
+	}
+}
+
+func TestEveryVerifiedProfileEmitsOnlyCatalogDeclaredNativeLabels(t *testing.T) {
+	t.Parallel()
+
+	module := testModule(t)
+	for _, profileID := range []string{
+		"nvidia", "amd", "intel-gpu", "huawei-ascend", "cambricon",
+		"iluvatar", "enflame", "furiosa", "rdma-shared-device-plugin",
+	} {
+		profile, found := module.contracts.profile(profileID)
+		if !found {
+			t.Fatalf("profile %s not found", profileID)
+		}
+		modelID := ""
+		if len(profile.Models) > 0 {
+			modelID = profile.Models[0].ID
+		} else {
+			modelID = profileID
+		}
+		families := parseExpositionAt(
+			t,
+			module,
+			testObservation(profileID, modelID, 1, 1),
+			time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC),
+		)
+		for _, family := range profile.MetricFamily {
+			samples := families[family.Name].Metric
+			if len(samples) != 1 {
+				t.Fatalf("profile %s family %s sample count = %d", profileID, family.Name, len(samples))
+			}
+			want := make([]string, 0, len(profile.DeviceLabels)+len(family.Labels))
+			for _, label := range profile.DeviceLabels {
+				want = append(want, label.Name)
+			}
+			for _, label := range family.Labels {
+				want = append(want, label.Name)
+			}
+			assertLabelKeys(t, metricLabels(samples[0]), want)
+		}
+	}
+}
+
+func TestNativeRDMADeviceLabelsRemainUniqueAcrossSyntheticNodes(t *testing.T) {
+	t.Parallel()
+
+	observation := Observation{
+		Nodes: []Node{
+			{InstanceName: "lab", InstanceUID: "instance-uid", Name: "kasim-node-a", Group: "workers"},
+			{InstanceName: "lab", InstanceUID: "instance-uid", Name: "kasim-node-b", Group: "workers"},
+		},
+	}
+	for _, node := range observation.Nodes {
+		observation.Devices = append(observation.Devices, Device{
+			InstanceName: node.InstanceName, InstanceUID: node.InstanceUID,
+			NodeName: node.Name, NodeGroup: node.Group, Pool: "rdma",
+			ProfileID: "rdma-shared-device-plugin", ModelID: "rdma-shared-device-plugin",
+			Healthy: true,
+		})
+	}
+	families := parseExpositionAt(
+		t,
+		testModule(t),
+		observation,
+		time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC),
+	)
+	samples := families["node_infiniband_rate_bytes_per_second"].Metric
+	if len(samples) != 2 {
+		t.Fatalf("RDMA samples = %d, want 2", len(samples))
+	}
+	left := metricLabels(samples[0])
+	right := metricLabels(samples[1])
+	assertLabelKeys(t, left, []string{"device", "port"})
+	assertLabelKeys(t, right, []string{"device", "port"})
+	if left["device"] == right["device"] {
+		t.Fatalf("aggregate endpoint produced duplicate native RDMA series labels: %#v", left)
 	}
 }
 
@@ -231,7 +396,7 @@ func TestModuleServesCachedMetricsAndReadiness(t *testing.T) {
 
 	baseURL := "http://" + listener.Addr().String()
 	body := eventuallyGET(t, baseURL+"/metrics")
-	if !strings.Contains(body, "gpu_gfx_activity") || !strings.Contains(body, `kasim_simulated="true"`) {
+	if !strings.Contains(body, "gpu_gfx_activity") || strings.Contains(nativeMetricLine(body, "gpu_gfx_activity"), "kasim_") {
 		t.Fatalf("unexpected metrics body:\n%s", body)
 	}
 	if ready := eventuallyStatus(t, baseURL+"/readyz"); ready != http.StatusOK {
@@ -421,6 +586,29 @@ func metricLabels(metric interface{ GetLabel() []*dto.LabelPair }) map[string]st
 		result[label.GetName()] = label.GetValue()
 	}
 	return result
+}
+
+func assertLabelKeys(t *testing.T, labels map[string]string, want []string) {
+	t.Helper()
+	got := make([]string, 0, len(labels))
+	for name := range labels {
+		got = append(got, name)
+	}
+	sort.Strings(got)
+	want = append([]string(nil), want...)
+	sort.Strings(want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("label keys = %v, want %v", got, want)
+	}
+}
+
+func nativeMetricLine(body, metricName string) string {
+	for _, line := range strings.Split(body, "\n") {
+		if strings.HasPrefix(line, metricName+"{") || strings.HasPrefix(line, metricName+" ") {
+			return line
+		}
+	}
+	return ""
 }
 
 func metricValueByLabel(t *testing.T, family *dto.MetricFamily, labelName, labelValue string) float64 {

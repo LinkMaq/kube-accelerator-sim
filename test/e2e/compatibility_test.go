@@ -43,7 +43,7 @@ func TestCompatibilitySchedulingLifecycle(t *testing.T) {
 	}
 	controllerImage := os.Getenv("KASIM_CONTROLLER_IMAGE")
 	if controllerImage == "" {
-		controllerImage = "kasim-controller:0.4.1"
+		controllerImage = "kasim-controller:0.5.0"
 	}
 	chartPath := absolutePath(t, "../../charts/kasim-runtime")
 	scenarioPath := absolutePath(t, "../../internal/cli/testdata/training-lab.yaml")
@@ -411,8 +411,10 @@ spec:
 		for _, line := range strings.Split(metrics, "\n") {
 			if strings.HasPrefix(line, "DCGM_FI_DEV_GPU_UTIL{") &&
 				prometheusLineHasLabel(line, "Hostname", syntheticNode) &&
-				prometheusLineHasLabel(line, "kasim_node", syntheticNode) &&
-				prometheusLineHasLabel(line, "node", syntheticNode) {
+				prometheusLineHasLabel(line, "device", "nvidia0") &&
+				prometheusLineHasLabel(line, "DCGM_FI_DRIVER_VERSION", "580.126.16") &&
+				!strings.Contains(line, "kasim_") &&
+				!strings.Contains(line, `node="`) {
 				return true
 			}
 		}
@@ -967,7 +969,7 @@ func installCompatibilityRuntime(
 		"--set",
 		"controller.image.repository=kasim-controller",
 		"--set",
-		"controller.image.tag=0.4.1",
+		"controller.image.tag=0.5.0",
 		"--set",
 		"controller.image.pullPolicy=Never",
 		"--set",
@@ -1620,7 +1622,7 @@ func writeCompatibilityReceipt(
 		},
 		"runtime": map[string]any{
 			"controllerImage": controllerImage,
-			"chart":           "kasim-runtime-0.4.1",
+			"chart":           "kasim-runtime-0.5.0",
 			"kwokImage":       chartKWOKTestRepo + "@" + chartKWOKAMD64Digest,
 		},
 		"releaseInputs": inputs,

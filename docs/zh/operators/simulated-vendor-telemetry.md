@@ -11,7 +11,7 @@ Kasim 通过一个只读的集群内端点，为每个准确归属的 Synthetic 
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.4.1 \
+  --version 0.5.0 \
   --namespace kasim-system \
   --create-namespace
 
@@ -27,7 +27,7 @@ Operator CRD，可以改用 ServiceMonitor；两种发现方式不要同时使�
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.4.1 \
+  --version 0.5.0 \
   --namespace kasim-system \
   --set telemetry.serviceMonitor.enabled=true
 ```
@@ -41,15 +41,19 @@ ServiceMonitor 关闭。
 H200 场景可能生成如下 NVIDIA 原生 family：
 
 ```text
-DCGM_FI_DEV_GPU_UTIL{Hostname="kasim-node-...",gpu="0",UUID="kasim-...",device="kasim0",modelName="nvidia-h200",node="kasim-node-...",kasim_instance="h200-lab",kasim_node="kasim-node-...",kasim_pool="accelerators",kasim_profile="nvidia",kasim_model="nvidia-h200",kasim_device="kasim-...",kasim_simulated="true"} 72.4
+DCGM_FI_DEV_GPU_UTIL{gpu="0",UUID="GPU-...",pci_bus_id="00000000:af:00.0",device="nvidia0",modelName="NVIDIA H200",Hostname="kasim-node-...",DCGM_FI_DRIVER_VERSION="580.126.16"} 72.4
 ```
 
-原始 family 名和原生 label key 来自固定版本的 exporter 证据。额外的 `kasim_*`
-标签是刻意保留的来源标识，让查询和告警始终能够证明数据是模拟值；
-`kasim_value_model="correlated-v1"` 标识所用数值模型。每条设备指标还会携带兼容标签
-`node=<Synthetic Node>`；它始终与 `kasim_node` 一致，不会使用承载集中式 telemetry Pod
-的真实节点，因此 PromQL 不需要通过 `kube_pod_info` 推导设备归属。Synthetic Node 是
-聚合端点中的 series 维度；Kasim 不会为每个节点伪造 exporter Pod 或 Service。
+family 名、`HELP`、`TYPE` 和完整 label key 集合来自所选 exporter 契约。厂商原生
+样本不会携带 `kasim_*`，也不会额外增加通用 `node`；只有当 `node` 本身就是原厂
+label 时才会出现。单 family 专属 label 同样保留，例如所提供的 DCGM 兼容契约中，
+`DCGM_FI_DEV_XID_ERRORS` 会额外带 `err_code` 和 `err_msg`。
+
+设备所属节点必须从 exporter 的原生 key 读取，例如 DCGM `Hostname`、AMD
+`hostname`、Cambricon `node`、Iluvatar `node_name`、Enflame `host`，或 exporter
+支持的可选 hostname。不要把承载集中式 telemetry Pod 的真实节点写进设备指标，
+也不要通过 `kube_pod_info` 覆盖它。Synthetic Node 仍是聚合端点中的 series 维度；
+Kasim 不会为每个节点伪造 exporter Pod 或 Service。
 
 每个归属节点都会生成 `kasim_telemetry_node_info`，每个设备都会生成
 `kasim_telemetry_device_contract_available`。证据不足的档案返回 `0`，而不是编造
@@ -60,13 +64,16 @@ DCGM_FI_DEV_GPU_UTIL{Hostname="kasim-node-...",gpu="0",UUID="kasim-...",device="
 - `kasim_telemetry_source_up`；
 - `kasim_telemetry_render_errors_total`。
 
+这些独立的 `kasim_telemetry_*` family 承担 Kasim 来源标识，因此无需污染厂商原生
+family。抓取目标配置也应明确标识 Kasim telemetry Service。
+
 ## 数值行为
 
 Kasim 每 15 秒生成一次不可变快照。同一时间桶内重复抓取数值完全一致，进程重启
 也不会改变该时间桶。稳定设备身份和时间桶共同产生一个关联负载状态：
 
 - 利用率在契约范围内平滑变化；
-- 已用和空闲显存保持非负，且不超过型号模拟边界；
+- 已用、空闲以及 exporter 定义的预留显存保持非负，且不超过型号模拟边界；
 - 功耗、温度、时钟和流量跟随同一负载，不会各自独立乱跳；
 - 不健康模拟单元降低活动，只使用已有证据定义的健康状态；
 - counter 从明确的模拟器 epoch 开始单调增长。

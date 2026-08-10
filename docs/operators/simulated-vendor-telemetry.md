@@ -14,7 +14,7 @@ Scenario file or any `kasim` command:
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.4.1 \
+  --version 0.5.0 \
   --namespace kasim-system \
   --create-namespace
 
@@ -31,7 +31,7 @@ duplicate targets:
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.4.1 \
+  --version 0.5.0 \
   --namespace kasim-system \
   --set telemetry.serviceMonitor.enabled=true
 ```
@@ -46,18 +46,22 @@ entirely outside the chart, set
 An H200 Scenario can expose a native NVIDIA family such as:
 
 ```text
-DCGM_FI_DEV_GPU_UTIL{Hostname="kasim-node-...",gpu="0",UUID="kasim-...",device="kasim0",modelName="nvidia-h200",node="kasim-node-...",kasim_instance="h200-lab",kasim_node="kasim-node-...",kasim_pool="accelerators",kasim_profile="nvidia",kasim_model="nvidia-h200",kasim_device="kasim-...",kasim_simulated="true"} 72.4
+DCGM_FI_DEV_GPU_UTIL{gpu="0",UUID="GPU-...",pci_bus_id="00000000:af:00.0",device="nvidia0",modelName="NVIDIA H200",Hostname="kasim-node-...",DCGM_FI_DRIVER_VERSION="580.126.16"} 72.4
 ```
 
-The original family name and native label keys come from a pinned exporter
-source. The `kasim_*` labels are intentionally additional: every query and
-alert can prove that the sample is synthetic; `kasim_value_model="correlated-v1"`
-identifies the value model. Every device sample also carries the compatibility
-label `node=<Synthetic Node>`. It always matches `kasim_node` and never names
-the real Node that hosts the centralized telemetry Pod, so PromQL does not need
-to derive device ownership from `kube_pod_info`. Synthetic Nodes are series
-dimensions on this aggregate endpoint; Kasim does not create a fake exporter
-Pod or Service for every Node.
+The family name, `HELP`, `TYPE`, and complete label-key set come from the
+selected exporter contract. Vendor-native samples contain no `kasim_*` label
+and no generic `node` compatibility label unless `node` is itself a native key
+of that exporter. Family-specific labels are also preserved: for example,
+`DCGM_FI_DEV_XID_ERRORS` additionally carries `err_code` and `err_msg` in the
+supplied DCGM compatibility contract.
+
+Node ownership must be read from the exporter's native key, such as DCGM
+`Hostname`, AMD `hostname`, Cambricon `node`, Iluvatar `node_name`, Enflame
+`host`, or an exporter-supported optional hostname. Do not replace it with the
+real Node that hosts the centralized telemetry Pod, and do not enrich it from
+`kube_pod_info`. Synthetic Nodes remain series dimensions on this aggregate
+endpoint; Kasim does not create a fake exporter Pod or Service for every Node.
 
 Every owned Node also has `kasim_telemetry_node_info`. Every device has
 `kasim_telemetry_device_contract_available`; profiles without enough evidence
@@ -69,6 +73,10 @@ state are available through:
 - `kasim_telemetry_source_up`;
 - `kasim_telemetry_render_errors_total`.
 
+These separate `kasim_telemetry_*` families carry Kasim provenance and make the
+synthetic source explicit without modifying any vendor family. Scrape-target
+configuration should also identify the Kasim telemetry Service.
+
 ## Value behavior
 
 Kasim samples an immutable snapshot every 15 seconds. Repeated scrapes within
@@ -76,7 +84,8 @@ one bucket return the same values, including after process restart. A stable
 device identity and time bucket drive one shared load state:
 
 - utilization changes smoothly within the contract range;
-- used and free memory stay non-negative and within the model envelope;
+- used, free, and exporter-defined reserved memory stay non-negative and within
+  the model envelope;
 - power, temperature, clocks, and traffic follow the same load instead of
   changing independently;
 - unhealthy simulated units suppress activity and use only a documented
