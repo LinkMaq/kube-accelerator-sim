@@ -182,25 +182,25 @@ jobs:
       - name: Build controller image
         run: >-
           docker build
-          --build-arg VERSION=0.5.2
+          --build-arg VERSION=0.5.3
           --build-arg SOURCE_REVISION=${{ github.sha }}
           --build-arg BUILD_DATE=1970-01-01T00:00:00Z
-          --tag kasim-controller:0.5.2
+          --tag kasim-controller:0.5.3
           .
 
       - name: Verify controller image metadata
         shell: bash
         run: |
-          test "$(docker image inspect kasim-controller:0.5.2 --format '{{.Config.User}}')" = "65532:65532"
-          test "$(docker image inspect kasim-controller:0.5.2 --format '{{index .Config.Labels "org.opencontainers.image.version"}}')" = "0.5.2"
-          test "$(docker image inspect kasim-controller:0.5.2 --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "${GITHUB_SHA}"
-          docker run --rm kasim-controller:0.5.2 --version | grep 'kasim-controller 0.5.2'
-          docker run --rm --entrypoint /kasim-telemetry kasim-controller:0.5.2 --version | grep 'kasim-telemetry 0.5.2'
+          test "$(docker image inspect kasim-controller:0.5.3 --format '{{.Config.User}}')" = "65532:65532"
+          test "$(docker image inspect kasim-controller:0.5.3 --format '{{index .Config.Labels "org.opencontainers.image.version"}}')" = "0.5.3"
+          test "$(docker image inspect kasim-controller:0.5.3 --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "${GITHUB_SHA}"
+          docker run --rm kasim-controller:0.5.3 --version | grep 'kasim-controller 0.5.3'
+          docker run --rm --entrypoint /kasim-telemetry kasim-controller:0.5.3 --version | grep 'kasim-telemetry 0.5.3'
 
       - name: Exercise chart install, upgrade, ownership, and uninstall
         env:
           KASIM_E2E_HELM: "1"
-          KASIM_CONTROLLER_IMAGE: kasim-controller:0.5.2
+          KASIM_CONTROLLER_IMAGE: kasim-controller:0.5.3
         run: >-
           go test -v ./test/e2e
           -run TestRuntimeChartInstallUpgradeUninstall
