@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -30,13 +31,13 @@ func TestBundledCatalogHasEvidenceGatedCoverage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadBundled() error = %v", err)
 	}
-	if catalog.Revision() != "2026-08-10.1" || !strings.HasPrefix(catalog.Digest(), "sha256:") {
+	if catalog.Revision() != "2026-08-12.1" || !strings.HasPrefix(catalog.Digest(), "sha256:") {
 		t.Fatalf("unexpected catalog identity: %s %s", catalog.Revision(), catalog.Digest())
 	}
 	states := catalog.ProfileStates()
 	for _, profile := range []string{
 		"nvidia", "amd", "intel-gpu", "huawei-ascend", "cambricon",
-		"iluvatar", "enflame", "furiosa", "rdma-shared-device-plugin",
+		"iluvatar", "enflame", "furiosa", "hygon", "rdma-shared-device-plugin",
 	} {
 		if states[profile] != "verified" {
 			t.Errorf("profile %s state = %q, want verified", profile, states[profile])
@@ -47,7 +48,7 @@ func TestBundledCatalogHasEvidenceGatedCoverage(t *testing.T) {
 			t.Errorf("profile %s state = %q, want provisional", profile, states[profile])
 		}
 	}
-	for _, profile := range []string{"hygon", "kunlunxin-hami", "sriov-network-device-plugin"} {
+	for _, profile := range []string{"kunlunxin-hami", "sriov-network-device-plugin"} {
 		if states[profile] != "unavailable" {
 			t.Errorf("profile %s state = %q, want unavailable", profile, states[profile])
 		}
@@ -128,7 +129,7 @@ func TestRenderIsDeterministicCorrelatedAndParseable(t *testing.T) {
 		labels := metricLabels(sample)
 		assertLabelKeys(t, labels, []string{
 			"gpu", "UUID", "pci_bus_id", "device", "modelName", "Hostname",
-			"DCGM_FI_DRIVER_VERSION", "node",
+			"DCGM_FI_DRIVER_VERSION", "node", "model", "uuid", "vendor",
 		})
 		if labels["Hostname"] != "kasim-node-a" || labels["node"] != "kasim-node-a" ||
 			labels["device"] != "nvidia"+labels["gpu"] ||
@@ -141,7 +142,7 @@ func TestRenderIsDeterministicCorrelatedAndParseable(t *testing.T) {
 	xidLabels := metricLabels(families["DCGM_FI_DEV_XID_ERRORS"].Metric[0])
 	assertLabelKeys(t, xidLabels, []string{
 		"gpu", "UUID", "pci_bus_id", "device", "modelName", "Hostname",
-		"DCGM_FI_DRIVER_VERSION", "err_code", "err_msg", "node",
+		"DCGM_FI_DRIVER_VERSION", "err_code", "err_msg", "node", "model", "uuid", "vendor",
 	})
 	if xidLabels["err_code"] != "0" || xidLabels["err_msg"] != "No Error" {
 		t.Errorf("DCGM XID labels = %#v", xidLabels)
@@ -216,7 +217,7 @@ func TestNVIDIARenderMatchesSuppliedDCGMExpositionSchema(t *testing.T) {
 		for label := range wantLabels {
 			wantKeys = append(wantKeys, label)
 		}
-		assertLabelKeys(t, metricLabels(got.Metric[0]), append(wantKeys, "node"))
+		assertLabelKeys(t, metricLabels(got.Metric[0]), withIdentityOverlay(wantKeys))
 	}
 }
 
@@ -267,7 +268,7 @@ func TestEveryVerifiedProfileEmitsOnlyCatalogDeclaredNativeLabels(t *testing.T) 
 	module := testModule(t)
 	for _, profileID := range []string{
 		"nvidia", "amd", "intel-gpu", "huawei-ascend", "cambricon",
-		"iluvatar", "enflame", "furiosa", "rdma-shared-device-plugin",
+		"iluvatar", "enflame", "furiosa", "hygon", "rdma-shared-device-plugin",
 	} {
 		profile, found := module.contracts.profile(profileID)
 		if !found {
@@ -297,10 +298,7 @@ func TestEveryVerifiedProfileEmitsOnlyCatalogDeclaredNativeLabels(t *testing.T) 
 			for _, label := range family.Labels {
 				want = append(want, label.Name)
 			}
-			if !slices.Contains(want, "node") {
-				want = append(want, "node")
-			}
-			assertLabelKeys(t, metricLabels(samples[0]), want)
+			assertLabelKeys(t, metricLabels(samples[0]), withIdentityOverlay(want))
 		}
 	}
 }
@@ -334,8 +332,8 @@ func TestNativeRDMADeviceLabelsRemainUniqueAcrossSyntheticNodes(t *testing.T) {
 	}
 	left := metricLabels(samples[0])
 	right := metricLabels(samples[1])
-	assertLabelKeys(t, left, []string{"device", "port", "node"})
-	assertLabelKeys(t, right, []string{"device", "port", "node"})
+	assertLabelKeys(t, left, withIdentityOverlay([]string{"device", "port"}))
+	assertLabelKeys(t, right, withIdentityOverlay([]string{"device", "port"}))
 	if left["device"] == right["device"] {
 		t.Fatalf("aggregate endpoint produced duplicate native RDMA series labels: %#v", left)
 	}
@@ -411,7 +409,7 @@ func TestRenderReportsUnavailableWithoutInventingNativeMetrics(t *testing.T) {
 	t.Parallel()
 
 	module := testModule(t)
-	body, err := module.render(testObservation("hygon", "hygon-k100-ai", 1, 1), time.Now().UTC())
+	body, err := module.render(testObservation("kunlunxin-hami", "kunlunxin-r200", 1, 1), time.Now().UTC())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -420,9 +418,182 @@ func TestRenderReportsUnavailableWithoutInventingNativeMetrics(t *testing.T) {
 		t.Fatal("unavailable profile lacks explicit diagnostic")
 	}
 	for name := range families {
-		if strings.Contains(strings.ToLower(name), "hygon") || strings.Contains(strings.ToLower(name), "dcu") {
+		if strings.Contains(strings.ToLower(name), "kunlun") || strings.Contains(strings.ToLower(name), "xpu") {
 			t.Fatalf("unavailable profile invented native family %q", name)
 		}
+	}
+}
+
+func TestHuaweiAndHygonEmitEightIndependentConsistentDeviceSeries(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		profile          string
+		model            string
+		identityLabel    string
+		utilization      string
+		usedMemory       string
+		totalMemory      string
+		memoryRemaining  string
+		memoryPercent    string
+		health           string
+		error            string
+		workloadLabels   []string
+		requiredFamilies []string
+	}{
+		{
+			name: "Huawei Ascend", profile: "huawei-ascend", model: "huawei-atlas-a3",
+			identityLabel: "id", utilization: "npu_chip_info_utilization",
+			usedMemory: "npu_chip_info_hbm_used_memory", totalMemory: "npu_chip_info_hbm_total_memory",
+			memoryPercent: "npu_chip_info_hbm_utilization", health: "npu_chip_info_health_status",
+			error: "npu_chip_info_error_code", workloadLabels: []string{"namespace", "pod_name", "container_name"},
+			requiredFamilies: []string{
+				"npu_chip_info_utilization", "npu_chip_info_temperature", "npu_chip_info_power",
+				"npu_chip_info_hbm_used_memory", "npu_chip_info_hbm_total_memory",
+				"npu_chip_info_hbm_utilization", "npu_chip_info_health_status", "npu_chip_info_error_code",
+			},
+		},
+		{
+			name: "Hygon DCU", profile: "hygon", model: "hygon-k100-ai",
+			identityLabel: "minor_number", utilization: "dcu_utilizationrate",
+			usedMemory: "dcu_usedmemory_bytes", totalMemory: "dcu_memorycap_bytes",
+			memoryRemaining: "dcu_memory_remaining", error: "dcu_ue_count",
+			workloadLabels: []string{"dcu_pod_namespace", "dcu_pod_name", "container"},
+			requiredFamilies: []string{
+				"dcu_utilizationrate", "dcu_usedmemory_bytes", "dcu_memorycap_bytes",
+				"dcu_memory_remaining", "dcu_power_usage", "dcu_temp", "dcu_ce_count", "dcu_ue_count",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			observation := testObservation(test.profile, test.model, 8, 7)
+			families := parseExpositionAt(
+				t, testModule(t), observation,
+				time.Date(2026, 8, 12, 12, 0, 0, 0, time.UTC),
+			)
+			identities := make(map[string]string, 8)
+			utilizationValues := make(map[float64]struct{}, 8)
+			for _, name := range test.requiredFamilies {
+				family := families[name]
+				if family == nil {
+					t.Fatalf("required family %s is absent", name)
+				}
+				if len(family.Metric) != 8 {
+					t.Fatalf("%s sample count = %d, want 8", name, len(family.Metric))
+				}
+				for _, sample := range family.Metric {
+					labels := metricLabels(sample)
+					ordinal := labels[test.identityLabel]
+					if ordinal == "" || labels["node"] != "kasim-node-a" || labels["device"] != ordinal ||
+						labels["model"] != test.model || labels["uuid"] == "" || labels["vendor"] == "" {
+						t.Errorf("%s identity labels = %#v", name, labels)
+					}
+					identity := strings.Join([]string{
+						labels["device"], labels["model"], labels["node"], labels["uuid"], labels["vendor"],
+					}, "|")
+					if previous, found := identities[ordinal]; found && previous != identity {
+						t.Fatalf("device %s identity changed: %q != %q", ordinal, previous, identity)
+					}
+					identities[ordinal] = identity
+					for _, workload := range test.workloadLabels {
+						if labels[workload] != "" {
+							t.Errorf("%s fabricated workload label %s=%q", name, workload, labels[workload])
+						}
+					}
+				}
+			}
+			if len(identities) != 8 {
+				t.Fatalf("unique identities = %d, want 8", len(identities))
+			}
+			uuidSet := make(map[string]struct{}, 8)
+			for _, identity := range identities {
+				parts := strings.Split(identity, "|")
+				uuidSet[parts[3]] = struct{}{}
+			}
+			if len(uuidSet) != 8 {
+				t.Fatalf("unique UUIDs = %d, want 8", len(uuidSet))
+			}
+
+			for _, sample := range families[test.utilization].Metric {
+				value := sample.GetGauge().GetValue()
+				if value < 0 || value > 100 {
+					t.Errorf("utilization = %v, want [0,100]", value)
+				}
+				utilizationValues[value] = struct{}{}
+			}
+			if len(utilizationValues) < 3 {
+				t.Fatalf("independent utilization values = %v, want at least 3", utilizationValues)
+			}
+
+			for ordinal := 0; ordinal < 8; ordinal++ {
+				id := fmt.Sprintf("%d", ordinal)
+				used := metricValueByLabel(t, families[test.usedMemory], test.identityLabel, id)
+				total := metricValueByLabel(t, families[test.totalMemory], test.identityLabel, id)
+				if used < 0 || total <= 0 || used > total {
+					t.Errorf("device %d memory used/total = %v/%v", ordinal, used, total)
+				}
+				if test.memoryRemaining != "" {
+					remaining := metricValueByLabel(t, families[test.memoryRemaining], test.identityLabel, id)
+					if math.Abs(used+remaining-total) > 0.001 {
+						t.Errorf("device %d memory invariant: %v + %v != %v", ordinal, used, remaining, total)
+					}
+				}
+				if test.memoryPercent != "" {
+					percent := metricValueByLabel(t, families[test.memoryPercent], test.identityLabel, id)
+					if math.Abs(percent-used/total*100) > 0.000001 {
+						t.Errorf("device %d memory percent = %v, want %v", ordinal, percent, used/total*100)
+					}
+				}
+			}
+
+			if test.health != "" {
+				if got := metricValueByLabel(t, families[test.health], test.identityLabel, "0"); got != 1 {
+					t.Errorf("healthy device status = %v, want 1", got)
+				}
+				if got := metricValueByLabel(t, families[test.health], test.identityLabel, "7"); got != 0 {
+					t.Errorf("faulty device status = %v, want 0", got)
+				}
+			}
+			if healthy := metricValueByLabel(t, families[test.error], test.identityLabel, "0"); healthy != 0 {
+				t.Errorf("healthy device error = %v, want 0", healthy)
+			}
+			if faulty := metricValueByLabel(t, families[test.error], test.identityLabel, "7"); faulty == 0 {
+				t.Errorf("faulty device error = %v, want non-zero", faulty)
+			}
+			for name := range families {
+				if strings.HasPrefix(name, "rune_accelerator_") ||
+					(test.profile != "nvidia" && strings.HasPrefix(name, "DCGM_FI_DEV_")) {
+					t.Errorf("profile %s emitted forbidden family %s", test.profile, name)
+				}
+			}
+		})
+	}
+}
+
+func TestDeviceUUIDSurvivesModuleRestartAndFaultRecovery(t *testing.T) {
+	t.Parallel()
+
+	at := time.Date(2026, 8, 12, 12, 0, 0, 0, time.UTC)
+	faulty := testObservation("huawei-ascend", "huawei-atlas-a3", 8, 7)
+	recovered := testObservation("huawei-ascend", "huawei-atlas-a3", 8, 8)
+	first := parseExpositionAt(t, testModule(t), faulty, at)
+	second := parseExpositionAt(t, testModule(t), recovered, at.Add(sampleInterval))
+
+	for ordinal := 0; ordinal < 8; ordinal++ {
+		id := fmt.Sprintf("%d", ordinal)
+		left := metricLabels(metricByLabel(t, first["npu_chip_info_utilization"], "id", id))["uuid"]
+		right := metricLabels(metricByLabel(t, second["npu_chip_info_utilization"], "id", id))["uuid"]
+		if left == "" || left != right {
+			t.Errorf("device %d UUID changed across restart/recovery: %q -> %q", ordinal, left, right)
+		}
+	}
+	if got := metricValueByLabel(t, second["npu_chip_info_health_status"], "id", "7"); got != 1 {
+		t.Errorf("recovered device health = %v, want 1", got)
 	}
 }
 
@@ -673,6 +844,16 @@ func assertLabelKeys(t *testing.T, labels map[string]string, want []string) {
 	}
 }
 
+func withIdentityOverlay(labels []string) []string {
+	result := append([]string(nil), labels...)
+	for _, name := range []string{"device", "model", "node", "uuid", "vendor"} {
+		if !slices.Contains(result, name) {
+			result = append(result, name)
+		}
+	}
+	return result
+}
+
 func nativeMetricLine(body, metricName string) string {
 	for _, line := range strings.Split(body, "\n") {
 		if strings.HasPrefix(line, metricName+"{") || strings.HasPrefix(line, metricName+" ") {
@@ -684,18 +865,29 @@ func nativeMetricLine(body, metricName string) string {
 
 func metricValueByLabel(t *testing.T, family *dto.MetricFamily, labelName, labelValue string) float64 {
 	t.Helper()
+	metric := metricByLabel(t, family, labelName, labelValue)
+	if metric.Gauge != nil {
+		return metric.Gauge.GetValue()
+	}
+	if metric.Counter != nil {
+		return metric.Counter.GetValue()
+	}
+	t.Fatalf("metric label %s=%s has no gauge or counter value", labelName, labelValue)
+	return 0
+}
+
+func metricByLabel(t *testing.T, family *dto.MetricFamily, labelName, labelValue string) *dto.Metric {
+	t.Helper()
+	if family == nil {
+		t.Fatalf("metric family for label %s=%s is absent", labelName, labelValue)
+	}
 	for _, metric := range family.Metric {
 		if metricLabels(metric)[labelName] == labelValue {
-			if metric.Gauge != nil {
-				return metric.Gauge.GetValue()
-			}
-			if metric.Counter != nil {
-				return metric.Counter.GetValue()
-			}
+			return metric
 		}
 	}
 	t.Fatalf("metric label %s=%s not found", labelName, labelValue)
-	return 0
+	return nil
 }
 
 func eventuallyGET(t *testing.T, url string) string {

@@ -248,12 +248,14 @@ func supportedLabelSource(source string) bool {
 
 func supportedSemantic(semantic string) bool {
 	return slices.Contains([]string{
-		"clock-core", "clock-memory", "constant-zero", "cycle-counter", "energy", "health-binary", "health-enflame",
+		"clock-core", "clock-memory", "constant-zero", "correctable-error-count", "cycle-counter", "energy",
+		"health-binary", "health-enflame", "health-one-healthy",
 		"ib-physical-state", "ib-state", "info", "link-rate", "memory-free",
-		"memory-free-reserved", "memory-ratio", "memory-reserved", "memory-total", "memory-used", "packet-rx-counter",
+		"memory-free-reserved", "memory-ratio", "memory-reserved", "memory-total", "memory-used",
+		"memory-utilization-percent", "packet-rx-counter",
 		"packet-tx-counter", "power", "temperature",
 		"traffic-rx-counter", "traffic-tx-counter", "throughput-rx", "throughput-tx",
-		"utilization", "utilization-ratio", "utilization-sparse", "last-error",
+		"uncorrectable-error-count", "utilization", "utilization-ratio", "utilization-sparse", "last-error",
 	}, semantic)
 }
 

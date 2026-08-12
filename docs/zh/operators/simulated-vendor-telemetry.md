@@ -11,7 +11,7 @@ Kasim 通过一个只读的集群内端点，为每个准确归属的 Synthetic 
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.5.2 \
+  --version 0.5.3 \
   --namespace kasim-system \
   --create-namespace
 
@@ -27,7 +27,7 @@ Operator CRD，可以改用 ServiceMonitor；两种发现方式不要同时使�
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.5.2 \
+  --version 0.5.3 \
   --namespace kasim-system \
   --set telemetry.serviceMonitor.enabled=true
 ```
@@ -47,12 +47,14 @@ ServiceMonitor 关闭。
 H200 场景可能生成如下 NVIDIA 原生 family：
 
 ```text
-DCGM_FI_DEV_GPU_UTIL{gpu="0",UUID="GPU-...",pci_bus_id="00000000:af:00.0",device="nvidia0",modelName="nvidia-h200",Hostname="kasim-node-...",DCGM_FI_DRIVER_VERSION="580.126.16",node="kasim-node-..."} 72.4
+DCGM_FI_DEV_GPU_UTIL{gpu="0",UUID="GPU-...",pci_bus_id="00000000:af:00.0",device="nvidia0",modelName="nvidia-h200",Hostname="kasim-node-...",DCGM_FI_DRIVER_VERSION="580.126.16",node="kasim-node-...",model="nvidia-h200",uuid="...",vendor="NVIDIA"} 72.4
 ```
 
 family 名、`TYPE` 和原生 label 来自所选 exporter 契约；除明确记录的 Kasim 兼容
-数值约定外，`HELP` 也保留来源定义。Kasim 为每个逐设备 family 增加唯一的兼容标签
-`node`，其值始终是该指标描述的 Synthetic Node。DCGM
+数值约定外，`HELP` 也保留来源定义。Kasim 为每个逐设备 family 增加稳定身份层：
+`node`、`device`、`model`、`uuid` 和 `vendor`。若 exporter 已定义同名 label，则保留
+其原生值；否则分别绑定 Synthetic Node、设备序号、catalog 型号、确定性设备 UUID
+和档案显示名。DCGM
 `Hostname`、AMD `hostname`、Cambricon `node`、Iluvatar `node_name`、Enflame
 `host` 等原生归属标签继续保留，且同样指向 Synthetic Node；厂商 family 不会携带
 `kasim_*`。单 family 专属 label 也会保留，例如 `DCGM_FI_DEV_XID_ERRORS` 额外带
@@ -62,8 +64,9 @@ family 名、`TYPE` 和原生 label 来自所选 exporter 契约；除明确记�
 `feature.node.cloud.xiaoshiai.cn/accelerator-model.name=<catalog-model-id>`。
 Telemetry Catalog 绑定的 exporter 型号标签使用同一个 catalog model ID，因此 NVIDIA
 `modelName` 与节点标签逐字节一致。同一 Node Group 的多个池可以共享同一型号；若包含
-不同加速器型号则明确拒绝，因为节点标签只能有一个值。同一张设备的所有指标始终使用
-相同的 `gpu` 和 `UUID`。
+不同加速器型号则明确拒绝，因为节点标签只能有一个值。同一张设备的全部指标及进程
+重启前后，五个身份 label 与 `gpu`、`id`、`minor_number`、`device_id` 等原生选择器
+始终一致。
 
 不要把承载集中式 telemetry Pod 的真实节点写进 `node`，也不要通过 `kube_pod_info`
 覆盖它。Synthetic Node 仍是聚合端点中的 series 维度；Kasim 不会为每个节点伪造
@@ -72,6 +75,37 @@ exporter Pod 或 Service。
 使用 ServiceMonitor 发现时，下游清单查询可以通过 `on(namespace, pod)` 关联抓取
 目标元数据，同时不改变设备归属。这类 join 只能识别 Kasim telemetry 抓取目标；
 它不能证明该 Pod 拥有、预留或正在使用这些设备。
+
+## 华为昇腾与海光 DCU 契约
+
+华为契约按设备分别生成 AI Core 使用率、温度、功耗、HBM 已用量、HBM 总量、HBM
+使用率、健康状态和错误码。原生设备 label 为 `id`、`model_name`、`vdie_id`、
+`pcie_bus_info`、`namespace`、`pod_name` 和 `container_name`。兼容层 `uuid`
+是稳定的模拟设备身份，原生 `vdie_id` 保持 exporter 兼容的虚拟 die 值；三个工作
+负载 label 保持空值，因为集中式 telemetry Pod 不是模拟业务负载。
+`npu_chip_info_health_status` 遵循原生约定：`1=健康`、`0=故障`；
+`npu_chip_info_error_code` 在健康时为零、故障时为非零。
+
+海光契约遵循 DCU-Exporter 的名称和 gauge 类型：
+
+| 含义 | Family | 单位 |
+| --- | --- | --- |
+| 核心使用率 | `dcu_utilizationrate` | percent |
+| 显存已用量 | `dcu_usedmemory_bytes` | bytes |
+| 显存总量 | `dcu_memorycap_bytes` | bytes |
+| 显存剩余量 | `dcu_memory_remaining` | bytes |
+| 实时功耗 | `dcu_power_usage` | watts |
+| 温度 | `dcu_temp` | Celsius |
+| 可恢复错误 | `dcu_ce_count` | count |
+| 不可恢复错误 | `dcu_ue_count` | count |
+
+海光原生 label 为 `device_id`、`minor_number`、`name`、`node`、
+`pcieBus_number`、`dcu_pod_namespace`、`dcu_pod_name` 和 `container`，错误 family
+还包含 `block_type`。`device_id`、`pcieBus_number`、身份层及 `0` 到 `N-1` 的设备
+序号均为确定值，工作负载 label 保持空值。物理设备 exporter 并未提供独立的
+`dcu_health` family 或物理设备显存百分比 family，因此必须保留原始契约：由监控规则
+或消费端根据可恢复/不可恢复错误信号判断健康状态，并按
+`dcu_usedmemory_bytes / dcu_memorycap_bytes * 100` 计算显存使用率。
 
 每个归属节点都会生成 `kasim_telemetry_node_info`，每个设备都会生成
 `kasim_telemetry_device_contract_available`。证据不足的档案返回 `0`，而不是编造
@@ -88,12 +122,13 @@ family。抓取目标配置也应明确标识 Kasim telemetry Service。
 ## 数值行为
 
 Kasim 每 15 秒生成一次不可变快照。同一时间桶内重复抓取数值完全一致，进程重启
-也不会改变该时间桶。稳定设备身份和时间桶共同产生一个关联负载状态：
+也不会改变该时间桶。稳定设备身份和时间桶共同产生一个关联负载状态。八卡池中的设备
+序号会确定性覆盖空闲、持续任务、显存高负载和突发任务，`kasim health` 控制故障与恢复：
 
 - 利用率在闭区间 `0`～`100` 内平滑变化；需要比例值的消费者再转换成 `0`～`1`；
 - 已用、空闲以及 exporter 定义的预留显存保持非负，且不超过型号模拟边界；
 - 功耗、温度、时钟和流量跟随同一负载，不会各自独立乱跳；
-- 健康类数值使用 `0` 表示正常、非零表示故障；不健康模拟单元同时降低活动；
+- 健康值保留厂商约定；正常设备的错误信号为零、故障设备为非零，不健康设备同时降低活动；
 - counter 从明确的模拟器 epoch 开始单调增长。
 
 这些曲线适合验证 Prometheus 采集、看板、告警规则和平台适配，不可用于板卡选型、
@@ -103,9 +138,9 @@ Kasim 每 15 秒生成一次不可变快照。同一时间桶内重复抓取数�
 
 | 状态 | 档案 |
 | --- | --- |
-| 已启用原生 family | NVIDIA DCGM、AMD Device Metrics Exporter、Intel XPU Manager、Huawei Ascend npu-exporter、Cambricon mlu-exporter、Iluvatar ix-exporter、Enflame gcu-exporter、Furiosa metrics exporter、Prometheus node_exporter InfiniBand collector |
+| 已启用原生 family | NVIDIA DCGM、AMD Device Metrics Exporter、Intel XPU Manager、Huawei Ascend npu-exporter、Hygon DCU-Exporter、Cambricon mlu-exporter、Iluvatar ix-exporter、Enflame gcu-exporter、Furiosa metrics exporter、Prometheus node_exporter InfiniBand collector |
 | 可发现但因 provisional 暂不启用 | Intel Gaudi、AWS Neuron、Google TPU provider telemetry、Moore Threads、Graphcore、MetaX |
-| 明确 unavailable | Biren、Hygon DCU、Kunlunxin through HAMi、Vastai through HAMi、Qualcomm Cloud AI 100、SR-IOV Device Plugin 原生遥测 |
+| 明确 unavailable | Biren、Kunlunxin through HAMi、Vastai through HAMi、Qualcomm Cloud AI 100、SR-IOV Device Plugin 原生遥测 |
 
 覆盖范围只由证据决定。支持调度资源并不等于支持遥测。精确指标名、类型、单位、
 原生标签、来源版本和产品限制见[加速器遥测研究](../../research/accelerator-telemetry-metrics.md)。
@@ -140,6 +175,35 @@ ServiceMonitor 模式会在抓取后保留 `namespace`、`pod` 并删除 `contai
 注解或外部配置抓取，且查询需要关联目标元数据，应保留等价的目标身份。无论采用哪种
 交付方式，后端都应把 `kasim-system` telemetry 目标识别为基础设施组件，不能根据其
 Pod 标签推断设备归属。
+
+## 验收查询
+
+对于一台八卡华为节点，以下即时查询均应返回 `8`：
+
+```promql
+count(npu_chip_info_utilization)
+count(npu_chip_info_hbm_used_memory)
+count(count by (node, device, uuid) (npu_chip_info_health_status))
+```
+
+对于一台八卡海光节点，使用：
+
+```promql
+count(dcu_utilizationrate)
+count(dcu_memorycap_bytes)
+count(count by (node, device, uuid) (dcu_ue_count))
+```
+
+至少完成两次抓取后，以下范围查询的每个结果都应大于一：
+
+```promql
+count_over_time(npu_chip_info_utilization[5m])
+count_over_time(dcu_utilizationrate[5m])
+```
+
+使用 `count(count by (uuid) (<family>))` 检查 UUID 唯一性，并与 Node 容量对比；对每个
+family 按 `(node, device, model, uuid, vendor)` 分组检查身份一致性。华为和海光不应匹配
+`{__name__=~"DCGM_FI_DEV_.*"}`。
 
 ## 故障排查
 

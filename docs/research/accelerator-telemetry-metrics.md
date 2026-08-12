@@ -1,6 +1,6 @@
 # Accelerator telemetry metric evidence
 
-Checked: 2026-08-10
+Checked: 2026-08-12
 
 ## Question and evidence rule
 
@@ -55,6 +55,8 @@ declared/emitted by the cited implementation.
 | Huawei Ascend | `npu_chip_info_utilization`, `npu_chip_info_overall_utilization`, `npu_chip_info_vector_utilization` | gauge | source describes utilization but does not fix an exposition unit in the collector | `id`, `model_name`, `vdie_id`, `pcie_bus_info`, `namespace`, `pod_name`, `container_name` | vNPU support differs; failed reads use vendor failure values. |
 | Huawei Ascend | `npu_chip_info_temperature`, `npu_chip_info_power`, `npu_chip_info_aicore_current_freq` | gauge | frequency is MHz; temperature and power units are not fixed in the cited collector help | same as above | Device-dependent. |
 | Huawei Ascend | `npu_chip_info_hbm_used_memory`, `npu_chip_info_hbm_total_memory`, `npu_chip_info_hbm_utilization`, `npu_chip_info_hbm_temperature`, `npu_chip_info_hbm_bandwidth_utilization` | gauge | collector help does not fix memory unit | same as above | HBM collector is restricted to supported Ascend 910-family devices; vNPU limitations apply. |
+| Hygon DCU | `dcu_utilizationrate`, `dcu_usedmemory_bytes`, `dcu_memorycap_bytes`, `dcu_memory_remaining` | gauge | percent for utilization; bytes for memory | `device_id`, `minor_number`, `name`, `node`, `pcieBus_number`, optional workload labels | The public implementation and vendor-operated guide agree on the names; the guide contains a `cu_usedmemory_bytes` typo while the source defines `dcu_usedmemory_bytes`. |
+| Hygon DCU | `dcu_power_usage`, `dcu_temp`, `dcu_ce_count`, `dcu_ue_count` | gauge | watts, Celsius, error counts | same as above; error families add `block_type` | The exporter has no separate physical-device health or memory-percentage family; consumers derive those from raw families. |
 | Huawei Ascend | `container_npu_utilization`, `container_npu_total_memory`, `container_npu_used_memory` | gauge | percent and MB | same as above | Workload attribution must exist; do not fabricate pod identity. |
 | Cambricon | `mlu_utilization` | gauge | percent | official Kubernetes configuration uses `driver`, `mcu`, `mlu`, `model`, `node`, `node_ip`, `sn`, `type`, `uuid`; some metrics include `vf` | Metric names, labels, and prefix are configuration-driven; official Kubernetes deployment uses prefix `mlu`. |
 | Cambricon | `mlu_memory_used`, `mlu_memory_total` | gauge | bytes | same as above | Product-dependent. |
@@ -84,6 +86,7 @@ declared/emitted by the cited implementation.
 - AMD: the [official metric list](https://github.com/ROCm/device-metrics-exporter/blob/4642bb460926b531cefed17b5ad997be81b891f2/docs/configuration/metricslist.md), [Prometheus declarations](https://github.com/ROCm/device-metrics-exporter/blob/4642bb460926b531cefed17b5ad997be81b891f2/pkg/amdgpu/gpuagent/gpuagent_gpu_metrics.go), and [prefix/label configuration](https://github.com/ROCm/device-metrics-exporter/blob/4642bb460926b531cefed17b5ad997be81b891f2/docs/configuration/configmap.md).
 - Intel GPU: XPU Manager's [metric catalog](https://github.com/intel/xpumanager/blob/57e44f558a3c3f4e7ec3cdfae6ccd8739ffb3be5/doc/Prometheus_Exported_Metrics.csv), [metric mapping and types](https://github.com/intel/xpumanager/blob/57e44f558a3c3f4e7ec3cdfae6ccd8739ffb3be5/rest/prometheus_exporter/prometheus_exporter_types.py), and [label/scaling implementation](https://github.com/intel/xpumanager/blob/57e44f558a3c3f4e7ec3cdfae6ccd8739ffb3be5/rest/prometheus_exporter/prometheus_exporter.py).
 - Huawei Ascend: the pinned MindCluster collectors for [NPU](https://gitee.com/ascend/mind-cluster/blob/97641a5566914158b9c0eb227c05a223d275e68d/component/npu-exporter/collector/metrics/collector_for_npu.go), [HBM](https://gitee.com/ascend/mind-cluster/blob/97641a5566914158b9c0eb227c05a223d275e68d/component/npu-exporter/collector/metrics/collector_for_hbm.go), [RoCE](https://gitee.com/ascend/mind-cluster/blob/97641a5566914158b9c0eb227c05a223d275e68d/component/npu-exporter/collector/metrics/collector_for_roce.go), and the [common gauge emission path](https://gitee.com/ascend/mind-cluster/blob/97641a5566914158b9c0eb227c05a223d275e68d/component/npu-exporter/collector/common/metrics_collector.go).
+- Hygon DCU: the vendor-operated [DCU-Exporter metric and label guide](https://developer.sourcefind.cn/document/87ee5c5b-c10d-11f0-b077-0242ac150003?id=504708cf-c9ce-11f0-9b60-0242ac150003&version=87ee5c5b-c10d-11f0-b077-0242ac150003) and public [gauge declarations and label bindings at `30408d0`](https://github.com/Project-HAMi/dcu-exporter/blob/30408d074cd420729f5698710d54fb30abefb0b1/main.go).
 - Cambricon: [official metric configuration](https://github.com/Cambricon/mlu-exporter/blob/613459d6b730cad3caf4c08aa3dcf28f523bf1c1/examples/metrics.yaml), [collector](https://github.com/Cambricon/mlu-exporter/blob/613459d6b730cad3caf4c08aa3dcf28f523bf1c1/pkg/collector/cndev.go), and [Prometheus emission code](https://github.com/Cambricon/mlu-exporter/blob/613459d6b730cad3caf4c08aa3dcf28f523bf1c1/pkg/metrics/metrics.go).
 - Iluvatar: the official DeepSpark [`metrics.yaml` at `7f169d7`](https://gitee.com/deep-spark/ix-exporter/blob/7f169d7f1c0b66cc809ecba28f6d520e8f28ff2c/etc/metrics.yaml) and [gauge emission implementation](https://gitee.com/deep-spark/ix-exporter/blob/7f169d7f1c0b66cc809ecba28f6d520e8f28ff2c/pkg/collector/collector.go).
 - Enflame: the official [namespace/typed emission code](https://github.com/EnflameTechnology/gcu-exporter/blob/0e6e15c9cb8034e85b70959cc30f702ac56114ed/collector/collector.go), [usage collector](https://github.com/EnflameTechnology/gcu-exporter/blob/0e6e15c9cb8034e85b70959cc30f702ac56114ed/collector/gcu_usage.go), and [repository README](https://github.com/EnflameTechnology/gcu-exporter/blob/0e6e15c9cb8034e85b70959cc30f702ac56114ed/README.md) at `0e6e15c`.
@@ -105,12 +108,13 @@ and `unit`. A supplied runtime scrape can define an intentional compatibility
 overlay, but it must be identified separately when it conflicts with the
 pinned first-party implementation.
 
-Telemetry revision `2026-08-10.1` intentionally adds a runtime compatibility
+Telemetry revision `2026-08-12.1` intentionally adds a runtime compatibility
 overlay that is not upstream exporter evidence: every per-device series gains
-`node=<Synthetic Node name>`, catalog-bound model labels use the stable catalog
-model ID, utilization uses 0–100, and health-like values use zero for healthy
-and non-zero for faulty. The Enflame health and Furiosa alive families therefore
-carry explicit compatibility `HELP`; the source facts below remain unchanged.
+stable `node`, `device`, `model`, `uuid`, and `vendor` identities when the
+exporter does not already define the name. Catalog-bound model labels use the
+stable catalog model ID and utilization uses 0–100. Native health conventions
+remain intact; error signals use zero for healthy and non-zero for faulty. The
+source facts below remain unchanged.
 
 ### Audit summary
 
@@ -119,7 +123,8 @@ carry explicit compatibility `HELP`; the source facts below remain unchanged.
 | NVIDIA | Nineteen of 20 catalog families match the pinned CSV's names, types, and HELP. `DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL` conflicts: pinned first-party type is gauge, supplied sample type is counter. Core labels also mix the sample's uppercase `Hostname` and XID detail labels with a newer pinned renderer. | Treat the sample-only differences as an explicit compatibility overlay, or change NVLink to gauge and the schema to pinned-source labels before calling the whole profile first-party exact. |
 | AMD | All eight catalog names, gauge types, HELP strings, label keys, and selected `clock_type="system"` value match the pinned source. | May remain verified. |
 | Intel GPU | All seven names, types, HELP strings, required selected-device label keys, and `src="direct"` match the pinned source; additional labels remain conditional. | May remain verified for the selected device-level shape. |
-| Huawei Ascend | All four families, gauge type, HELP strings, and seven labels are exact. | May remain verified. |
+| Huawei Ascend | All nine families, gauge type, HELP strings, and seven native labels are exact. | May remain verified. |
+| Hygon DCU | All eight selected names, gauge types, exact generic HELP, base labels, and `block_type` error label match the public implementation. | May be promoted to verified with the identity overlay documented separately. |
 | Cambricon | All five families, gauge type, HELP strings, and family-specific `vf` labels are exact under the official `mlu` prefix. | May remain verified. |
 | Iluvatar | All eight families, gauge types, HELP strings, and base labels are exact; Kubernetes workload labels are conditional. | May remain verified for the base schema. |
 | Enflame | All six names, gauge types, and the health-specific `healthmsg` label are exact. The health family uses explicit compatibility HELP and 0/non-zero values. | Keep the source health semantics recorded and classify the runtime value mapping as a compatibility overlay. |
@@ -229,7 +234,11 @@ the actual aggregation-function name. The source scales percentage inputs by
 
 ### Huawei Ascend npu-exporter
 
-Pinned first-party evidence: the [four descriptors at `97641a5`](https://gitee.com/ascend/mind-cluster/blob/97641a5566914158b9c0eb227c05a223d275e68d/component/npu-exporter/collector/metrics/collector_for_npu.go#L43-L51), [common label descriptor](https://gitee.com/ascend/mind-cluster/blob/97641a5566914158b9c0eb227c05a223d275e68d/component/npu-exporter/collector/common/metrics_collector.go#L30-L53), and [common gauge emission](https://gitee.com/ascend/mind-cluster/blob/97641a5566914158b9c0eb227c05a223d275e68d/component/npu-exporter/collector/metrics/common_utils.go#L70-L105).
+Pinned first-party evidence: the [base, health, and error descriptors at
+`97641a5`](https://gitee.com/ascend/mind-cluster/blob/97641a5566914158b9c0eb227c05a223d275e68d/component/npu-exporter/collector/metrics/collector_for_npu.go),
+the [HBM descriptors at the same revision](https://gitee.com/ascend/mind-cluster/blob/97641a5566914158b9c0eb227c05a223d275e68d/component/npu-exporter/collector/metrics/collector_for_hbm.go),
+[common label descriptor](https://gitee.com/ascend/mind-cluster/blob/97641a5566914158b9c0eb227c05a223d275e68d/component/npu-exporter/collector/common/metrics_collector.go#L30-L53),
+and [common gauge emission](https://gitee.com/ascend/mind-cluster/blob/97641a5566914158b9c0eb227c05a223d275e68d/component/npu-exporter/collector/metrics/common_utils.go#L70-L105).
 
 | Family | TYPE | Exact first-party HELP |
 | --- | --- | --- |
@@ -237,9 +246,42 @@ Pinned first-party evidence: the [four descriptors at `97641a5`](https://gitee.c
 | `npu_chip_info_temperature` | gauge | `the npu temperature` |
 | `npu_chip_info_power` | gauge | `the npu power` |
 | `npu_chip_info_aicore_current_freq` | gauge | `the npu ai core current frequency, unit is 'MHz'` |
+| `npu_chip_info_hbm_used_memory` | gauge | `the npu hbm used memory` |
+| `npu_chip_info_hbm_total_memory` | gauge | `the npu hbm total memory` |
+| `npu_chip_info_hbm_utilization` | gauge | `the npu hbm utilization` |
+| `npu_chip_info_health_status` | gauge | `the npu health status` |
+| `npu_chip_info_error_code` | gauge | `the npu error code` |
 
-All four use exactly `id`, `model_name`, `vdie_id`, `pcie_bus_info`,
+All nine use exactly `id`, `model_name`, `vdie_id`, `pcie_bus_info`,
 `namespace`, `pod_name`, and `container_name`. The catalog matches this schema.
+The health collector uses `1` for healthy and `0` for unhealthy, while the
+error-code family is zero for healthy devices.
+
+### Hygon DCU-Exporter
+
+Pinned implementation evidence: [DCU-Exporter at
+`30408d0`](https://github.com/Project-HAMi/dcu-exporter/blob/30408d074cd420729f5698710d54fb30abefb0b1/main.go).
+The vendor-operated [overview and label
+table](https://developer.sourcefind.cn/document/87ee5c5b-c10d-11f0-b077-0242ac150003?id=504708cf-c9ce-11f0-9b60-0242ac150003&version=87ee5c5b-c10d-11f0-b077-0242ac150003)
+confirms the selected families and meanings.
+
+| Family | TYPE | Exact implementation HELP | Unit |
+| --- | --- | --- | --- |
+| `dcu_utilizationrate` | gauge | `dcu metrics of gauge` | percent |
+| `dcu_usedmemory_bytes` | gauge | `dcu metrics of gauge` | bytes |
+| `dcu_memorycap_bytes` | gauge | `dcu metrics of gauge` | bytes |
+| `dcu_memory_remaining` | gauge | `dcu metrics of gauge` | bytes |
+| `dcu_power_usage` | gauge | `dcu metrics of gauge` | watts |
+| `dcu_temp` | gauge | `dcu metrics of gauge` | Celsius |
+| `dcu_ce_count` | gauge | `dcu metrics of gauge` | count |
+| `dcu_ue_count` | gauge | `dcu metrics of gauge` | count |
+
+All families use `device_id`, `minor_number`, `name`, `node`,
+`pcieBus_number`, `dcu_pod_namespace`, `dcu_pod_name`, and `container`;
+the error families add `block_type`. The catalog intentionally uses
+`dcu_usedmemory_bytes`, as defined by the implementation, instead of the
+vendor overview's one-character `cu_usedmemory_bytes` typo. No source-backed
+physical-device `dcu_health` or memory-percentage family is declared.
 
 ### Cambricon mlu-exporter
 
@@ -369,7 +411,6 @@ revisionable Prometheus metric contract with exact names and types was found:
 | Profile | Result for this iteration |
 | --- | --- |
 | Biren | unavailable; the [official Device Plugin repository](https://gitee.com/BirenTechnology/k8s-device-plugin/tree/a9984054f975d3430c61cd1f068691b7137da9a6) does not expose a hardware Prometheus exporter contract. |
-| Hygon DCU | unavailable; the [official ecosystem](https://developer.sourcefind.cn/servicelist) advertises `dcu-exporter`, but no accessible, revisioned first-party metric-name/type catalog was found. |
 | Kunlunxin (HAMi integration) | unavailable; the [HAMi scheduling integration](https://github.com/Project-HAMi/HAMi/tree/e831337db299f331b170a46d6ca3dba256b9d6f1) is not evidence of a Kunlunxin-native telemetry namespace. |
 | Vastai (HAMi integration) | unavailable; the [HAMi scheduling integration](https://github.com/Project-HAMi/HAMi/tree/e831337db299f331b170a46d6ca3dba256b9d6f1) is not evidence of a Vastai-native telemetry namespace. |
 | Qualcomm Cloud AI 100 | unavailable; the [official Kubernetes deployment documentation](https://quic.github.io/cloud-ai-sdk-pages/1.20/Getting-Started/Installation/Docker/k8s/index.html) does not define a Prometheus exporter contract with exact metric names/types. |

@@ -215,11 +215,26 @@ func nativeLabels(profile profileRecord, metric metricFamily, device Device) map
 			result[label.Name] = label.Prefix + strings.ToUpper(shortHash(deviceIdentityKey(device)))
 		}
 	}
-	// node is the sole Kasim compatibility overlay on source-backed exporter
-	// schemas. It names the Synthetic Node described by the device sample, not
-	// the real Node hosting the centralized telemetry Pod.
-	result["node"] = device.NodeName
+	addIdentityOverlay(result, profile, device)
 	return result
+}
+
+// addIdentityOverlay gives every native family one cross-vendor device join
+// contract without changing the family name or inventing workload ownership.
+// A native device label wins when an exporter already defines one.
+func addIdentityOverlay(result map[string]string, profile profileRecord, device Device) {
+	values := map[string]string{
+		"device": strconv.FormatUint(device.Ordinal, 10),
+		"model":  device.ModelID,
+		"node":   device.NodeName,
+		"uuid":   syntheticNativeUUID(device),
+		"vendor": profile.DisplayName,
+	}
+	for name, value := range values {
+		if _, native := result[name]; !native {
+			result[name] = value
+		}
+	}
 }
 
 func limitsFor(profile profileRecord, modelID string) simulationLimits {
@@ -247,11 +262,15 @@ func metricValue(
 		if metric.Semantic == "health-binary" {
 			return 1, true
 		}
+		if metric.Semantic == "health-one-healthy" {
+			return 0, true
+		}
 		if metric.Semantic != "info" && metric.Semantic != "memory-total" {
 			latent = 0
 		}
 	}
-	memoryUsed := limits.MemoryMiB * (0.08 + 0.82*latent)
+	memoryFraction := deviceMemoryFraction(device, latent)
+	memoryUsed := limits.MemoryMiB * memoryFraction
 	switch metric.Semantic {
 	case "constant-zero":
 		return 0, true
@@ -264,7 +283,9 @@ func metricValue(
 	case "utilization-ratio":
 		return clamp(100*latent, 0, 100), true
 	case "memory-ratio":
-		return clamp(0.08+0.82*latent, 0, 1), true
+		return memoryFraction, true
+	case "memory-utilization-percent":
+		return 100 * memoryFraction, limits.MemoryMiB > 0
 	case "memory-used":
 		return convertMemory(memoryUsed, metric.Unit)
 	case "memory-free":
@@ -303,11 +324,23 @@ func metricValue(
 		return 0, true
 	case "health-binary":
 		return 0, true
+	case "health-one-healthy":
+		return 1, true
 	case "last-error":
 		if device.Healthy {
 			return 0, true
 		}
 		return 79, true
+	case "correctable-error-count":
+		if device.Healthy {
+			return 0, true
+		}
+		return 2, true
+	case "uncorrectable-error-count":
+		if device.Healthy {
+			return 0, true
+		}
+		return 1, true
 	case "traffic-rx-counter", "traffic-tx-counter":
 		rate := 2.5e9 + 22.5e9*seedUnit(deviceIdentityKey(device)+metric.Semantic)
 		return counterBuckets(now) * sampleInterval.Seconds() * rate, true
@@ -357,9 +390,25 @@ func deviceLatent(device Device, now time.Time) float64 {
 	bucket := now.Unix() / int64(sampleInterval/time.Second)
 	key := deviceIdentityKey(device)
 	phase := seedUnit(key+"phase") * 2 * math.Pi
-	slow := 0.5 + 0.34*math.Sin(float64(bucket)/11+phase)
-	fast := (seedUnit(fmt.Sprintf("%s:%d", key, bucket)) - 0.5) * 0.12
-	return clamp(slow+fast, 0.02, 0.98)
+	wave := 0.5 + 0.5*math.Sin(float64(bucket)/11+phase)
+	noise := seedUnit(fmt.Sprintf("%s:%d", key, bucket))
+	switch device.Ordinal % 4 {
+	case 0: // idle
+		return clamp(0.02+0.08*(0.75*wave+0.25*noise), 0.02, 0.10)
+	case 1: // sustained work
+		return clamp(0.58+0.37*(0.75*wave+0.25*noise), 0.58, 0.95)
+	case 2: // memory-heavy work
+		return clamp(0.32+0.40*(0.65*wave+0.35*noise), 0.32, 0.72)
+	default: // bursty work
+		return clamp(0.12+0.80*(0.55*wave+0.45*noise), 0.12, 0.92)
+	}
+}
+
+func deviceMemoryFraction(device Device, latent float64) float64 {
+	if device.Healthy && device.Ordinal%4 == 2 {
+		return clamp(0.90+0.08*latent, 0.90, 0.98)
+	}
+	return clamp(0.08+0.82*latent, 0.08, 0.90)
 }
 
 func syntheticIdentity(device Device) string {

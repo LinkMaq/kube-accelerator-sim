@@ -148,17 +148,17 @@ func TestDocumentationReleaseNavigationTracksPublishedReleases(t *testing.T) {
 func TestVersionedReleaseNotesAreBilingualAndNamePublishedPackages(t *testing.T) {
 	t.Parallel()
 
-	notes := readReleaseContractFile(t, "../../release/notes/v0.5.2.md")
+	notes := readReleaseContractFile(t, "../../release/notes/v0.5.3.md")
 	for _, required := range []string{
 		"# 中文",
 		"# English",
-		"ghcr.io/linkmaq/kube-accelerator-sim-controller:0.5.2",
+		"ghcr.io/linkmaq/kube-accelerator-sim-controller:0.5.3",
 		"oci://ghcr.io/linkmaq/charts/kasim-runtime",
 		"Linux amd64/arm64",
 		"Windows amd64",
 	} {
 		if !strings.Contains(notes, required) {
-			t.Errorf("v0.5.2 release notes are missing %q", required)
+			t.Errorf("v0.5.3 release notes are missing %q", required)
 		}
 	}
 	if strings.Index(notes, "# 中文") > strings.Index(notes, "# English") {
@@ -178,11 +178,11 @@ func TestReleaseInputsDeclareExplicitPublicSurfaceVersions(t *testing.T) {
 		`"catalog": "2026-08-03"`,
 		`"compatibilityMatrix": "2026-07-30"`,
 		`"controllerImage": "v1"`,
-		`"telemetry": "v1alpha4"`,
-		`"chart": "0.5.2"`,
+		`"telemetry": "v1alpha5"`,
+		`"chart": "0.5.3"`,
 		`"telemetryCatalog"`,
-		`"revision": "2026-08-10.1"`,
-		`"sha256": "817178bb388bf36a25c869b9c7e7352a0e3cba3a1a8465d21c7e8bb1e28914a0"`,
+		`"revision": "2026-08-12.1"`,
+		`"sha256": "40e52b3a86f7df9be9ccd4bddca7cca1e35f819b05fcfa0aef2aa3a2e9df47b0"`,
 	} {
 		if !strings.Contains(inputs, required) {
 			t.Errorf("release inputs are missing explicit surface %s", required)

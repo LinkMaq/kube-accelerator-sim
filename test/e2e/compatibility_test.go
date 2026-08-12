@@ -43,7 +43,7 @@ func TestCompatibilitySchedulingLifecycle(t *testing.T) {
 	}
 	controllerImage := os.Getenv("KASIM_CONTROLLER_IMAGE")
 	if controllerImage == "" {
-		controllerImage = "kasim-controller:0.5.2"
+		controllerImage = "kasim-controller:0.5.3"
 	}
 	chartPath := absolutePath(t, "../../charts/kasim-runtime")
 	scenarioPath := absolutePath(t, "../../internal/cli/testdata/training-lab.yaml")
@@ -1005,7 +1005,7 @@ func installCompatibilityRuntime(
 		"--set",
 		"controller.image.repository=kasim-controller",
 		"--set",
-		"controller.image.tag=0.5.2",
+		"controller.image.tag=0.5.3",
 		"--set",
 		"controller.image.pullPolicy=Never",
 		"--set",
@@ -1658,7 +1658,7 @@ func writeCompatibilityReceipt(
 		},
 		"runtime": map[string]any{
 			"controllerImage": controllerImage,
-			"chart":           "kasim-runtime-0.5.2",
+			"chart":           "kasim-runtime-0.5.3",
 			"kwokImage":       chartKWOKTestRepo + "@" + chartKWOKAMD64Digest,
 		},
 		"releaseInputs": inputs,

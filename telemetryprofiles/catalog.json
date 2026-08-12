@@ -1,6 +1,6 @@
 {
   "schemaVersion": "v1alpha2",
-  "revision": "2026-08-10.1",
+  "revision": "2026-08-12.1",
   "profiles": [
     {
       "id": "nvidia",
@@ -132,7 +132,12 @@
         {"name": "npu_chip_info_utilization", "type": "gauge", "help": "the ai core utilization", "semantic": "utilization", "unit": "vendor-value"},
         {"name": "npu_chip_info_temperature", "type": "gauge", "help": "the npu temperature", "semantic": "temperature", "unit": "vendor-value"},
         {"name": "npu_chip_info_power", "type": "gauge", "help": "the npu power", "semantic": "power", "unit": "vendor-value"},
-        {"name": "npu_chip_info_aicore_current_freq", "type": "gauge", "help": "the npu ai core current frequency, unit is 'MHz'", "semantic": "clock-core", "unit": "MHz"}
+        {"name": "npu_chip_info_aicore_current_freq", "type": "gauge", "help": "the npu ai core current frequency, unit is 'MHz'", "semantic": "clock-core", "unit": "MHz"},
+        {"name": "npu_chip_info_hbm_used_memory", "type": "gauge", "help": "the npu hbm used memory", "semantic": "memory-used", "unit": "MB"},
+        {"name": "npu_chip_info_hbm_total_memory", "type": "gauge", "help": "the npu hbm total memory", "semantic": "memory-total", "unit": "MB"},
+        {"name": "npu_chip_info_hbm_utilization", "type": "gauge", "help": "the npu hbm utilization", "semantic": "memory-utilization-percent", "unit": "percent"},
+        {"name": "npu_chip_info_health_status", "type": "gauge", "help": "the npu health status", "semantic": "health-one-healthy", "unit": "state"},
+        {"name": "npu_chip_info_error_code", "type": "gauge", "help": "the npu error code", "semantic": "last-error", "unit": "code"}
       ]
     },
     {
@@ -237,7 +242,35 @@
     {"id": "graphcore", "displayName": "Graphcore", "state": "provisional", "exporter": "Graphcore V-IPU Prometheus", "evidence": [{"source": "https://docs.graphcore.ai/projects/vipu-admin/en/latest/vipu-prometheus.html", "revision": "unversioned-public-documentation", "checkedAt": "2026-08-07"}]},
     {"id": "metax", "displayName": "MetaX", "state": "provisional", "exporter": "MetaX mx-exporter", "evidence": [{"source": "https://developer.metax-tech.com/api/client/document/preview/930/split_files/gpu%E6%80%A7%E8%83%BD%E6%8C%87%E6%A0%87%E5%B1%95%E7%A4%BA.html", "revision": "unversioned-public-documentation", "checkedAt": "2026-08-07"}]},
     {"id": "biren", "displayName": "Biren", "state": "unavailable"},
-    {"id": "hygon", "displayName": "Hygon DCU", "state": "unavailable"},
+    {
+      "id": "hygon", "displayName": "Hygon DCU", "state": "verified", "exporter": "DCU-Exporter",
+      "evidence": [
+        {"source": "https://developer.sourcefind.cn/document/87ee5c5b-c10d-11f0-b077-0242ac150003?id=504708cf-c9ce-11f0-9b60-0242ac150003&version=87ee5c5b-c10d-11f0-b077-0242ac150003", "revision": "87ee5c5b-c10d-11f0-b077-0242ac150003", "checkedAt": "2026-08-12"},
+        {"source": "https://github.com/Project-HAMi/dcu-exporter/blob/30408d074cd420729f5698710d54fb30abefb0b1/main.go", "revision": "30408d074cd420729f5698710d54fb30abefb0b1", "checkedAt": "2026-08-12"}
+      ],
+      "defaults": {"memoryMiB": 32768, "idlePowerW": 45, "maxPowerW": 350, "idleTempC": 30, "maxTempC": 88, "coreClockMHz": 1800, "memoryClockMHz": 1200},
+      "models": [{"id": "hygon-k100-ai", "nativeName": "K100_AI", "memoryMiB": 32768}],
+      "deviceLabels": [
+        {"name": "device_id", "valueFrom": "serial", "prefix": "DCU-"},
+        {"name": "minor_number", "valueFrom": "device-index"},
+        {"name": "name", "valueFrom": "model-name"},
+        {"name": "node", "valueFrom": "node-name"},
+        {"name": "pcieBus_number", "valueFrom": "pci-bdf"},
+        {"name": "dcu_pod_namespace", "valueFrom": "empty"},
+        {"name": "dcu_pod_name", "valueFrom": "empty"},
+        {"name": "container", "valueFrom": "empty"}
+      ],
+      "metricFamilies": [
+        {"name": "dcu_utilizationrate", "type": "gauge", "help": "dcu metrics of gauge", "semantic": "utilization", "unit": "percent"},
+        {"name": "dcu_usedmemory_bytes", "type": "gauge", "help": "dcu metrics of gauge", "semantic": "memory-used", "unit": "bytes"},
+        {"name": "dcu_memorycap_bytes", "type": "gauge", "help": "dcu metrics of gauge", "semantic": "memory-total", "unit": "bytes"},
+        {"name": "dcu_memory_remaining", "type": "gauge", "help": "dcu metrics of gauge", "semantic": "memory-free", "unit": "bytes"},
+        {"name": "dcu_power_usage", "type": "gauge", "help": "dcu metrics of gauge", "semantic": "power", "unit": "watts"},
+        {"name": "dcu_temp", "type": "gauge", "help": "dcu metrics of gauge", "semantic": "temperature", "unit": "Celsius"},
+        {"name": "dcu_ce_count", "type": "gauge", "help": "dcu metrics of gauge", "semantic": "correctable-error-count", "unit": "count", "labels": [{"name": "block_type", "valueFrom": "fixed", "value": "dcu"}]},
+        {"name": "dcu_ue_count", "type": "gauge", "help": "dcu metrics of gauge", "semantic": "uncorrectable-error-count", "unit": "count", "labels": [{"name": "block_type", "valueFrom": "fixed", "value": "dcu"}]}
+      ]
+    },
     {"id": "kunlunxin-hami", "displayName": "Kunlunxin through HAMi", "state": "unavailable"},
     {"id": "vastai-hami", "displayName": "Vastai through HAMi", "state": "unavailable"},
     {"id": "qualcomm-cloud-ai-100", "displayName": "Qualcomm Cloud AI 100", "state": "unavailable"},

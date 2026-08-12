@@ -14,7 +14,7 @@ Scenario file or any `kasim` command:
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.5.2 \
+  --version 0.5.3 \
   --namespace kasim-system \
   --create-namespace
 
@@ -31,7 +31,7 @@ duplicate targets:
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.5.2 \
+  --version 0.5.3 \
   --namespace kasim-system \
   --set telemetry.serviceMonitor.enabled=true
 ```
@@ -53,13 +53,16 @@ the exporter-native Node identity label for device placement.
 An H200 Scenario can expose a native NVIDIA family such as:
 
 ```text
-DCGM_FI_DEV_GPU_UTIL{gpu="0",UUID="GPU-...",pci_bus_id="00000000:af:00.0",device="nvidia0",modelName="nvidia-h200",Hostname="kasim-node-...",DCGM_FI_DRIVER_VERSION="580.126.16",node="kasim-node-..."} 72.4
+DCGM_FI_DEV_GPU_UTIL{gpu="0",UUID="GPU-...",pci_bus_id="00000000:af:00.0",device="nvidia0",modelName="nvidia-h200",Hostname="kasim-node-...",DCGM_FI_DRIVER_VERSION="580.126.16",node="kasim-node-...",model="nvidia-h200",uuid="...",vendor="NVIDIA"} 72.4
 ```
 
 The family name, `TYPE`, and native labels come from the selected exporter
 contract. `HELP` remains source-backed except where an explicit Kasim
-compatibility value convention is documented. Kasim adds one compatibility label, `node`, to every
-per-device family; it always names the Synthetic Node described by the sample.
+compatibility value convention is documented. Kasim adds a stable identity
+overlay to every per-device family: `node`, `device`, `model`, `uuid`, and
+`vendor`. If the exporter already defines one of those names, its native value
+is preserved. Otherwise the values come from the Synthetic Node, device
+ordinal, catalog model, deterministic device UUID, and profile display name.
 Vendor-native ownership labels such as DCGM `Hostname`, AMD `hostname`,
 Cambricon `node`, Iluvatar `node_name`, and Enflame `host` remain present and
 also describe that Synthetic Node. Vendor-native samples contain no `kasim_*` label.
@@ -72,7 +75,9 @@ Exporter model labels bound by the Telemetry Catalog use the same catalog model
 ID, so NVIDIA `modelName` is byte-for-byte equal to the Node label. Multiple
 pools on one Node Group may share a model, but different accelerator models in
 one Node Group are rejected because the Node label has only one value. Within
-one device, `gpu` and `UUID` remain identical across every metric family.
+one device, all five identity-overlay values and native selectors such as
+`gpu`, `id`, `minor_number`, and `device_id` remain identical across every
+metric family and process restart.
 
 Do not replace `node` with the real Node hosting the centralized telemetry Pod
 and do not enrich it from `kube_pod_info`. Synthetic Nodes remain series
@@ -83,6 +88,43 @@ With ServiceMonitor discovery, downstream inventory queries may match
 scrape-target metadata with `on(namespace, pod)` without changing device
 placement. Such a join only identifies the Kasim telemetry target; it does not
 prove that the Pod owns, reserves, or uses those devices.
+
+## Huawei Ascend and Hygon DCU contracts
+
+The Huawei contract emits one series per device for AI Core utilization,
+temperature, power, HBM used memory, HBM total memory, HBM utilization,
+health, and error code. Its native device labels are `id`, `model_name`,
+`vdie_id`, `pcie_bus_info`, `namespace`, `pod_name`, and `container_name`.
+The compatibility `uuid` is the stable synthetic device identity; the native
+`vdie_id` remains the exporter-compatible virtual-die value. The three
+workload labels remain empty because the centralized telemetry Pod is
+not a simulated workload. `npu_chip_info_health_status` uses the native
+convention `1=healthy`, `0=faulty`; `npu_chip_info_error_code` is zero while
+healthy and non-zero while faulty.
+
+The Hygon contract follows the DCU-Exporter names and gauge types:
+
+| Meaning | Family | Unit |
+| --- | --- | --- |
+| Core utilization | `dcu_utilizationrate` | percent |
+| Used memory | `dcu_usedmemory_bytes` | bytes |
+| Total memory | `dcu_memorycap_bytes` | bytes |
+| Memory remaining | `dcu_memory_remaining` | bytes |
+| Current power | `dcu_power_usage` | watts |
+| Temperature | `dcu_temp` | Celsius |
+| Correctable errors | `dcu_ce_count` | count |
+| Uncorrectable errors | `dcu_ue_count` | count |
+
+Hygon native labels are `device_id`, `minor_number`, `name`, `node`,
+`pcieBus_number`, `dcu_pod_namespace`, `dcu_pod_name`, and `container`; error
+families also carry `block_type`. `device_id`, `pcieBus_number`, the identity
+overlay, and ordinals `0` through `N-1` are deterministic. Workload labels are
+empty. The physical-device exporter does not publish a separate
+`dcu_health` family or a physical-device memory-percentage family. Preserve the
+raw contract: derive health from uncorrectable/correctable error signals and
+derive memory percentage as
+`dcu_usedmemory_bytes / dcu_memorycap_bytes * 100` in recording rules or the
+consumer.
 
 Every owned Node also has `kasim_telemetry_node_info`. Every device has
 `kasim_telemetry_device_contract_available`; profiles without enough evidence
@@ -102,7 +144,9 @@ configuration should also identify the Kasim telemetry Service.
 
 Kasim samples an immutable snapshot every 15 seconds. Repeated scrapes within
 one bucket return the same values, including after process restart. A stable
-device identity and time bucket drive one shared load state:
+device identity and time bucket drive one shared load state. Across an
+eight-device pool, ordinal classes cover idle, sustained-work, memory-heavy,
+and bursty behavior, while `kasim health` controls fault and recovery:
 
 - utilization changes smoothly in the inclusive `0` to `100` range; consumers
   that require a ratio convert it to `0` to `1`;
@@ -110,8 +154,9 @@ device identity and time bucket drive one shared load state:
   the model envelope;
 - power, temperature, clocks, and traffic follow the same load instead of
   changing independently;
-- health-like values use `0` for healthy and a non-zero value for faulty;
-  unhealthy simulated units also suppress activity;
+- health values retain the vendor convention; error signals remain zero while
+  healthy and become non-zero while faulty, and unhealthy units suppress
+  activity;
 - counters increase monotonically from the documented simulator epoch.
 
 These curves are useful for Prometheus ingestion, dashboard, alert-rule, and
@@ -123,9 +168,9 @@ comparison.
 
 | State | Profiles |
 | --- | --- |
-| Native families enabled | NVIDIA DCGM, AMD Device Metrics Exporter, Intel XPU Manager, Huawei Ascend npu-exporter, Cambricon mlu-exporter, Iluvatar ix-exporter, Enflame gcu-exporter, Furiosa metrics exporter, Prometheus node_exporter InfiniBand collector |
+| Native families enabled | NVIDIA DCGM, AMD Device Metrics Exporter, Intel XPU Manager, Huawei Ascend npu-exporter, Hygon DCU-Exporter, Cambricon mlu-exporter, Iluvatar ix-exporter, Enflame gcu-exporter, Furiosa metrics exporter, Prometheus node_exporter InfiniBand collector |
 | Discoverable but disabled as provisional | Intel Gaudi, AWS Neuron, Google TPU provider telemetry, Moore Threads, Graphcore, MetaX |
-| Explicitly unavailable | Biren, Hygon DCU, Kunlunxin through HAMi, Vastai through HAMi, Qualcomm Cloud AI 100, SR-IOV Device Plugin native telemetry |
+| Explicitly unavailable | Biren, Kunlunxin through HAMi, Vastai through HAMi, Qualcomm Cloud AI 100, SR-IOV Device Plugin native telemetry |
 
 Coverage is intentionally evidence-driven. Scheduling support does not imply
 telemetry support. See the exact names, types, units, labels, source revisions,
@@ -165,6 +210,37 @@ scraping. Annotation-based or externally managed scraping should preserve an
 equivalent target identity when target-metadata joins are required. In every
 delivery mode, classify the `kasim-system` telemetry target as infrastructure
 and never infer device ownership from its Pod labels.
+
+## Acceptance queries
+
+For one eight-device Huawei Node, these instant queries return `8`:
+
+```promql
+count(npu_chip_info_utilization)
+count(npu_chip_info_hbm_used_memory)
+count(count by (node, device, uuid) (npu_chip_info_health_status))
+```
+
+For one eight-device Hygon Node, use:
+
+```promql
+count(dcu_utilizationrate)
+count(dcu_memorycap_bytes)
+count(count by (node, device, uuid) (dcu_ue_count))
+```
+
+After at least two scrapes, every result from these range queries should be
+greater than one:
+
+```promql
+count_over_time(npu_chip_info_utilization[5m])
+count_over_time(dcu_utilizationrate[5m])
+```
+
+Check uniqueness with `count(count by (uuid) (<family>))`, compare that result
+with the Node capacity, and verify identity alignment by grouping every family
+with `(node, device, model, uuid, vendor)`. No Huawei or Hygon series should
+match `{__name__=~"DCGM_FI_DEV_.*"}`.
 
 ## Troubleshooting
 

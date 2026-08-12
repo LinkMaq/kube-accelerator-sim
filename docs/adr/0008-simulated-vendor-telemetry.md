@@ -52,13 +52,16 @@ The runtime exposes `GET` and `HEAD` only:
 Synthetic Nodes are metric-series dimensions, not scrape targets or fake
 exporter Pods. Every enabled family preserves the selected exporter's exact
 name, `TYPE`, and native labels. `HELP` is also exact unless a documented Kasim
-value convention requires compatibility `HELP`. Each family then adds one compatibility label:
-`node=<Synthetic Node name>`. Kasim never injects a `kasim_*` label into a
-vendor family. Native Node identity labels remain present and describe the
-same Synthetic Node; neither they nor `node` are replaced by the real Node that
-schedules the centralized telemetry Pod. Separate `kasim_telemetry_*`
-diagnostic families carry Scenario, Synthetic Node, profile, catalog, source,
-and simulation provenance.
+value convention requires compatibility `HELP`. Each per-device family adds a
+small identity overlay: `node`, `device`, `model`, `uuid`, and `vendor`. A
+vendor-native label with one of these names wins; otherwise Kasim binds it to
+the Synthetic Node, device ordinal, catalog model, stable synthetic UUID, or
+profile display name. Kasim never injects a `kasim_*` label or workload
+identity into a vendor family. Native Node identity labels remain present and
+describe the same Synthetic Node; neither they nor `node` are replaced by the
+real Node that schedules the centralized telemetry Pod. Separate
+`kasim_telemetry_*` diagnostic families carry Scenario, Synthetic Node,
+profile, catalog, source, and simulation provenance.
 
 Prometheus target labels are a separate delivery concern. The maintained
 ServiceMonitor retains `namespace` and `pod` so existing inventory queries can
@@ -73,7 +76,7 @@ Every Synthetic Node publishes the singular label
 catalog model ID. Catalog-bound metric model labels use exactly that value.
 Node Groups containing different accelerator models fail closed. UUID and
 device-index bindings derive from the same stable device identity across all
-metric families.
+metric families and process restarts.
 
 ### Deep Module and seams
 
@@ -122,12 +125,15 @@ and semantic. The same input and bucket produce identical values across
 repeated scrapes and restarts.
 
 One per-device latent load drives utilization, memory use, power, temperature,
-clock, and throughput. Utilization is emitted in the inclusive 0-to-100 range.
-Values are bounded by the Telemetry Contract envelope; used and free memory
-cannot exceed total memory. Health-like values use zero for healthy and a
-non-zero value for faulty, while unhealthy devices suppress activity. Counters
-are monotonic from a documented simulator epoch. Static identity and capacity
-do not drift within an observed topology.
+clock, and throughput. Device ordinals deterministically cover idle,
+sustained-work, memory-heavy, and bursty curves; a Scenario health change
+controls the faulty/recovered state. Utilization is emitted in the inclusive
+0-to-100 range. Values are bounded by the Telemetry Contract envelope; used
+and free memory cannot exceed total memory. Health values retain the vendor's
+native convention, while error signals remain zero for healthy devices and
+non-zero for faulty devices; unhealthy devices suppress activity. Counters are
+monotonic from a documented simulator epoch. Static identity and capacity do
+not drift within an observed topology.
 
 These curves are suitable for Prometheus ingestion, dashboards, alert rules,
 and platform adaptation tests. They are not performance, capacity, thermal,
