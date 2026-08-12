@@ -14,7 +14,7 @@ Scenario file or any `kasim` command:
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.5.1 \
+  --version 0.5.2 \
   --namespace kasim-system \
   --create-namespace
 
@@ -31,7 +31,7 @@ duplicate targets:
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.5.1 \
+  --version 0.5.2 \
   --namespace kasim-system \
   --set telemetry.serviceMonitor.enabled=true
 ```
@@ -40,9 +40,13 @@ The ServiceMonitor option fails closed when
 `monitoring.coreos.com/v1/ServiceMonitor` is not available. To manage scraping
 entirely outside the chart, set
 `telemetry.service.prometheusScrape=false` and leave ServiceMonitor disabled.
-When ServiceMonitor mode is enabled, its metric relabeling drops the target
-labels `namespace`, `pod`, and `container`. This prevents the centralized
-`kasim-system` telemetry Pod from being mistaken for a user workload.
+When ServiceMonitor mode is enabled, its metric relabeling retains the target
+labels `namespace` and `pod` and drops `container`. Keeping the first two lets
+existing inventory queries join a device series to scrape-target metadata,
+for example with `on(namespace, pod)`. They identify the one centralized
+`kasim-system` telemetry Pod, not a Synthetic Node or a workload that owns the
+simulated device. Classify this target as infrastructure and use `node` plus
+the exporter-native Node identity label for device placement.
 
 ## What one sample means
 
@@ -74,6 +78,11 @@ Do not replace `node` with the real Node hosting the centralized telemetry Pod
 and do not enrich it from `kube_pod_info`. Synthetic Nodes remain series
 dimensions on this aggregate endpoint; Kasim does not create a fake exporter
 Pod or Service for every Node.
+
+With ServiceMonitor discovery, downstream inventory queries may match
+scrape-target metadata with `on(namespace, pod)` without changing device
+placement. Such a join only identifies the Kasim telemetry target; it does not
+prove that the Pod owns, reserves, or uses those devices.
 
 Every owned Node also has `kasim_telemetry_node_info`. Every device has
 `kasim_telemetry_device_contract_available`; profiles without enough evidence
@@ -151,9 +160,11 @@ The telemetry ServiceAccount can only `get`, `list`, and `watch` Scenario
 Instances and Nodes. The process has no cluster write permission and is pinned
 to real Nodes by the same hard placement boundary as other runtime components.
 One snapshot is bounded to 1,000 Synthetic Nodes and 8,000 simulated devices.
-ServiceMonitor mode removes `namespace`, `pod`, and `container` after scraping;
-annotation-based or externally managed scraping must apply the same relabeling
-or classify the `kasim-system` telemetry target as infrastructure.
+ServiceMonitor mode retains `namespace` and `pod` and removes `container` after
+scraping. Annotation-based or externally managed scraping should preserve an
+equivalent target identity when target-metadata joins are required. In every
+delivery mode, classify the `kasim-system` telemetry target as infrastructure
+and never infer device ownership from its Pod labels.
 
 ## Troubleshooting
 

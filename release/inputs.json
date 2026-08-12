@@ -1,6 +1,6 @@
 {
   "schemaVersion": "v1alpha1",
-  "productVersion": "0.5.1",
+  "productVersion": "0.5.2",
   "publicSurfaces": {
     "cliBehavior": "v1",
     "scenarioTransport": "v1alpha1",
@@ -9,8 +9,8 @@
     "catalog": "2026-08-03",
     "compatibilityMatrix": "2026-07-30",
     "controllerImage": "v1",
-    "telemetry": "v1alpha3",
-    "chart": "0.5.1"
+    "telemetry": "v1alpha4",
+    "chart": "0.5.2"
   },
   "goVersion": "1.26.0",
   "kubernetesDependencies": "0.36.3",

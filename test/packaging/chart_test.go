@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	productVersion = "0.5.1"
+	productVersion = "0.5.2"
 	chartPath      = "../../charts/kasim-runtime"
 )
 
@@ -239,8 +239,11 @@ func TestTelemetryDeliveryModesFailClosed(t *testing.T) {
 		t.Fatalf("ServiceMonitor metricRelabelings = %#v, want one labeldrop rule", relabelings)
 	}
 	rule, ok := relabelings[0].(map[string]any)
-	if !ok || rule["action"] != "labeldrop" || rule["regex"] != "^(namespace|pod|container)$" {
-		t.Fatalf("ServiceMonitor metric relabeling = %#v", relabelings[0])
+	if !ok || rule["action"] != "labeldrop" || rule["regex"] != "^container$" {
+		t.Fatalf(
+			"ServiceMonitor metric relabeling = %#v, want namespace/pod preserved and only container dropped",
+			relabelings[0],
+		)
 	}
 	service := requireObject(t, withCRD, "Service", "contract-kasim-runtime-telemetry")
 	if annotations, found := service.Metadata["annotations"].(map[string]any); found &&

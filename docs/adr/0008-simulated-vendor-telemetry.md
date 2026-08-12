@@ -1,6 +1,6 @@
 # ADR 0008: Isolate source-backed Simulated Vendor Telemetry
 
-Status: Accepted; compatibility contract amended 2026-08-10
+Status: Accepted; compatibility contract amended 2026-08-12
 
 ## Context
 
@@ -59,6 +59,14 @@ same Synthetic Node; neither they nor `node` are replaced by the real Node that
 schedules the centralized telemetry Pod. Separate `kasim_telemetry_*`
 diagnostic families carry Scenario, Synthetic Node, profile, catalog, source,
 and simulation provenance.
+
+Prometheus target labels are a separate delivery concern. The maintained
+ServiceMonitor retains `namespace` and `pod` so existing inventory queries can
+join device series to scrape-target metadata, and drops `container`. The
+retained labels identify the one centralized `kasim-system` telemetry Pod;
+they never identify the Synthetic Node or a business workload that owns a
+simulated device. Consumers use `node` and exporter-native Node identity labels
+for device placement and classify the telemetry target as infrastructure.
 
 Every Synthetic Node publishes the singular label
 `feature.node.cloud.xiaoshiai.cn/accelerator-model.name` with its stable
@@ -155,8 +163,10 @@ observe or reproduce physical vendor telemetry.
 - The central endpoint does not reproduce a real vendor DaemonSet's one-target-
   per-node topology; queries group by `node` while exporter-native Node labels
   remain available and separate Kasim diagnostics carry simulator provenance.
-- ServiceMonitor mode drops `namespace`, `pod`, and `container` from scraped
-  series so the centralized telemetry target is not classified as a workload.
+- ServiceMonitor mode retains `namespace` and `pod` for scrape-target metadata
+  joins and drops `container`; consumers must classify the centralized
+  `kasim-system` telemetry target as infrastructure and use device Node labels
+  for simulated ownership.
 - Provisional and unavailable vendors remain visible without fabricated data.
 - The image contains one additional internal runtime binary and the chart owns
   one additional read-only Pod, Service, ServiceAccount, Role, and Binding.

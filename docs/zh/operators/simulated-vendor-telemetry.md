@@ -11,7 +11,7 @@ Kasim 通过一个只读的集群内端点，为每个准确归属的 Synthetic 
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.5.1 \
+  --version 0.5.2 \
   --namespace kasim-system \
   --create-namespace
 
@@ -27,7 +27,7 @@ Operator CRD，可以改用 ServiceMonitor；两种发现方式不要同时使�
 ```sh
 helm upgrade --install kasim-runtime \
   oci://ghcr.io/linkmaq/charts/kasim-runtime \
-  --version 0.5.1 \
+  --version 0.5.2 \
   --namespace kasim-system \
   --set telemetry.serviceMonitor.enabled=true
 ```
@@ -35,8 +35,12 @@ helm upgrade --install kasim-runtime \
 如果集群没有 `monitoring.coreos.com/v1/ServiceMonitor`，该选项会明确失败。若完全
 由外部抓取配置管理发现，请设置 `telemetry.service.prometheusScrape=false`，并保持
 ServiceMonitor 关闭。
-启用 ServiceMonitor 后，其 metric relabeling 会删除目标标签 `namespace`、`pod` 和
-`container`，避免集中式 `kasim-system` telemetry Pod 被误识别为业务工作负载。
+启用 ServiceMonitor 后，其 metric relabeling 会保留目标标签 `namespace`、`pod`，
+并删除 `container`。保留前两个标签后，现有清单查询可以通过
+`on(namespace, pod)` 将设备 series 与抓取目标元数据关联。它们只表示唯一的集中式
+`kasim-system` telemetry Pod，不表示 Synthetic Node，也不表示拥有模拟设备的业务
+工作负载。后端应把该目标识别为基础设施组件，并使用 `node` 及 exporter 原生节点
+身份标签判断设备归属。
 
 ## 一条指标代表什么
 
@@ -64,6 +68,10 @@ Telemetry Catalog 绑定的 exporter 型号标签使用同一个 catalog model I
 不要把承载集中式 telemetry Pod 的真实节点写进 `node`，也不要通过 `kube_pod_info`
 覆盖它。Synthetic Node 仍是聚合端点中的 series 维度；Kasim 不会为每个节点伪造
 exporter Pod 或 Service。
+
+使用 ServiceMonitor 发现时，下游清单查询可以通过 `on(namespace, pod)` 关联抓取
+目标元数据，同时不改变设备归属。这类 join 只能识别 Kasim telemetry 抓取目标；
+它不能证明该 Pod 拥有、预留或正在使用这些设备。
 
 每个归属节点都会生成 `kasim_telemetry_node_info`，每个设备都会生成
 `kasim_telemetry_device_contract_available`。证据不足的档案返回 `0`，而不是编造
@@ -128,9 +136,10 @@ telemetry:
 telemetry ServiceAccount 只能对 Scenario Instance 和 Node 执行 `get/list/watch`，
 没有任何集群写权限；Pod 通过硬亲和规则只能运行在真实 Node 上。单个快照最多支持
 1,000 个 Synthetic Node 和 8,000 个模拟设备。
-ServiceMonitor 模式会在抓取后删除 `namespace`、`pod` 和 `container`；若使用注解
-抓取或外部抓取配置，应应用同样的 relabeling，或在后端把 `kasim-system` telemetry
-目标识别为基础设施组件。
+ServiceMonitor 模式会在抓取后保留 `namespace`、`pod` 并删除 `container`。若通过
+注解或外部配置抓取，且查询需要关联目标元数据，应保留等价的目标身份。无论采用哪种
+交付方式，后端都应把 `kasim-system` telemetry 目标识别为基础设施组件，不能根据其
+Pod 标签推断设备归属。
 
 ## 故障排查
 
