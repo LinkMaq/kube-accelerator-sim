@@ -5,6 +5,11 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: Published semantic release tag to advertise
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -20,6 +25,41 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Resolve published release version
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version }}
+        run: |
+          release_version="${REQUESTED_RELEASE_VERSION}"
+          if [[ -z "${release_version}" ]]; then
+            release_version="$(
+              gh release view \
+                --repo "${GITHUB_REPOSITORY}" \
+                --json tagName \
+                --jq .tagName
+            )"
+          fi
+          if ! [[ "${release_version}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            printf 'documentation release version is not a semantic tag: %s\n' \
+              "${release_version}" >&2
+            exit 2
+          fi
+          published_version="$(
+            gh release view "${release_version}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --json isDraft,tagName \
+              --jq 'select(.isDraft == false) | .tagName'
+          )"
+          if [[ "${published_version}" != "${release_version}" ]]; then
+            printf 'documentation release is not published: %s\n' \
+              "${release_version}" >&2
+            exit 2
+          fi
+          printf 'KASIM_DOCS_RELEASE_VERSION=%s\n' "${release_version}" >> "${GITHUB_ENV}"
 
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -32,6 +72,9 @@ jobs:
 
       - name: Build documentation
         run: npm run docs:build
+
+      - name: Verify advertised release version
+        run: npm run docs:check-release
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5

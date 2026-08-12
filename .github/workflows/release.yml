@@ -400,6 +400,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
+      actions: write
       contents: write
       packages: write
       id-token: write
@@ -485,13 +486,23 @@ jobs:
             --notes-file "${notes_file}" \
             --title "kube-accelerator-sim v${RELEASE_VERSION}"
 
+      - name: Refresh release-aware documentation
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: >-
+          gh workflow run pages.yml
+          --repo "${GITHUB_REPOSITORY}"
+          --ref main
+          --field "release_version=v${RELEASE_VERSION}"
+
   recover:
     name: Recover verified tag publication
     if: inputs.publish && inputs.recovery_run_id != ''
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
-      actions: read
+      actions: write
       contents: write
       packages: write
       id-token: write
@@ -667,3 +678,13 @@ jobs:
             --verify-tag \
             --notes-file "${notes_file}" \
             --title "kube-accelerator-sim v${RELEASE_VERSION}"
+
+      - name: Refresh release-aware documentation
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: >-
+          gh workflow run pages.yml
+          --repo "${GITHUB_REPOSITORY}"
+          --ref main
+          --field "release_version=v${RELEASE_VERSION}"

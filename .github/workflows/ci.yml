@@ -83,6 +83,9 @@ jobs:
       - name: Build documentation
         run: npm run docs:build
 
+      - name: Verify advertised release version
+        run: npm run docs:check-release
+
   verify:
     runs-on: ubuntu-24.04
     timeout-minutes: 20

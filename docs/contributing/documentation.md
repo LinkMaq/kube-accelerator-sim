@@ -34,6 +34,7 @@ Install the pinned documentation dependency and build the site:
 ```sh
 npm ci
 npm run docs:build
+npm run docs:check-release
 ```
 
 For local authoring with hot reload:
@@ -60,4 +61,19 @@ included; reviewers still verify that it accurately describes the behavior
 and that affected English and Chinese operator pages remain aligned.
 
 After a change reaches `main`, the GitHub Pages workflow rebuilds and deploys
-the site automatically.
+the site automatically. The workflow resolves the navigation version from the
+latest published GitHub release instead of a source-code constant. The
+evidence-gated release workflow also dispatches a Pages rebuild after both a
+normal publication and a recovered publication, passing the exact published
+tag. The build then checks that the English and Chinese home pages both
+advertise and link to that release.
+
+Local builds resolve the nearest semantic release tag from Git. To reproduce a
+specific Pages build, fetch the tags and set the same explicit input before
+building and checking:
+
+```sh
+export KASIM_DOCS_RELEASE_VERSION="$(git describe --tags --abbrev=0 --match 'v[0-9]*')"
+npm run docs:build
+npm run docs:check-release
+```

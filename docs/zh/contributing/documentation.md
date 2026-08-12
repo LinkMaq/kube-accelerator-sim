@@ -24,6 +24,7 @@
 ```sh
 npm ci
 npm run docs:build
+npm run docs:check-release
 ```
 
 本地热更新：
@@ -42,4 +43,16 @@ CI 会把 PR 与 base commit 比较。修改 `api/`、`cmd/`、`internal/`、`pr
 测试、工作流和 Agent 专用变更本身不会触发产品文档门禁。
 
 门禁通过只表示提交包含文档；评审者仍要确认英文与中文操作说明准确、互相一致。
-变更合入 `main` 后，GitHub Pages 会自动重建和部署整个双语站点。
+变更合入 `main` 后，GitHub Pages 会自动重建和部署整个双语站点。导航栏版本从
+GitHub 最新的已发布 release 解析，不再使用源码里的手写常量。证据门禁 release
+流程在正常发布或恢复发布完成后，还会把准确的已发布 tag 传给 Pages 并触发重建；
+构建随后检查中英文首页是否都展示并链接到该 release。
+
+本地构建默认从 Git 解析最近的语义化 release tag。若要复现某次 Pages 构建，先
+获取 tags，再显式设置同一个版本并执行构建与检查：
+
+```sh
+export KASIM_DOCS_RELEASE_VERSION="$(git describe --tags --abbrev=0 --match 'v[0-9]*')"
+npm run docs:build
+npm run docs:check-release
+```

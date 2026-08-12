@@ -3,11 +3,15 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitepress'
 
+import { resolveDocumentationReleaseVersion } from '../../tools/documentation-release.mjs'
+
 const repository = 'https://github.com/LinkMaq/kube-accelerator-sim'
 const repositoryRoot = path.resolve(
   fileURLToPath(new URL('../..', import.meta.url)),
 )
 const documentationRoot = path.join(repositoryRoot, 'docs')
+const releaseVersion = resolveDocumentationReleaseVersion({ repositoryRoot })
+const releaseLink = `${repository}/releases/tag/${releaseVersion}`
 
 const zhNav = [
   { text: '指南', link: '/zh/operators/quickstart' },
@@ -17,7 +21,7 @@ const zhNav = [
   { text: '兼容性', link: '/zh/operators/kubernetes-compatibility' },
   { text: '设备档案', link: '/zh/operators/profile-evidence' },
   { text: '架构', link: '/zh/architecture' },
-  { text: 'v0.1.0', link: `${repository}/releases/tag/v0.1.0` },
+  { text: releaseVersion, link: releaseLink },
 ]
 
 const zhSidebar = [
@@ -239,7 +243,7 @@ export default defineConfig({
       { text: 'Compatibility', link: '/operators/kubernetes-compatibility' },
       { text: 'Profiles', link: '/operators/profile-evidence' },
       { text: 'Architecture', link: '/spec/v1' },
-      { text: 'v0.1.0', link: `${repository}/releases/tag/v0.1.0` },
+      { text: releaseVersion, link: releaseLink },
     ],
     sidebar: [
       {

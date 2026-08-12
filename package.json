@@ -7,6 +7,7 @@
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
     "docs:check-impact": "node tools/check-docs-impact.mjs",
+    "docs:check-release": "node tools/check-docs-release-version.mjs",
     "test:ui": "node test/browser/kasim-ui.mjs"
   },
   "devDependencies": {

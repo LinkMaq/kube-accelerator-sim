@@ -105,6 +105,46 @@ func TestReleasePipelineIsEvidenceGatedAndReproducible(t *testing.T) {
 	}
 }
 
+func TestDocumentationReleaseNavigationTracksPublishedReleases(t *testing.T) {
+	t.Parallel()
+
+	pagesWorkflow := readReleaseContractFile(t, "../../.github/workflows/pages.yml")
+	for _, required := range []string{
+		"release_version:",
+		"fetch-depth: 0",
+		"gh release view",
+		"KASIM_DOCS_RELEASE_VERSION",
+		"npm run docs:check-release",
+	} {
+		if !strings.Contains(pagesWorkflow, required) {
+			t.Errorf("documentation workflow is missing %q", required)
+		}
+	}
+
+	releaseWorkflow := readReleaseContractFile(t, "../../.github/workflows/release.yml")
+	if refreshes := strings.Count(releaseWorkflow, "gh workflow run pages.yml"); refreshes != 2 {
+		t.Errorf("release workflow dispatches documentation refresh %d times, want 2", refreshes)
+	}
+
+	config := readReleaseContractFile(t, "../../docs/.vitepress/config.mts")
+	for _, required := range []string{
+		"resolveDocumentationReleaseVersion",
+		"releases/tag/${releaseVersion}",
+	} {
+		if !strings.Contains(config, required) {
+			t.Errorf("VitePress config is missing %q", required)
+		}
+	}
+	if strings.Contains(config, "releases/tag/v0.1.0") {
+		t.Error("VitePress config still hard-codes the first release")
+	}
+
+	packageManifest := readReleaseContractFile(t, "../../package.json")
+	if !strings.Contains(packageManifest, `"docs:check-release"`) {
+		t.Error("package scripts do not expose the built-site release check")
+	}
+}
+
 func TestVersionedReleaseNotesAreBilingualAndNamePublishedPackages(t *testing.T) {
 	t.Parallel()
 
