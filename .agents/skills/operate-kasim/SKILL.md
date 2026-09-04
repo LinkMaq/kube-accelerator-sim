@@ -84,13 +84,21 @@ reviewed the evidence and explicitly accepts them.
    when multiple valid choices would materially change the result. Use the
    same explicit kubeconfig/context as the CLI, and wait for both controller
    Deployments.
-4. Run `apply --dry-run=server` against the exact target before the first
+4. Enable Prometheus scraping whenever the target supports it. Check for the
+   Prometheus Operator API `monitoring.coreos.com/v1 ServiceMonitor`
+   (`kubectl api-resources --api-group=monitoring.coreos.com`) on the exact
+   target. When the CRD exists, install or upgrade the runtime with
+   `--set telemetry.serviceMonitor.enabled=true` and verify afterward that the
+   `*-telemetry` ServiceMonitor exists and Prometheus reports the telemetry
+   target up. When the CRD is absent, state that the ServiceMonitor was not
+   created and port-forwarding remains the only telemetry access path.
+5. Run `apply --dry-run=server` against the exact target before the first
    persistent submission when the runtime is installed.
-5. Submit with the native `kasim apply` command and retain JSON output under
+6. Submit with the native `kasim apply` command and retain JSON output under
    `dist/receipts/<scenario>/`.
-6. Run `kasim status ... --watch -o json`, then inspect only Nodes labeled
+7. Run `kasim status ... --watch -o json`, then inspect only Nodes labeled
    `simulation.kasim.io/scenario=<scenario>`.
-7. When the user asks to see the whole cluster or open the UI, run `kasim ui`
+8. When the user asks to see the whole cluster or open the UI, run `kasim ui`
    with no target flags when kubectl's current kubeconfig/context is the
    intended target; otherwise override it with `--kubeconfig` and/or
    `--context`. Verify the context printed before the URL. Keep the default
@@ -99,7 +107,7 @@ reviewed the evidence and explicitly accepts them.
    warning, and require restricted network access. Do not add a proxy, tunnel,
    or persistent service unless separately requested. Treat the complete
    fragment URL as a temporary read capability and never publish it.
-8. Report the context, target fingerprint, Scenario UID and generation,
+9. Report the context, target fingerprint, Scenario UID and generation,
    resolved profiles, requested/observed pool totals, fidelity surfaces,
    diagnostics, and receipt paths.
 

@@ -63,7 +63,7 @@ func TestAuxiliaryDevicePoolPreservesSchedulingOnlyContractAndAssociations(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	profile, err := domain.NewProfileReference(profileID, "2026-08-03", digest)
+	profile, err := domain.NewProfileReference(profileID, "2026-09-04", digest)
 	if err != nil {
 		t.Fatal(err)
 	}

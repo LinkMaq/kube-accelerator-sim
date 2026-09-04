@@ -79,12 +79,15 @@ func (adapter Adapter) Render(
 				if signal.Kind != "node-label" || signal.Value == "" {
 					continue
 				}
-				if _, collision := labels[signal.Key]; collision {
-					return projection.ProjectionFragment{}, fmt.Errorf(
-						"Node %q has duplicate source-backed identity label %q",
-						node.Name(),
-						signal.Key,
-					)
+				if previous, collision := labels[signal.Key]; collision {
+					if previous != signal.Value {
+						return projection.ProjectionFragment{}, fmt.Errorf(
+							"Node %q has conflicting source-backed identity label %q",
+							node.Name(),
+							signal.Key,
+						)
+					}
+					continue
 				}
 				labels[signal.Key] = signal.Value
 			}

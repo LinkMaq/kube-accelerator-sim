@@ -33,6 +33,7 @@ const zhSidebar = [
       { text: '运行时安装', link: '/zh/operators/runtime-installation' },
       { text: '只读集群清单 UI', link: '/zh/operators/cluster-inventory-ui' },
       { text: '模拟厂商 Prometheus 遥测', link: '/zh/operators/simulated-vendor-telemetry' },
+      { text: '节点发现标签', link: '/zh/operators/node-discovery-labels' },
     ],
   },
   {
@@ -55,6 +56,7 @@ const zhSidebar = [
       { text: '场景生命周期（英文）', link: '/adr/0003-revisioned-scenario-instance-contract' },
       { text: '扩展边界（英文）', link: '/adr/0007-deep-modules-and-extension-seams' },
       { text: '模拟遥测决策（英文）', link: '/adr/0008-simulated-vendor-telemetry' },
+      { text: '节点发现标签决策（英文）', link: '/adr/0011-evidence-backed-node-discovery-labels' },
       { text: 'Kasim UI 提案', link: '/zh/spec/kasim-ui' },
     ],
   },
@@ -254,6 +256,7 @@ export default defineConfig({
           { text: 'Runtime installation', link: '/operators/runtime-installation' },
           { text: 'Read-only cluster inventory UI', link: '/operators/cluster-inventory-ui' },
           { text: 'Simulated vendor Prometheus telemetry', link: '/operators/simulated-vendor-telemetry' },
+          { text: 'Node discovery labels', link: '/operators/node-discovery-labels' },
         ],
       },
       {
@@ -276,6 +279,7 @@ export default defineConfig({
           { text: 'Explicit targets and receipts', link: '/adr/0005-explicit-target-receipt-driven-cli' },
           { text: 'Extension seams', link: '/adr/0007-deep-modules-and-extension-seams' },
           { text: 'Simulated vendor telemetry', link: '/adr/0008-simulated-vendor-telemetry' },
+          { text: 'Node discovery labels', link: '/adr/0011-evidence-backed-node-discovery-labels' },
           { text: 'Kasim UI proposal', link: '/spec/kasim-ui' },
         ],
       },

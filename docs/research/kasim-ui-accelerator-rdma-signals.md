@@ -2,7 +2,7 @@
 
 - Status: research snapshot for [Research: 主流加速器与 RDMA 的 Kubernetes
   可见信号](https://github.com/LinkMaq/kube-accelerator-sim/issues/36)
-- Evidence cut-off: 2026-08-03
+- Evidence cut-off: 2026-09-04
 - Scope: read-only signals available to a `kasim ui` client through the
   Kubernetes API of one explicit Simulation Target
 - Kubernetes floor: 1.30; stable DRA inventory is capability-detected on

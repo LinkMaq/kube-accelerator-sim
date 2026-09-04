@@ -271,7 +271,7 @@ func TestOfflineCommandsNeedNoClusterConfiguration(t *testing.T) {
 	}{
 		"version": {
 			args: []string{"version", "-o", "json"},
-			want: []string{`"kind": "Version"`, `"catalogVersion": "2026-08-03"`},
+			want: []string{`"kind": "Version"`, `"catalogVersion": "2026-09-04"`},
 		},
 		"profile list": {
 			args: []string{"profile", "list", "-o", "json"},

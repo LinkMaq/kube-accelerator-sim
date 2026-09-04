@@ -41,8 +41,8 @@ spec:
         - name: training
           profile:
             id: nvidia
-            revision: 2026-08-03
-            digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
+            revision: 2026-09-04
+            digest: sha256:75266b3202e76b55786a989bf920c1c4dc27f3e955e23b0db72fe2fabe94675e
           model: nvidia-h100
           contract: device-plugin
           resource: gpu
@@ -111,8 +111,8 @@ spec:
         - name: training
           profile:
             id: nvidia
-            revision: 2026-08-03
-            digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
+            revision: 2026-09-04
+            digest: sha256:75266b3202e76b55786a989bf920c1c4dc27f3e955e23b0db72fe2fabe94675e
           model: nvidia-h100
           contract: device-plugin
           resource: gpu
@@ -169,7 +169,7 @@ func TestCompileCanonicalGolden(t *testing.T) {
 	if !bytes.Equal(compiled.Bytes(), want) {
 		t.Fatalf("canonical golden drifted:\n%s\n%s", compiled.Bytes(), want)
 	}
-	const wantDigest = "sha256:0a16dfb938531b644337c0c44c3c9c2f7d5753708f250e9d7517c5f14cd0f9ea"
+	const wantDigest = "sha256:9865a3d5ae27f23fafd9fa9682b5ddcc0e571ba26c7a93a1d0d5c1092a106a3a"
 	if compiled.Digest().String() != wantDigest {
 		t.Fatalf("digest = %s, want %s", compiled.Digest(), wantDigest)
 	}
@@ -253,7 +253,7 @@ func TestCompileRejectsNonCanonicalOrStructurallyAmbiguousDocuments(t *testing.T
 		"unpinned profile": {
 			document: strings.Replace(
 				validScenarioDocument,
-				"sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de",
+				"sha256:75266b3202e76b55786a989bf920c1c4dc27f3e955e23b0db72fe2fabe94675e",
 				"sha256:afd6878266ba81287632d5a0cc9d5fe8856d2839ac735a460929ba5d7f519705",
 				1,
 			),
@@ -327,8 +327,8 @@ func TestCompileRejectsScalarResourceCollisionOnOneNode(t *testing.T) {
         - name: inference
           profile:
             id: nvidia
-            revision: 2026-08-03
-            digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
+            revision: 2026-09-04
+            digest: sha256:75266b3202e76b55786a989bf920c1c4dc27f3e955e23b0db72fe2fabe94675e
           model: nvidia-h100
           contract: device-plugin
           resource: gpu
@@ -357,7 +357,7 @@ func TestCompileRejectsMultipleAcceleratorModelsOnOneNodeGroup(t *testing.T) {
         - name: inference
           profile:
             id: amd
-            revision: 2026-08-03
+            revision: 2026-09-04
             digest: sha256:c165c4b0616a2f4064e6a1805e14d97ed76b66d632a9c050fda89cd8b15d2bea
           model: amd-mi300x
           contract: device-plugin
@@ -431,8 +431,8 @@ func TestCompileRejectsConflictingDRAIdentitySignalsOnOneNode(t *testing.T) {
         - name: inference
           profile:
             id: nvidia
-            revision: 2026-08-03
-            digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
+            revision: 2026-09-04
+            digest: sha256:75266b3202e76b55786a989bf920c1c4dc27f3e955e23b0db72fe2fabe94675e
           model: nvidia-h200
           contract: dra
           resource: device
@@ -496,8 +496,8 @@ spec:
         - name: accelerators
           profile:
             id: nvidia
-            revision: 2026-08-03
-            digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de
+            revision: 2026-09-04
+            digest: sha256:75266b3202e76b55786a989bf920c1c4dc27f3e955e23b0db72fe2fabe94675e
           model: nvidia-h100
           contract: device-plugin
           resource: gpu
@@ -528,7 +528,7 @@ func TestCompilationFailsClosedOnProvisionalAndAmbiguousCatalogChoices(t *testin
 	provisionalDocument := strings.NewReplacer(
 		"id: nvidia",
 		"id: kunlunxin-hami",
-		"digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de",
+		"digest: sha256:75266b3202e76b55786a989bf920c1c4dc27f3e955e23b0db72fe2fabe94675e",
 		"digest: sha256:5c5b606b7b3b84e37a816201869fbb24e558f15b28ff1a9b291772153cfe5e10",
 		"model: nvidia-h100",
 		"model: kunlunxin-p800",

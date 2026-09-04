@@ -41,7 +41,7 @@ spec:
       node: {capacity: {}, placement: {}, labels: {}, taints: []}
       acceleratorPools:
         - name: accelerators
-          profile: {id: nvidia, revision: 2026-08-03, digest: sha256:15fa27b98c21e0b3bc60661acd0b4835c7e16e5c8b5c949334048ca08f3731de}
+          profile: {id: nvidia, revision: 2026-09-04, digest: sha256:75266b3202e76b55786a989bf920c1c4dc27f3e955e23b0db72fe2fabe94675e}
           model: nvidia-h100
           contract: device-plugin
           resource: gpu

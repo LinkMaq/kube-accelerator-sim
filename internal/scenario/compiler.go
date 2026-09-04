@@ -47,6 +47,7 @@ type ShortcutInput struct {
 	HealthyPerNode             *int64
 	AcceptsProvisionalProfiles bool
 	Variant                    map[string]string
+	DiscoveryLabels            bool
 }
 
 type shortcutInput struct {
@@ -206,10 +207,11 @@ type rawNodeGroup struct {
 }
 
 type rawNode struct {
-	Capacity  map[string]string `yaml:"capacity"`
-	Placement map[string]string `yaml:"placement"`
-	Labels    map[string]string `yaml:"labels"`
-	Taints    []rawTaint        `yaml:"taints"`
+	Capacity        map[string]string `yaml:"capacity"`
+	Placement       map[string]string `yaml:"placement"`
+	Labels          map[string]string `yaml:"labels"`
+	Taints          []rawTaint        `yaml:"taints"`
+	DiscoveryLabels bool              `yaml:"discoveryLabels"`
 }
 
 type rawTaint struct {
@@ -274,10 +276,11 @@ type canonicalNodeGroup struct {
 }
 
 type canonicalNode struct {
-	Capacity  map[string]string `json:"capacity"`
-	Placement map[string]string `json:"placement"`
-	Labels    map[string]string `json:"labels"`
-	Taints    []canonicalTaint  `json:"taints"`
+	Capacity        map[string]string `json:"capacity"`
+	Placement       map[string]string `json:"placement"`
+	Labels          map[string]string `json:"labels"`
+	Taints          []canonicalTaint  `json:"taints"`
+	DiscoveryLabels bool              `json:"discoveryLabels,omitempty"`
 }
 
 type canonicalTaint struct {
@@ -450,10 +453,11 @@ func compileShortcutInput(input ShortcutInput, catalogSnapshot catalog.Snapshot)
 				Name:     "nodes",
 				Replicas: input.Nodes,
 				Node: rawNode{
-					Capacity:  map[string]string{},
-					Placement: map[string]string{},
-					Labels:    map[string]string{},
-					Taints:    []rawTaint{},
+					Capacity:        map[string]string{},
+					Placement:       map[string]string{},
+					Labels:          map[string]string{},
+					Taints:          []rawTaint{},
+					DiscoveryLabels: input.DiscoveryLabels,
 				},
 				AcceleratorPools: []rawAcceleratorPool{{
 					Name: "accelerators",
@@ -863,19 +867,21 @@ func compileNode(raw rawNode) (domain.NodeTemplate, canonicalNode, error) {
 		canonicalTaints = append(canonicalTaints, canonicalTaint(rawTaint))
 	}
 	template, err := domain.NewNodeTemplate(domain.NodeTemplateInput{
-		Capacity:  capacity,
-		Placement: raw.Placement,
-		Labels:    raw.Labels,
-		Taints:    taints,
+		Capacity:        capacity,
+		Placement:       raw.Placement,
+		Labels:          raw.Labels,
+		Taints:          taints,
+		DiscoveryLabels: raw.DiscoveryLabels,
 	})
 	if err != nil {
 		return domain.NodeTemplate{}, canonicalNode{}, err
 	}
 	return template, canonicalNode{
-		Capacity:  nonNilMap(capacity),
-		Placement: nonNilMap(raw.Placement),
-		Labels:    nonNilMap(raw.Labels),
-		Taints:    nonNilTaints(canonicalTaints),
+		Capacity:        nonNilMap(capacity),
+		Placement:       nonNilMap(raw.Placement),
+		Labels:          nonNilMap(raw.Labels),
+		Taints:          nonNilTaints(canonicalTaints),
+		DiscoveryLabels: raw.DiscoveryLabels,
 	}, nil
 }
 

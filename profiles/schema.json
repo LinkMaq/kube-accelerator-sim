@@ -50,6 +50,31 @@
         "key": {"type": "string", "minLength": 1, "maxLength": 317}
       }
     },
+    "derivedNodeLabel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "valueFrom"],
+      "properties": {
+        "key": {"type": "string", "minLength": 1, "maxLength": 317},
+        "valueFrom": {"enum": ["static", "pool-total-capacity"]},
+        "value": {"type": "string", "minLength": 1, "maxLength": 63}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"valueFrom": {"const": "static"}}},
+          "then": {"required": ["value"]}
+        }
+      ]
+    },
+    "modelNodeLabel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "value"],
+      "properties": {
+        "key": {"type": "string", "minLength": 1, "maxLength": 317},
+        "value": {"type": "string", "minLength": 1, "maxLength": 63}
+      }
+    },
     "capabilities": {
       "type": "object",
       "additionalProperties": false,
@@ -103,6 +128,10 @@
           "type": "array",
           "items": {"$ref": "#/$defs/identitySignal"}
         },
+        "derivedNodeLabels": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/derivedNodeLabel"}
+        },
         "capabilities": {"$ref": "#/$defs/capabilities"},
         "evidenceRefs": {
           "type": "array",
@@ -155,6 +184,11 @@
           "type": "array",
           "uniqueItems": true,
           "items": {"type": "string", "minLength": 1, "maxLength": 63}
+        },
+        "nodeLabels": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/modelNodeLabel"}
         },
         "evidenceRefs": {
           "type": "array",

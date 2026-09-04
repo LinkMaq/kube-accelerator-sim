@@ -1,6 +1,6 @@
 {
   "schemaVersion": "v1alpha2",
-  "revision": "2026-08-03",
+  "revision": "2026-09-04",
   "profiles": [
     {
       "id": "nvidia",
@@ -20,6 +20,13 @@
           "source": "https://github.com/kubernetes-sigs/dra-driver-nvidia-gpu/commit/16c671c4f7f1e9d3de0d46bb9f1d9b9a6a449fa6",
           "revision": "16c671c4f7f1e9d3de0d46bb9f1d9b9a6a449fa6",
           "checkedAt": "2026-07-30"
+        },
+        {
+          "id": "gfd",
+          "grade": "A",
+          "source": "https://github.com/NVIDIA/k8s-device-plugin/blob/3c6be400411aad793892e976824910d0880dd3a8/docs/gpu-feature-discovery/README.md",
+          "revision": "3c6be400411aad793892e976824910d0880dd3a8",
+          "checkedAt": "2026-09-04"
         }
       ],
       "contracts": [
@@ -61,6 +68,33 @@
             {
               "kind": "node-label",
               "key": "nvidia.com/gpu.product"
+            },
+            {
+              "kind": "node-label",
+              "key": "nvidia.com/gpu.family"
+            },
+            {
+              "kind": "node-label",
+              "key": "nvidia.com/gpu.compute.major"
+            },
+            {
+              "kind": "node-label",
+              "key": "nvidia.com/gpu.compute.minor"
+            },
+            {
+              "kind": "node-label",
+              "key": "nvidia.com/gpu.memory"
+            }
+          ],
+          "derivedNodeLabels": [
+            {
+              "key": "nvidia.com/gpu.present",
+              "valueFrom": "static",
+              "value": "true"
+            },
+            {
+              "key": "nvidia.com/gpu.count",
+              "valueFrom": "pool-total-capacity"
             }
           ],
           "capabilities": {
@@ -83,16 +117,16 @@
         }
       ],
       "models": [
-        {"id":"nvidia-a100-40gb","displayName":"NVIDIA A100 40GB","aliases":["A100-40GB"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
-        {"id":"nvidia-a100-80gb","displayName":"NVIDIA A100 80GB","aliases":["A100-80GB"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","mig-1g-10gb","mig-2g-20gb","mig-7g-80gb","device"],"evidenceRefs":["contract","dra"]},
-        {"id":"nvidia-h100","displayName":"NVIDIA H100","aliases":["H100"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
-        {"id":"nvidia-h200","displayName":"NVIDIA H200","aliases":["H200"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
-        {"id":"nvidia-l40s","displayName":"NVIDIA L40S","aliases":["L40S"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","gpu-shared","device"],"evidenceRefs":["contract","dra"]},
-        {"id":"nvidia-b200","displayName":"NVIDIA B200","aliases":["B200"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
-        {"id":"nvidia-b300","displayName":"NVIDIA B300","aliases":["B300"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
-        {"id":"nvidia-a800","displayName":"NVIDIA A800","aliases":["A800"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
-        {"id":"nvidia-h800","displayName":"NVIDIA H800","aliases":["H800"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]},
-        {"id":"nvidia-h20","displayName":"NVIDIA H20","aliases":["H20"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"evidenceRefs":["contract","dra"]}
+        {"id":"nvidia-a100-40gb","displayName":"NVIDIA A100 40GB","aliases":["A100-40GB"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"nodeLabels":[{"key":"nvidia.com/gpu.product","value":"NVIDIA-A100-40GB-PCIe"},{"key":"nvidia.com/gpu.family","value":"ampere"},{"key":"nvidia.com/gpu.compute.major","value":"8"},{"key":"nvidia.com/gpu.compute.minor","value":"0"},{"key":"nvidia.com/gpu.memory","value":"40960"}],"evidenceRefs":["contract","gfd","dra"]},
+        {"id":"nvidia-a100-80gb","displayName":"NVIDIA A100 80GB","aliases":["A100-80GB"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","mig-1g-10gb","mig-2g-20gb","mig-7g-80gb","device"],"nodeLabels":[{"key":"nvidia.com/gpu.product","value":"NVIDIA-A100-SXM4-80GB"},{"key":"nvidia.com/gpu.family","value":"ampere"},{"key":"nvidia.com/gpu.compute.major","value":"8"},{"key":"nvidia.com/gpu.compute.minor","value":"0"},{"key":"nvidia.com/gpu.memory","value":"81920"}],"evidenceRefs":["contract","gfd","dra"]},
+        {"id":"nvidia-h100","displayName":"NVIDIA H100","aliases":["H100"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"nodeLabels":[{"key":"nvidia.com/gpu.product","value":"NVIDIA-H100-80GB-HBM3"},{"key":"nvidia.com/gpu.family","value":"hopper"},{"key":"nvidia.com/gpu.compute.major","value":"9"},{"key":"nvidia.com/gpu.compute.minor","value":"0"},{"key":"nvidia.com/gpu.memory","value":"81920"}],"evidenceRefs":["contract","gfd","dra"]},
+        {"id":"nvidia-h200","displayName":"NVIDIA H200","aliases":["H200"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"nodeLabels":[{"key":"nvidia.com/gpu.product","value":"NVIDIA-H200"},{"key":"nvidia.com/gpu.family","value":"hopper"},{"key":"nvidia.com/gpu.compute.major","value":"9"},{"key":"nvidia.com/gpu.compute.minor","value":"0"},{"key":"nvidia.com/gpu.memory","value":"144384"}],"evidenceRefs":["contract","gfd","dra"]},
+        {"id":"nvidia-l40s","displayName":"NVIDIA L40S","aliases":["L40S"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","gpu-shared","device"],"nodeLabels":[{"key":"nvidia.com/gpu.product","value":"NVIDIA-L40S"},{"key":"nvidia.com/gpu.family","value":"ada"},{"key":"nvidia.com/gpu.compute.major","value":"8"},{"key":"nvidia.com/gpu.compute.minor","value":"9"},{"key":"nvidia.com/gpu.memory","value":"49152"}],"evidenceRefs":["contract","gfd","dra"]},
+        {"id":"nvidia-b200","displayName":"NVIDIA B200","aliases":["B200"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"nodeLabels":[{"key":"nvidia.com/gpu.product","value":"NVIDIA-B200"},{"key":"nvidia.com/gpu.family","value":"blackwell"},{"key":"nvidia.com/gpu.compute.major","value":"10"},{"key":"nvidia.com/gpu.compute.minor","value":"0"},{"key":"nvidia.com/gpu.memory","value":"184320"}],"evidenceRefs":["contract","gfd","dra"]},
+        {"id":"nvidia-b300","displayName":"NVIDIA B300","aliases":["B300"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"nodeLabels":[{"key":"nvidia.com/gpu.product","value":"NVIDIA-B300"},{"key":"nvidia.com/gpu.family","value":"blackwell"},{"key":"nvidia.com/gpu.compute.major","value":"10"},{"key":"nvidia.com/gpu.compute.minor","value":"0"},{"key":"nvidia.com/gpu.memory","value":"294912"}],"evidenceRefs":["contract","gfd","dra"]},
+        {"id":"nvidia-a800","displayName":"NVIDIA A800","aliases":["A800"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"nodeLabels":[{"key":"nvidia.com/gpu.product","value":"NVIDIA-A800-80GB-PCIe"},{"key":"nvidia.com/gpu.family","value":"ampere"},{"key":"nvidia.com/gpu.compute.major","value":"8"},{"key":"nvidia.com/gpu.compute.minor","value":"0"},{"key":"nvidia.com/gpu.memory","value":"81920"}],"evidenceRefs":["contract","gfd","dra"]},
+        {"id":"nvidia-h800","displayName":"NVIDIA H800","aliases":["H800"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"nodeLabels":[{"key":"nvidia.com/gpu.product","value":"NVIDIA-H800"},{"key":"nvidia.com/gpu.family","value":"hopper"},{"key":"nvidia.com/gpu.compute.major","value":"9"},{"key":"nvidia.com/gpu.compute.minor","value":"0"},{"key":"nvidia.com/gpu.memory","value":"81920"}],"evidenceRefs":["contract","gfd","dra"]},
+        {"id":"nvidia-h20","displayName":"NVIDIA H20","aliases":["H20"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","device"],"nodeLabels":[{"key":"nvidia.com/gpu.product","value":"NVIDIA-H20"},{"key":"nvidia.com/gpu.family","value":"hopper"},{"key":"nvidia.com/gpu.compute.major","value":"9"},{"key":"nvidia.com/gpu.compute.minor","value":"0"},{"key":"nvidia.com/gpu.memory","value":"98304"}],"evidenceRefs":["contract","gfd","dra"]}
       ]
     },
     {

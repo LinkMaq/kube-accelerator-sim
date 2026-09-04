@@ -176,12 +176,51 @@ func Build(input BuildInput) (DesiredGraph, error) {
 			}
 			resourceOwners[resolved.ResourceName()] = pool.Name().String()
 
-			signals := make([]IdentitySignal, 0, len(resolved.IdentitySignals()))
+			signals := make([]IdentitySignal, 0, len(resolved.IdentitySignals())+
+				len(resolved.DerivedSignals()))
+			// Vendor discovery labels are opt-in per Node Group. When the
+			// Scenario does not request them, evidenced values stay in the
+			// catalog and pre-existing revisions keep their exact shape.
+			discovery := group.Node().DiscoveryLabels()
 			for _, signal := range resolved.IdentitySignals() {
+				value := ""
+				if discovery {
+					value = signal.Value()
+				}
 				signals = append(signals, IdentitySignal{
-					Kind: signal.Kind(),
-					Key:  signal.Key(),
+					Kind:  signal.Kind(),
+					Key:   signal.Key(),
+					Value: value,
 				})
+			}
+			// Derived node labels resolve from the Scenario shape. The total
+			// capacity of every Accelerator Pool on one Synthetic Node drives
+			// pool-total-capacity values and equals the observed GFD count.
+			if discovery {
+				totalCapacity := uint64(0)
+				for _, member := range group.Pools() {
+					totalCapacity += member.Counts().Total()
+				}
+				for _, signal := range resolved.DerivedSignals() {
+					value := signal.Value()
+					switch signal.ValueFrom() {
+					case catalog.DerivedNodeLabelStatic:
+					case catalog.DerivedNodeLabelPoolTotalCapacity:
+						value = strconv.FormatUint(totalCapacity, 10)
+					default:
+						return DesiredGraph{}, fmt.Errorf(
+							"Node Group %q derived node label %q has unsupported value source %q",
+							group.Name(),
+							signal.Key(),
+							signal.ValueFrom(),
+						)
+					}
+					signals = append(signals, IdentitySignal{
+						Kind:  signal.Kind(),
+						Key:   signal.Key(),
+						Value: value,
+					})
+				}
 			}
 			pools = append(pools, DesiredPool{
 				name:            pool.Name().String(),
@@ -233,6 +272,9 @@ func Build(input BuildInput) (DesiredGraph, error) {
 		acceleratorModel, err := singleAcceleratorModel(pools)
 		if err != nil {
 			return DesiredGraph{}, fmt.Errorf("Node Group %q: %w", group.Name(), err)
+		}
+		if err := checkVendorLabelCollisions(group, pools); err != nil {
+			return DesiredGraph{}, err
 		}
 
 		for replica := uint64(0); replica < group.Replicas().Value(); replica++ {
@@ -300,6 +342,45 @@ func singleAcceleratorModel(pools []DesiredPool) (string, error) {
 		}
 	}
 	return model, nil
+}
+
+// checkVendorLabelCollisions fails closed when evidenced or derived node
+// labels conflict across Accelerator Pools or with Scenario-provided Node
+// labels. Identical repeated values stay legal because several pools may
+// resolve the same model and contract.
+func checkVendorLabelCollisions(
+	group domain.NodeGroup,
+	pools []DesiredPool,
+) error {
+	seen := make(map[string]string)
+	for _, pool := range pools {
+		for _, signal := range pool.IdentitySignals() {
+			if signal.Kind != "node-label" || signal.Value == "" {
+				continue
+			}
+			if previous, duplicate := seen[signal.Key]; duplicate {
+				if previous != signal.Value {
+					return fmt.Errorf(
+						"Node Group %q vendor node label %q conflicts between Accelerator Pools",
+						group.Name(),
+						signal.Key,
+					)
+				}
+				continue
+			}
+			seen[signal.Key] = signal.Value
+		}
+	}
+	for key := range seen {
+		if _, conflict := group.Node().Labels()[key]; conflict {
+			return fmt.Errorf(
+				"Node Group %q Node label %q is reserved by vendor node discovery",
+				group.Name(),
+				key,
+			)
+		}
+	}
+	return nil
 }
 
 func verifyResolution(

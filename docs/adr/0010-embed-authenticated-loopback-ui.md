@@ -1,6 +1,6 @@
 # ADR 0010: Embed an authenticated temporary UI in kasim
 
-Status: Accepted; amended 2026-08-03 to allow explicit listen hosts
+Status: Accepted; amended 2026-09-04 to allow explicit listen hosts
 
 `kasim ui` is a temporary, read-only view of one resolved Simulation Target, not a persistent management service. The released `kasim` binary embeds standards-based HTML, CSS, and JavaScript assets and listens on `127.0.0.1` by default. An operator may explicitly select another listen host for a short-lived network-accessible session. The UI does not require a Node.js runtime, an external asset directory, another process, a Helm component, or a persistent deployment.
 

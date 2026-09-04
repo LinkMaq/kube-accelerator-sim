@@ -22,6 +22,19 @@ the kubeconfig and context flags explicitly.
 
 ## Install the shared runtime
 
+Before installing, check whether the target supports Prometheus Operator:
+
+```sh
+kubectl --kubeconfig "$KUBECONFIG_PATH" --context "$KUBE_CONTEXT" \
+  api-resources --api-group=monitoring.coreos.com
+```
+
+When `servicemonitors.monitoring.coreos.com` is listed, use the Helm command
+below as written (it already enables the ServiceMonitor). When it is absent,
+remove the `--set telemetry.serviceMonitor.enabled=true` line and tell the
+user the ServiceMonitor was not created (port-forward remains the only
+telemetry path).
+
 ```sh
 kubectl --kubeconfig "$KUBECONFIG_PATH" --context "$KUBE_CONTEXT" \
   get namespace kasim-system >/dev/null 2>&1 || \
@@ -32,6 +45,7 @@ helm upgrade --install kasim-runtime ./charts/kasim-runtime \
   --kubeconfig "$KUBECONFIG_PATH" \
   --kube-context "$KUBE_CONTEXT" \
   --namespace kasim-system \
+  --set telemetry.serviceMonitor.enabled=true \
   --wait --timeout 10m
 
 kubectl --kubeconfig "$KUBECONFIG_PATH" --context "$KUBE_CONTEXT" \
@@ -41,6 +55,21 @@ kubectl --kubeconfig "$KUBECONFIG_PATH" --context "$KUBE_CONTEXT" \
   --namespace kasim-system rollout status \
   deployment/kasim-runtime-kasim-runtime-kwok-controller --timeout=5m
 ```
+
+When the ServiceMonitor was enabled, verify scraping after install:
+
+```sh
+kubectl --kubeconfig "$KUBECONFIG_PATH" --context "$KUBE_CONTEXT" \
+  get servicemonitor -n kasim-system
+kubectl --kubeconfig "$KUBECONFIG_PATH" --context "$KUBE_CONTEXT" \
+  --namespace kasim-system get endpoints \
+  service/kasim-runtime-kasim-runtime-telemetry
+```
+
+If a Prometheus instance is reachable, also confirm the telemetry target is
+`up` (for example, query its `/api/v1/targets` for `9400/metrics`). Treat an
+existing-but-never-scraped ServiceMonitor as a failure to report, not a
+success.
 
 Use the pinned OCI Chart and `--version` instead of the local Chart when the
 user requests a published release deployment.

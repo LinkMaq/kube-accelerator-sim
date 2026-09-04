@@ -1,6 +1,6 @@
 # Kasim UI: Kubernetes 1.30+ device inventory and scheduling signals
 
-Research date: 2026-08-03
+Research date: 2026-09-04
 
 Decision ticket:
 [Research: Kubernetes 1.30+ 设备清单与调度使用信号](https://github.com/LinkMaq/kube-accelerator-sim/issues/35)

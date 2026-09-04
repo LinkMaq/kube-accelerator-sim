@@ -45,17 +45,18 @@ type profileRecord struct {
 }
 
 type contractRecord struct {
-	ID                 string            `json:"id"`
-	Subject            string            `json:"subject,omitempty"`
-	AuxiliaryCategory  string            `json:"auxiliaryCategory,omitempty"`
-	ResourceNamePolicy string            `json:"resourceNamePolicy,omitempty"`
-	Kind               string            `json:"kind"`
-	ProviderScope      string            `json:"providerScope"`
-	FidelityModes      []string          `json:"fidelityModes"`
-	Resources          []resourceRecord  `json:"resources"`
-	IdentitySignals    []identitySignal  `json:"identitySignals"`
-	Capabilities       map[string]string `json:"capabilities"`
-	EvidenceRefs       []string          `json:"evidenceRefs"`
+	ID                 string                   `json:"id"`
+	Subject            string                   `json:"subject,omitempty"`
+	AuxiliaryCategory  string                   `json:"auxiliaryCategory,omitempty"`
+	ResourceNamePolicy string                   `json:"resourceNamePolicy,omitempty"`
+	Kind               string                   `json:"kind"`
+	ProviderScope      string                   `json:"providerScope"`
+	FidelityModes      []string                 `json:"fidelityModes"`
+	Resources          []resourceRecord         `json:"resources"`
+	IdentitySignals    []identitySignal         `json:"identitySignals"`
+	DerivedNodeLabels  []derivedNodeLabelRecord `json:"derivedNodeLabels,omitempty"`
+	Capabilities       map[string]string        `json:"capabilities"`
+	EvidenceRefs       []string                 `json:"evidenceRefs"`
 }
 
 type resourceRecord struct {
@@ -69,15 +70,27 @@ type identitySignal struct {
 	Key  string `json:"key"`
 }
 
+type derivedNodeLabelRecord struct {
+	Key       string `json:"key"`
+	ValueFrom string `json:"valueFrom"`
+	Value     string `json:"value,omitempty"`
+}
+
+type nodeLabelRecord struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 type modelRecord struct {
-	ID              string   `json:"id"`
-	DisplayName     string   `json:"displayName"`
-	Aliases         []string `json:"aliases"`
-	Lifecycle       string   `json:"lifecycle"`
-	Selectable      bool     `json:"selectable"`
-	Contracts       []string `json:"contracts"`
-	ResourceAliases []string `json:"resourceAliases"`
-	EvidenceRefs    []string `json:"evidenceRefs"`
+	ID              string            `json:"id"`
+	DisplayName     string            `json:"displayName"`
+	Aliases         []string          `json:"aliases"`
+	Lifecycle       string            `json:"lifecycle"`
+	Selectable      bool              `json:"selectable"`
+	Contracts       []string          `json:"contracts"`
+	ResourceAliases []string          `json:"resourceAliases"`
+	NodeLabels      []nodeLabelRecord `json:"nodeLabels,omitempty"`
+	EvidenceRefs    []string          `json:"evidenceRefs"`
 }
 
 // EvidenceReceipt identifies the exact source and review date supporting a
@@ -195,15 +208,36 @@ type ResolvedSelection struct {
 	resourceAlias      string
 	resourceName       string
 	identity           []ResolvedIdentitySignal
+	derived            []ResolvedDerivedSignal
 	evidence           []EvidenceReceipt
 }
 
 // ResolvedIdentitySignal is one exact source-backed vendor identity key used
-// by the selected Resource Contract. Values remain model/backend data.
+// by the selected Resource Contract. The optional value carries the exact
+// model-level evidence and is emitted only when the Scenario opts into node
+// discovery labels; model IDs are never substituted for missing values.
 type ResolvedIdentitySignal struct {
-	kind string
-	key  string
+	kind  string
+	key   string
+	value string
 }
+
+// ResolvedDerivedSignal is one contract-declared node label whose value is
+// derived from the resolved Scenario shape rather than per-model evidence.
+type ResolvedDerivedSignal struct {
+	kind      string
+	key       string
+	valueFrom string
+	value     string
+}
+
+const (
+	// DerivedNodeLabelStatic emits the contract-declared literal value.
+	DerivedNodeLabelStatic = "static"
+	// DerivedNodeLabelPoolTotalCapacity emits the summed Accelerator Pool
+	// total capacity of the Synthetic Node.
+	DerivedNodeLabelPoolTotalCapacity = "pool-total-capacity"
+)
 
 // LoadBundled validates the exact embedded catalog and computes stable profile
 // and whole-catalog digests.
@@ -524,6 +558,61 @@ func validateContract(
 		}
 		identitySignals[identity] = struct{}{}
 	}
+	derivedKeys := make(map[string]struct{}, len(contract.DerivedNodeLabels))
+	for _, label := range contract.DerivedNodeLabels {
+		if !validQualifiedName(label.Key) {
+			return fmt.Errorf(
+				"profile %q contract %q has invalid derived node label key %q",
+				profileID,
+				contract.ID,
+				label.Key,
+			)
+		}
+		switch label.ValueFrom {
+		case DerivedNodeLabelStatic:
+			if label.Value == "" {
+				return fmt.Errorf(
+					"profile %q contract %q static derived node label %q requires a value",
+					profileID,
+					contract.ID,
+					label.Key,
+				)
+			}
+		case DerivedNodeLabelPoolTotalCapacity:
+			if label.Value != "" {
+				return fmt.Errorf(
+					"profile %q contract %q pool-total derived node label %q must not carry a value",
+					profileID,
+					contract.ID,
+					label.Key,
+				)
+			}
+		default:
+			return fmt.Errorf(
+				"profile %q contract %q has invalid derived node label source %q",
+				profileID,
+				contract.ID,
+				label.ValueFrom,
+			)
+		}
+		if _, duplicate := derivedKeys[label.Key]; duplicate {
+			return fmt.Errorf(
+				"profile %q contract %q repeats derived node label %q",
+				profileID,
+				contract.ID,
+				label.Key,
+			)
+		}
+		if _, declared := identitySignals["node-label\x00"+label.Key]; declared {
+			return fmt.Errorf(
+				"profile %q contract %q derived node label %q duplicates an identity signal",
+				profileID,
+				contract.ID,
+				label.Key,
+			)
+		}
+		derivedKeys[label.Key] = struct{}{}
+	}
 	requiredCapabilities := map[string]struct{}{
 		"health": {}, "topology": {}, "sharing": {}, "partitioning": {},
 	}
@@ -652,6 +741,42 @@ func validateModel(
 				resourceAlias,
 			)
 		}
+	}
+	declaredNodeLabels := make(map[string]struct{})
+	for _, contractID := range model.Contracts {
+		for _, signal := range contracts[contractID].IdentitySignals {
+			if signal.Kind == "node-label" {
+				declaredNodeLabels[signal.Key] = struct{}{}
+			}
+		}
+	}
+	modelNodeLabels := make(map[string]struct{}, len(model.NodeLabels))
+	for _, label := range model.NodeLabels {
+		if label.Value == "" {
+			return fmt.Errorf(
+				"profile %q model %q node label %q requires a value",
+				profileID,
+				model.ID,
+				label.Key,
+			)
+		}
+		if _, declared := declaredNodeLabels[label.Key]; !declared {
+			return fmt.Errorf(
+				"profile %q model %q node label %q is not declared by its contracts",
+				profileID,
+				model.ID,
+				label.Key,
+			)
+		}
+		if _, duplicate := modelNodeLabels[label.Key]; duplicate {
+			return fmt.Errorf(
+				"profile %q model %q repeats node label %q",
+				profileID,
+				model.ID,
+				label.Key,
+			)
+		}
+		modelNodeLabels[label.Key] = struct{}{}
 	}
 	return validateEvidenceReferences(profileID, "model "+model.ID, model.EvidenceRefs, evidenceIDs)
 }
@@ -824,18 +949,32 @@ func (snapshot Snapshot) Resolve(request ResolveRequest) (ResolvedSelection, err
 		resource = compatibleResources[0]
 	}
 	evidence := append([]EvidenceReceipt(nil), profile.record.Evidence...)
+	modelValues := make(map[string]string, len(model.NodeLabels))
+	for _, label := range model.NodeLabels {
+		modelValues[label.Key] = label.Value
+	}
 	identity := make([]ResolvedIdentitySignal, 0, len(contract.IdentitySignals))
 	for _, signal := range contract.IdentitySignals {
 		identity = append(identity, ResolvedIdentitySignal{
-			kind: signal.Kind,
-			key:  signal.Key,
+			kind:  signal.Kind,
+			key:   signal.Key,
+			value: modelValues[signal.Key],
+		})
+	}
+	derived := make([]ResolvedDerivedSignal, 0, len(contract.DerivedNodeLabels))
+	for _, label := range contract.DerivedNodeLabels {
+		derived = append(derived, ResolvedDerivedSignal{
+			kind:      "node-label",
+			key:       label.Key,
+			valueFrom: label.ValueFrom,
+			value:     label.Value,
 		})
 	}
 	return ResolvedSelection{
 		profileClass: profile.record.Class, profileDigest: profile.digest,
 		subject: "accelerator", modelID: model.ID, contractID: contract.ID,
 		resourceAlias: resource.Alias, resourceName: resource.Name,
-		identity: identity, evidence: evidence,
+		identity: identity, derived: derived, evidence: evidence,
 	}, nil
 }
 
@@ -911,12 +1050,21 @@ func (snapshot Snapshot) ResolveAuxiliary(
 	for _, signal := range contract.IdentitySignals {
 		identity = append(identity, ResolvedIdentitySignal{kind: signal.Kind, key: signal.Key})
 	}
+	derived := make([]ResolvedDerivedSignal, 0, len(contract.DerivedNodeLabels))
+	for _, label := range contract.DerivedNodeLabels {
+		derived = append(derived, ResolvedDerivedSignal{
+			kind:      "node-label",
+			key:       label.Key,
+			valueFrom: label.ValueFrom,
+			value:     label.Value,
+		})
+	}
 	return ResolvedSelection{
 		profileClass: profile.record.Class, profileDigest: profile.digest,
 		subject: "auxiliary", auxiliaryCategory: contract.AuxiliaryCategory,
 		resourceNamePolicy: contract.ResourceNamePolicy,
 		contractID:         contract.ID, resourceAlias: resource.Alias,
-		resourceName: resourceName, identity: identity,
+		resourceName: resourceName, identity: identity, derived: derived,
 		evidence: append([]EvidenceReceipt(nil), profile.record.Evidence...),
 	}, nil
 }
@@ -1297,6 +1445,12 @@ func (selection ResolvedSelection) IdentitySignals() []ResolvedIdentitySignal {
 	return append([]ResolvedIdentitySignal(nil), selection.identity...)
 }
 
+// DerivedSignals returns a copy of the contract-declared derived node labels
+// whose values are computed from the resolved Scenario shape.
+func (selection ResolvedSelection) DerivedSignals() []ResolvedDerivedSignal {
+	return append([]ResolvedDerivedSignal(nil), selection.derived...)
+}
+
 // Kind returns node-label, annotation, or dra-attribute.
 func (signal ResolvedIdentitySignal) Kind() string {
 	return signal.kind
@@ -1305,6 +1459,33 @@ func (signal ResolvedIdentitySignal) Kind() string {
 // Key returns the exact source-backed signal key.
 func (signal ResolvedIdentitySignal) Key() string {
 	return signal.key
+}
+
+// Value returns the exact evidenced model value, or an empty string when the
+// catalog does not carry evidence for this key.
+func (signal ResolvedIdentitySignal) Value() string {
+	return signal.value
+}
+
+// Kind returns the derived signal kind, currently only node-label.
+func (signal ResolvedDerivedSignal) Kind() string {
+	return signal.kind
+}
+
+// Key returns the exact source-backed derived signal key.
+func (signal ResolvedDerivedSignal) Key() string {
+	return signal.key
+}
+
+// ValueFrom returns static or pool-total-capacity.
+func (signal ResolvedDerivedSignal) ValueFrom() string {
+	return signal.valueFrom
+}
+
+// Value returns the contract-declared literal value for static derivation and
+// an empty string for pool-total-capacity.
+func (signal ResolvedDerivedSignal) Value() string {
+	return signal.value
 }
 
 // Evidence returns a copy of the evidence supporting the selection.

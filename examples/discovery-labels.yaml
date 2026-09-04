@@ -1,23 +1,24 @@
 metadata:
-  name: nvidia-h100-fleet
+  name: discovery-labels
 spec:
   fidelity: scheduling
   acceptance:
     provisionalProfiles: false
   nodeGroups:
-    - name: nvidia-workers
+    - name: workers
       replicas: 2
       node:
         capacity:
-          cpu: "64"
+          cpu: "88"
           memory: 256Gi
           pods: "110"
         placement:
-          zone: accelerator-a
+          zone: lab-a
         labels: {}
         taints: []
+        discoveryLabels: true
       acceleratorPools:
-        - name: h100
+        - name: accelerator
           profile:
             id: nvidia
             revision: 2026-09-04

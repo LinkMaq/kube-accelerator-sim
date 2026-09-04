@@ -337,18 +337,20 @@ func (taint Taint) Effect() string {
 // NodeTemplateInput is the portable base capacity and placement intent shared
 // by every replica of a Node Group.
 type NodeTemplateInput struct {
-	Capacity  map[string]string
-	Placement map[string]string
-	Labels    map[string]string
-	Taints    []Taint
+	Capacity        map[string]string
+	Placement       map[string]string
+	Labels          map[string]string
+	Taints          []Taint
+	DiscoveryLabels bool
 }
 
 // NodeTemplate is an immutable homogeneous Synthetic Node template.
 type NodeTemplate struct {
-	capacity  map[string]string
-	placement map[string]string
-	labels    map[string]string
-	taints    []Taint
+	capacity        map[string]string
+	placement       map[string]string
+	labels          map[string]string
+	taints          []Taint
+	discoveryLabels bool
 }
 
 // NewNodeTemplate validates required map entries and copies mutable inputs.
@@ -374,10 +376,11 @@ func NewNodeTemplate(input NodeTemplateInput) (NodeTemplate, error) {
 		}
 	}
 	return NodeTemplate{
-		capacity:  cloneStringMap(input.Capacity),
-		placement: cloneStringMap(input.Placement),
-		labels:    cloneStringMap(input.Labels),
-		taints:    append([]Taint(nil), input.Taints...),
+		capacity:        cloneStringMap(input.Capacity),
+		placement:       cloneStringMap(input.Placement),
+		labels:          cloneStringMap(input.Labels),
+		taints:          append([]Taint(nil), input.Taints...),
+		discoveryLabels: input.DiscoveryLabels,
 	}, nil
 }
 
@@ -391,6 +394,12 @@ func (node NodeTemplate) Placement() map[string]string {
 
 func (node NodeTemplate) Labels() map[string]string {
 	return cloneStringMap(node.labels)
+}
+
+// DiscoveryLabels reports whether the Synthetic Node requests evidence-backed
+// vendor discovery labels, such as the gpu-operator/GFD node label set.
+func (node NodeTemplate) DiscoveryLabels() bool {
+	return node.discoveryLabels
 }
 
 func (node NodeTemplate) Taints() []Taint {

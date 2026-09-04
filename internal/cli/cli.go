@@ -458,6 +458,7 @@ func runApply(
 	var nodes, accelerators, healthy int64
 	var expectedGeneration uint64
 	var acceptProvisional bool
+	var discoveryLabels bool
 	var async bool
 	var timeout time.Duration
 	flags.StringVar(&file, "f", "", "local Scenario file or - for stdin")
@@ -488,6 +489,12 @@ func runApply(
 		"accept-provisional",
 		false,
 		"accept provisional profile evidence",
+	)
+	flags.BoolVar(
+		&discoveryLabels,
+		"discovery-labels",
+		false,
+		"emit evidence-backed vendor discovery node labels, such as the gpu-operator/GFD set",
 	)
 	if err := flags.Parse(args); err != nil {
 		return writeFailure("apply", "InvocationInvalid", err.Error(), format, stderr)
@@ -603,6 +610,7 @@ func runApply(
 			AcceleratorsPerNode:        accelerators,
 			HealthyPerNode:             healthyPointer,
 			AcceptsProvisionalProfiles: acceptProvisional,
+			DiscoveryLabels:            discoveryLabels,
 		})
 	} else {
 		if file == "" {
@@ -617,7 +625,7 @@ func runApply(
 		if profileID != "" || modelID != "" || contractID != "" ||
 			resourceAlias != "" || fidelity != "" ||
 			nodes != -1 || accelerators != -1 || healthy != -1 ||
-			acceptProvisional {
+			acceptProvisional || discoveryLabels {
 			return writeFailure(
 				"apply",
 				"InvocationInvalid",

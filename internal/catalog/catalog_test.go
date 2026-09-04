@@ -14,12 +14,12 @@ func TestAuxiliaryContractRequiresExactScenarioResourceName(t *testing.T) {
 
 	snapshot, err := catalog.LoadCustom(strings.NewReader(`{
   "schemaVersion":"v1alpha2",
-  "revision":"2026-08-03",
+  "revision":"2026-09-04",
   "profiles":[{
     "id":"rdma-shared-device-plugin",
     "displayName":"RDMA Shared Device Plugin",
     "class":"custom",
-    "evidence":[{"id":"upstream","grade":"A","source":"https://github.com/Mellanox/k8s-rdma-shared-dev-plugin","revision":"v1.5.3","checkedAt":"2026-08-03"}],
+    "evidence":[{"id":"upstream","grade":"A","source":"https://github.com/Mellanox/k8s-rdma-shared-dev-plugin","revision":"v1.5.3","checkedAt":"2026-09-04"}],
     "contracts":[{
       "id":"shared-hca","subject":"auxiliary","auxiliaryCategory":"rdma",
       "resourceNamePolicy":"scenario-required","kind":"extended-resource",
@@ -317,12 +317,12 @@ func TestProfileViewExposesImmutableOfflineContractEvidence(t *testing.T) {
 	if profile.ID() != "nvidia" ||
 		profile.DisplayName() != "NVIDIA" ||
 		profile.Class() != "verified" ||
-		profile.Revision() != "2026-08-03" ||
+		profile.Revision() != "2026-09-04" ||
 		profile.Digest().String() == "" {
 		t.Fatalf("incomplete profile identity: %#v", profile)
 	}
-	if len(profile.Evidence()) != 2 {
-		t.Fatalf("evidence count = %d, want 2", len(profile.Evidence()))
+	if len(profile.Evidence()) != 3 {
+		t.Fatalf("evidence count = %d, want 3", len(profile.Evidence()))
 	}
 	contracts := profile.Contracts()
 	if len(contracts) != 2 ||
@@ -330,10 +330,16 @@ func TestProfileViewExposesImmutableOfflineContractEvidence(t *testing.T) {
 		contracts[1].ID() != "dra" {
 		t.Fatalf("unexpected contracts: %#v", contracts)
 	}
+	hasProductSignal := false
+	for _, signal := range contracts[0].IdentitySignals() {
+		if signal.Kind() == "node-label" && signal.Key() == "nvidia.com/gpu.product" {
+			hasProductSignal = true
+		}
+	}
 	if contracts[0].Kind() != "extended-resource" ||
 		contracts[0].ProviderScope() != "any-kubernetes" ||
 		contracts[0].Resources()[0].Name() != "nvidia.com/gpu" ||
-		contracts[0].IdentitySignals()[0].Key() != "nvidia.com/gpu.product" ||
+		!hasProductSignal ||
 		contracts[0].Capabilities()["health"] != "verified" {
 		t.Fatalf("incomplete contract view: %#v", contracts[0])
 	}

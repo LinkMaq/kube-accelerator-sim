@@ -114,6 +114,7 @@ fidelity claim.
 - [Scenario examples](docs/operators/scenario-examples.md)
 - [Read-only cluster inventory UI](docs/operators/cluster-inventory-ui.md)
 - [Simulated vendor Prometheus telemetry](docs/operators/simulated-vendor-telemetry.md)
+- [Node discovery labels](docs/operators/node-discovery-labels.md)
 - [Vendor profile evidence and support classes](docs/operators/profile-evidence.md)
 - [Runtime installation and permissions](docs/operators/runtime-installation.md)
 - [Kubernetes compatibility](docs/operators/kubernetes-compatibility.md)
