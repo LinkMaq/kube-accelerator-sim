@@ -733,9 +733,11 @@ func NewApplySyntheticNode(
 			)
 		}
 	}
-	for key, value := range input.Labels {
-		if key == "" || value == "" {
-			return nil, fmt.Errorf("Synthetic Node labels must be non-empty")
+	for key := range input.Labels {
+		if key == "" {
+			// Kubernetes label values may be empty strings; GFD emits
+			// empty-valued labels such as nvidia.com/gpu.deploy.nvsm.
+			return nil, fmt.Errorf("Synthetic Node label key must not be empty")
 		}
 	}
 	for key := range input.Annotations {

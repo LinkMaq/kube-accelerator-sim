@@ -22,8 +22,8 @@ spec:
         - name: accelerator
           profile:
             id: nvidia
-            revision: 2026-09-04
-            digest: sha256:75266b3202e76b55786a989bf920c1c4dc27f3e955e23b0db72fe2fabe94675e
+            revision: 2026-09-05
+            digest: sha256:a04f86407d43998b667d61e6d2bbbc91a3ef004634e776dfc2fe330716a2a479
           model: nvidia-h100
           contract: device-plugin
           resource: gpu
@@ -35,7 +35,7 @@ spec:
 
 ## 输出的标签集
 
-对一个 8 卡 H100 节点组，两个模拟节点会获得：
+对一个 8 卡 H100 节点组，两个模拟节点会获得与 GPU Operator 管理节点一致的 36 个 `nvidia.com/*` 标签（仅缺 `gfd.timestamp` 与 `gpu.machine`，见"边界"）：
 
 | 标签 | 值 | 来源 |
 | --- | --- | --- |
@@ -46,6 +46,35 @@ spec:
 | `nvidia.com/gpu.compute.major` | `9` | 型号证据 |
 | `nvidia.com/gpu.compute.minor` | `0` | 型号证据 |
 | `nvidia.com/gpu.memory` | `81920` | 型号证据，MiB 内存包络 |
+| `nvidia.com/gpu.mode` | `compute` | 型号证据，数据中心板的 PCI class 模式 |
+| `nvidia.com/mig.capable` | `true` | 型号证据（L40S 为 `false`） |
+| `nvidia.com/mig.strategy` | `single` | 契约派生，gpu-operator 默认值 |
+| `nvidia.com/gpu.replicas` | `1` | 契约派生，未配置共享 |
+| `nvidia.com/gpu.sharing-strategy` | `none` | 契约派生，未配置共享 |
+| `nvidia.com/mps.capable` | `false` | 契约派生，未配置 MPS |
+| `nvidia.com/vgpu.present` | `false` | 契约派生，无 vGPU manager |
+| `nvidia.com/cuda.driver-version.full` | `580.126.16` | 契约派生，与 DCGM 遥测共享的驱动证据 |
+| `nvidia.com/cuda.driver-version.major` | `580` | 契约派生 |
+| `nvidia.com/cuda.driver-version.minor` | `126` | 契约派生 |
+| `nvidia.com/cuda.driver-version.revision` | `16` | 契约派生 |
+| `nvidia.com/cuda.driver.major` | `580` | 契约派生，GFD 已废弃键 |
+| `nvidia.com/cuda.driver.minor` | `126` | 契约派生，GFD 已废弃键 |
+| `nvidia.com/cuda.driver.rev` | `16` | 契约派生，GFD 已废弃键 |
+| `nvidia.com/cuda.runtime-version.full` | `13.3.1` | 契约派生，最新 CUDA GA 版本 |
+| `nvidia.com/cuda.runtime-version.major` | `13` | 契约派生 |
+| `nvidia.com/cuda.runtime-version.minor` | `3` | 契约派生 |
+| `nvidia.com/cuda.runtime.major` | `13` | 契约派生，GFD 已废弃键 |
+| `nvidia.com/cuda.runtime.minor` | `3` | 契约派生，GFD 已废弃键 |
+| `nvidia.com/gpu-driver-upgrade-state` | `upgrade-done` | 契约派生，operator 升级生命周期 |
+| `nvidia.com/gpu.deploy.container-toolkit` | `true` | 契约派生，operator 组件状态 |
+| `nvidia.com/gpu.deploy.dcgm` | `true` | 契约派生 |
+| `nvidia.com/gpu.deploy.dcgm-exporter` | `true` | 契约派生 |
+| `nvidia.com/gpu.deploy.device-plugin` | `true` | 契约派生 |
+| `nvidia.com/gpu.deploy.driver` | `true` | 契约派生 |
+| `nvidia.com/gpu.deploy.gpu-feature-discovery` | `true` | 契约派生 |
+| `nvidia.com/gpu.deploy.node-status-exporter` | `true` | 契约派生 |
+| `nvidia.com/gpu.deploy.nvsm` | ``（空） | 契约派生，NVSM 未部署 |
+| `nvidia.com/gpu.deploy.operator-validator` | `true` | 契约派生 |
 
 Kasim 归属标签（`simulation.kasim.io/*`）与 `feature.node.cloud.xiaoshiai.cn/accelerator-model.name` 保持原样。
 
@@ -57,4 +86,4 @@ Kasim 归属标签（`simulation.kasim.io/*`）与 `feature.node.cloud.xiaoshiai
 
 ## 边界
 
-Kasim 有意不输出 `nvidia.com/gfd.timestamp`（破坏 Snapshot 确定性）、`nvidia.com/gpu.machine`（主机特定）、`gpu.clique`（NVLink 拓扑超出保真边界）、MIG 策略标签（分区通过资源别名选择）以及 CUDA runtime 版本标签（不声明 CUDA runtime 保真）。这些标签描述的是模拟调度清单，永远不证明驱动、设备文件或加速计算的存在。
+Kasim 有意不输出 `nvidia.com/gfd.timestamp`（破坏 Snapshot 确定性）与 `nvidia.com/gpu.machine`（主机特定，模拟节点无真实主机）。CUDA runtime 版本按目录修订版锚定到最新 CUDA GA 版本，而非从节点 toolkit 安装探测；升级目录即可更新。这些标签描述的是模拟调度清单，永远不证明驱动、设备文件或加速计算的存在。

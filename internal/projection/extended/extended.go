@@ -76,7 +76,7 @@ func (adapter Adapter) Render(
 			capacity[pool.ResourceName()] = pool.Capacity()
 			allocatable[pool.ResourceName()] = pool.Allocatable()
 			for _, signal := range pool.IdentitySignals() {
-				if signal.Kind != "node-label" || signal.Value == "" {
+				if signal.Kind != "node-label" {
 					continue
 				}
 				if previous, collision := labels[signal.Key]; collision {

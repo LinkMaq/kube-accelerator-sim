@@ -20,8 +20,8 @@ spec:
         - name: h100
           profile:
             id: nvidia
-            revision: 2026-09-04
-            digest: sha256:75266b3202e76b55786a989bf920c1c4dc27f3e955e23b0db72fe2fabe94675e
+            revision: 2026-09-05
+            digest: sha256:a04f86407d43998b667d61e6d2bbbc91a3ef004634e776dfc2fe330716a2a479
           model: nvidia-h100
           contract: device-plugin
           resource: gpu
@@ -32,7 +32,7 @@ spec:
         - name: rdma-a
           profile:
             id: rdma-shared-device-plugin
-            revision: 2026-09-04
+            revision: 2026-09-05
             digest: sha256:47a91b9586b98c5362610722f0b2fe3ee278d773717d6748d88e890d6974a6d8
           contract: shared-hca
           resource: shared-token
@@ -56,7 +56,7 @@ spec:
         - name: mi300x
           profile:
             id: amd
-            revision: 2026-09-04
+            revision: 2026-09-05
             digest: sha256:c165c4b0616a2f4064e6a1805e14d97ed76b66d632a9c050fda89cd8b15d2bea
           model: amd-mi300x
           contract: device-plugin
@@ -68,7 +68,7 @@ spec:
         - name: sriov-a
           profile:
             id: sriov-network-device-plugin
-            revision: 2026-09-04
+            revision: 2026-09-05
             digest: sha256:3e925812d245b51146c0bcc833b276244c93aa76412c29ab3a4735bca9eb44cd
           contract: sriov-resource
           resource: virtual-function

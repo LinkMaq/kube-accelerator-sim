@@ -22,14 +22,22 @@ objects through the existing reconcile merge, participate in the
 `extended-resources` fidelity surface, and fail closed on conflicts between
 pools or against Scenario-provided labels.
 
-The emitted set covers `gpu.present`, `gpu.count`, `gpu.product`,
-`gpu.family`, `gpu.compute.major`, `gpu.compute.minor`, and `gpu.memory`.
-Kasim deliberately excludes `gfd.timestamp` (Snapshot determinism),
-`gpu.machine` (host-specific), `gpu.clique` (NVLink fabric is outside the
-fidelity boundary), MIG strategy labels (partitioning is selected through
-resource aliases), and CUDA runtime version labels (no CUDA runtime fidelity
-claim). The labels describe simulated scheduling inventory only; they do not
-claim drivers, device files, telemetry authenticity, or accelerator compute.
+The emitted set reproduces the complete 36-label `nvidia.com/*` collection a
+GPU Operator-managed node carries: the core inventory labels (`gpu.present`,
+`gpu.count`, `gpu.product`, `gpu.family`, `gpu.compute.major`,
+`gpu.compute.minor`, `gpu.memory`), per-model hardware facts (`gpu.mode`,
+`mig.capable`), the operator-shaped defaults (`mig.strategy`, `gpu.replicas`,
+`gpu.sharing-strategy`, `mps.capable`, `vgpu.present`,
+`gpu-driver-upgrade-state`, the `gpu.deploy.*` component states including the
+empty `gpu.deploy.nvsm`), the driver version labels in both current and
+deprecated GFD spellings (`cuda.driver-version.*`, `cuda.driver.*`), and the
+CUDA runtime version labels (`cuda.runtime-version.*`, `cuda.runtime.*`)
+pinned per catalog revision to the latest CUDA GA release. Static values may
+be empty because GFD itself emits empty labels for undeployed components.
+Kasim deliberately excludes only `gfd.timestamp` (Snapshot determinism) and
+`gpu.machine` (host-specific, no simulated host exists). The labels describe
+simulated scheduling inventory only; they do not claim drivers, device files,
+telemetry authenticity, or accelerator compute.
 
 ## Considered options
 

@@ -5,7 +5,15 @@
   "nodes": [
     {
       "name": "kasim-node-dd261ef38fe9d85f08e42d49",
-      "identityLabels": {},
+      "identityLabels": {
+        "nvidia.com/gpu.compute.major": "",
+        "nvidia.com/gpu.compute.minor": "",
+        "nvidia.com/gpu.family": "",
+        "nvidia.com/gpu.memory": "",
+        "nvidia.com/gpu.mode": "",
+        "nvidia.com/gpu.product": "",
+        "nvidia.com/mig.capable": ""
+      },
       "capacity": {
         "nvidia.com/gpu": 8
       },

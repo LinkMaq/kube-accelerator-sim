@@ -14,12 +14,12 @@ func TestAuxiliaryContractRequiresExactScenarioResourceName(t *testing.T) {
 
 	snapshot, err := catalog.LoadCustom(strings.NewReader(`{
   "schemaVersion":"v1alpha2",
-  "revision":"2026-09-04",
+  "revision":"2026-09-05",
   "profiles":[{
     "id":"rdma-shared-device-plugin",
     "displayName":"RDMA Shared Device Plugin",
     "class":"custom",
-    "evidence":[{"id":"upstream","grade":"A","source":"https://github.com/Mellanox/k8s-rdma-shared-dev-plugin","revision":"v1.5.3","checkedAt":"2026-09-04"}],
+    "evidence":[{"id":"upstream","grade":"A","source":"https://github.com/Mellanox/k8s-rdma-shared-dev-plugin","revision":"v1.5.3","checkedAt":"2026-09-05"}],
     "contracts":[{
       "id":"shared-hca","subject":"auxiliary","auxiliaryCategory":"rdma",
       "resourceNamePolicy":"scenario-required","kind":"extended-resource",
@@ -317,7 +317,7 @@ func TestProfileViewExposesImmutableOfflineContractEvidence(t *testing.T) {
 	if profile.ID() != "nvidia" ||
 		profile.DisplayName() != "NVIDIA" ||
 		profile.Class() != "verified" ||
-		profile.Revision() != "2026-09-04" ||
+		profile.Revision() != "2026-09-05" ||
 		profile.Digest().String() == "" {
 		t.Fatalf("incomplete profile identity: %#v", profile)
 	}

@@ -118,6 +118,17 @@ Then run target preflight and persist:
 The shortcut creates the Scenario name `demo`. Use a Scenario YAML when a
 stable custom name or more than one pool is required.
 
+### Vendor discovery labels (opt-in)
+
+If the user wants the Synthetic Nodes to carry the vendor's GPU discovery
+labels (as gpu-operator/GFD would set them, e.g. `nvidia.com/gpu.product`),
+add `--discovery-labels` to both the server dry-run and the apply commands
+above (and `nodeGroups[].node.discoveryLabels: true` in a Scenario YAML).
+The labels are evidence-gated: a label is only emitted when the catalog
+profile carries an evidenced value for that model, so an unsupported model
+fails closed instead of inventing values. After apply reaches Ready, verify
+with `kubectl get nodes -l simulation.kasim.io/scenario=demo --show-labels`.
+
 ## Apply a Scenario document
 
 ```sh

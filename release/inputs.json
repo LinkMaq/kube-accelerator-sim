@@ -1,16 +1,16 @@
 {
   "schemaVersion": "v1alpha1",
-  "productVersion": "0.6.0",
+  "productVersion": "0.6.1",
   "publicSurfaces": {
     "cliBehavior": "v1",
     "scenarioTransport": "v1alpha1",
     "productKubernetesTransport": "simulation.kasim.io/v1alpha1",
     "machineOutput": "v1alpha1",
-    "catalog": "2026-09-04",
+    "catalog": "2026-09-05",
     "compatibilityMatrix": "2026-07-30",
     "controllerImage": "v1",
     "telemetry": "v1alpha5",
-    "chart": "0.6.0"
+    "chart": "0.6.1"
   },
   "goVersion": "1.26.0",
   "kubernetesDependencies": "0.36.3",
@@ -24,8 +24,8 @@
     "runtime": "gcr.io/distroless/static-debian13:nonroot@sha256:f7f8f729987ad0fdf6b05eeeae94b26e6a0f613bdf46feea7fc40f7bd72953e6"
   },
   "catalog": {
-    "revision": "2026-09-04",
-    "sha256": "a8be23853f708ad24f388bf66208ded51435894703d48e773642971d8f93441d"
+    "revision": "2026-09-05",
+    "sha256": "f4804d5fa2c0e6cd78c0d7cda23aacf653626e81ad64fa33f656ba3e9a9cb8db"
   },
   "telemetryCatalog": {
     "revision": "2026-08-12.1",
@@ -33,7 +33,7 @@
   },
   "catalogSchema": {
     "version": "v1alpha2",
-    "sha256": "811ee5827e9afa24eac08ecc3620c93a06371df0ff4106dca1f6eb17daa15c91"
+    "sha256": "9b1a6e4050ddbd0f2f6350aa1f849149acc421485ac6dc7ffcb385cd934b431d"
   },
   "productCRD": {
     "version": "simulation.kasim.io/v1alpha1",

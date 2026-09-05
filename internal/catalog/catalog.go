@@ -570,14 +570,8 @@ func validateContract(
 		}
 		switch label.ValueFrom {
 		case DerivedNodeLabelStatic:
-			if label.Value == "" {
-				return fmt.Errorf(
-					"profile %q contract %q static derived node label %q requires a value",
-					profileID,
-					contract.ID,
-					label.Key,
-				)
-			}
+			// An empty literal is valid: GFD emits empty-valued labels
+			// such as nvidia.com/gpu.deploy.nvsm for undeployed components.
 		case DerivedNodeLabelPoolTotalCapacity:
 			if label.Value != "" {
 				return fmt.Errorf(

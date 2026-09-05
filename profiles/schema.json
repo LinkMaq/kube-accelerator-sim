@@ -57,7 +57,7 @@
       "properties": {
         "key": {"type": "string", "minLength": 1, "maxLength": 317},
         "valueFrom": {"enum": ["static", "pool-total-capacity"]},
-        "value": {"type": "string", "minLength": 1, "maxLength": 63}
+        "value": {"type": "string", "maxLength": 63}
       },
       "allOf": [
         {
