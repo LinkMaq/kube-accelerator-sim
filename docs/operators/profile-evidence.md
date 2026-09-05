@@ -19,7 +19,7 @@ or vendor preference. Model lifecycle such as `current-product`,
 
 ## Bundled ecosystem coverage
 
-The catalog revision is `2026-09-04`. Use `kasim profile show <id> -o json` for
+The catalog revision is `2026-09-05.1`. Use `kasim profile show <id> -o json` for
 the exact source URLs, immutable revisions, checked dates, contract spellings,
 models, limitations, and digest.
 
@@ -53,6 +53,23 @@ is retained as the pre-2026-07-31 snapshot. Their source links are research
 inputs; the bundled
 [`profiles/catalog.json`](../../profiles/catalog.json) is the exact validated
 release input.
+
+## Version anchors
+
+Evidence is anchored to immutable upstream revisions, preferring release tags
+over floating commits. The key anchors as of catalog revision `2026-09-05.1`:
+
+| Evidence source | Anchor | Covers |
+| --- | --- | --- |
+| MindCluster / ascend-device-plugin | [v26.1.0](https://gitcode.com/ascend/mind-cluster/tree/v26.1.0), cross-checked byte-identical against pinned master commit `97641a55` | Ascend node-discovery label keys, vNPU resource names (`Ascend310P-*` / `Ascend910-*` preset templates, 910B `npu-core`), npu-exporter metric families |
+| Ascend public device specifications | unversioned hiascend.com documentation (grade B) | Chip-family values for `node.kubernetes.io/npu.chip.name`; sub-model variants are not fabricated |
+| dcgm-exporter | releases 4.6.0 through 4.8.3 (pinned commit `181290c`) | DCGM family names, types, and labels; includes the #658 counter-to-gauge correction of NVLink bandwidth families |
+| k8s-device-plugin (resource contract) | `5f27eee`, master tip following v0.19.3 | NVIDIA resource naming |
+| k8s-device-plugin (GFD labels) | `3c6be40`, master tip following v0.20.0 | GPU Feature Discovery node label keys |
+| dra-driver-nvidia-gpu | `16c671c` (2026-07-30, `~v25.8.x` series) | DRA device class and claim naming |
+
+Anchors are re-verified whenever a catalog revision changes; the `checkedAt`
+dates in `profile show` output record the last verification.
 
 ## Inspect before use
 

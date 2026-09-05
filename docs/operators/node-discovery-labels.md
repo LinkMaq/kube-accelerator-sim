@@ -32,7 +32,7 @@ spec:
         - name: accelerator
           profile:
             id: nvidia
-            revision: 2026-09-05
+            revision: 2026-09-05.1
             digest: sha256:a04f86407d43998b667d61e6d2bbbc91a3ef004634e776dfc2fe330716a2a479
           model: nvidia-h100
           contract: device-plugin
@@ -92,6 +92,29 @@ For one eight-card H100 Node Group the two Synthetic Nodes receive the same
 Kasim ownership labels (`simulation.kasim.io/*`) and
 `feature.node.cloud.xiaoshiai.cn/accelerator-model.name` remain present and
 unchanged.
+
+## Huawei Ascend discovery labels
+
+The same mechanism covers the Huawei Ascend device plugin. Real clusters run
+Ascend Device Plugin from MindCluster, which stamps every NPU Node with a chip
+identity label pair; Kasim projects the identical keys from the pinned catalog
+evidence:
+
+| Label | Value per model | Source |
+| --- | --- | --- |
+| `node.kubernetes.io/npu.chip.name` | `310` / `310P` / `910A` / `910B` (Atlas A2) | MindCluster `ChipNameLabel` (grade A); value reported at chip-family granularity (grade B) |
+| `servertype` | `Ascend310-4` / `Ascend310P-8` / `Ascend910-32` / `Ascend910B-20` | MindCluster `ServerTypeLabelKey` (grade A); AI-core counts from Huawei product documentation (grade B) |
+
+Evidence is anchored to the MindCluster
+[v26.1.0 release](https://gitcode.com/ascend/mind-cluster/blob/v26.1.0/component/ascend-device-plugin/pkg/common/constants.go)
+where the label constants are byte-identical to the audited master snapshot.
+`huawei-atlas-a3` emits no vendor labels: its chip name and AI-core count are
+not publicly evidenced, and the catalog never fabricates values.
+
+Real device plugins additionally emit `accelerator-type=card-910b-infer` and
+`infer-card-type=card-300i-duo` only for specific inference boards, plus
+`mind-cluster/npu-chip-memory`; those depend on board identity rather than the
+chip and are deliberately not emitted (see Boundaries).
 
 ## Failure behavior
 

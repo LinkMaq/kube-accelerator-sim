@@ -22,7 +22,7 @@ spec:
         - name: accelerator
           profile:
             id: nvidia
-            revision: 2026-09-05
+            revision: 2026-09-05.1
             digest: sha256:a04f86407d43998b667d61e6d2bbbc91a3ef004634e776dfc2fe330716a2a479
           model: nvidia-h100
           contract: device-plugin
@@ -78,6 +78,20 @@ spec:
 
 Kasim 归属标签（`simulation.kasim.io/*`）与 `feature.node.cloud.xiaoshiai.cn/accelerator-model.name` 保持原样。
 
+## 华为昇腾发现标签
+
+同一机制覆盖华为昇腾设备插件。真实集群运行 MindCluster 的 Ascend Device Plugin，它会在每个 NPU 节点打芯片身份标签对；Kasim 从锚定的目录证据投射完全相同的键：
+
+| 标签 | 各型号取值 | 来源 |
+| --- | --- | --- |
+| `node.kubernetes.io/npu.chip.name` | `310` / `310P` / `910A` / `910B`（Atlas A2） | MindCluster `ChipNameLabel`（A 级证据）；取值按芯片家族粒度（B 级证据） |
+| `servertype` | `Ascend310-4` / `Ascend310P-8` / `Ascend910-32` / `Ascend910B-20` | MindCluster `ServerTypeLabelKey`（A 级证据）；AI Core 数量来自华为产品文档（B 级证据） |
+
+证据锚定到 MindCluster
+[v26.1.0 release](https://gitcode.com/ascend/mind-cluster/blob/v26.1.0/component/ascend-device-plugin/pkg/common/constants.go)——该正式版本的标签常量与已审计的 master 快照逐字一致。`huawei-atlas-a3` 不输出 vendor 标签：其芯片名与 AI Core 数量没有公开证据，目录不编造取值。
+
+真实设备插件还会对特定推理板打 `accelerator-type=card-910b-infer`、`infer-card-type=card-300i-duo` 以及 `mind-cluster/npu-chip-memory`；它们取决于板卡身份而非芯片型号，Kasim 有意不输出（见"边界"）。
+
 ## 失败行为
 
 - 型号在目录中没有节点标签证据时不输出 vendor 标签，场景仍可提交，该池只是不投射任何发现标签；可用 `kasim profile show` 查看型号证据。
@@ -86,4 +100,4 @@ Kasim 归属标签（`simulation.kasim.io/*`）与 `feature.node.cloud.xiaoshiai
 
 ## 边界
 
-Kasim 有意不输出 `nvidia.com/gfd.timestamp`（破坏 Snapshot 确定性）与 `nvidia.com/gpu.machine`（主机特定，模拟节点无真实主机）。CUDA runtime 版本按目录修订版锚定到最新 CUDA GA 版本，而非从节点 toolkit 安装探测；升级目录即可更新。这些标签描述的是模拟调度清单，永远不证明驱动、设备文件或加速计算的存在。
+Kasim 有意不输出 `nvidia.com/gfd.timestamp`（破坏 Snapshot 确定性）与 `nvidia.com/gpu.machine`（主机特定，模拟节点无真实主机）。昇腾侧不输出 `accelerator-type`、`infer-card-type` 与 `mind-cluster/npu-chip-memory`，因为它们取决于实际插的板卡或芯片子型号而非所选模拟型号；`npu.chip.name` 按芯片家族粒度输出（`910B`，而非 `910B1`–`910B4`），子型号精度需要目录层拆分型号。CUDA runtime 版本按目录修订版锚定到最新 CUDA GA 版本，而非从节点 toolkit 安装探测；升级目录即可更新。这些标签描述的是模拟调度清单，永远不证明驱动、设备文件或加速计算的存在。

@@ -69,6 +69,13 @@ also describe that Synthetic Node. Vendor-native samples contain no `kasim_*` la
 Family-specific labels are preserved; for example,
 `DCGM_FI_DEV_XID_ERRORS` additionally carries `err_code` and `err_msg`.
 
+The NVIDIA DCGM contract is anchored to dcgm-exporter releases 4.6.0 through
+4.8.3. Within that release line upstream corrected the NVLink bandwidth
+families from counters to gauges (#658). Since telemetry catalog revision
+`2026-09-05.1`, `DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL` therefore exports
+`TYPE = GAUGE`, matching the pinned contract rather than the older
+counter-typed capture.
+
 Every Synthetic Node carries
 `feature.node.cloud.xiaoshiai.cn/accelerator-model.name=<catalog-model-id>`.
 Exporter model labels bound by the Telemetry Catalog use the same catalog model
@@ -91,9 +98,25 @@ prove that the Pod owns, reserves, or uses those devices.
 
 ## Huawei Ascend and Hygon DCU contracts
 
-The Huawei contract emits one series per device for AI Core utilization,
-temperature, power, HBM used memory, HBM total memory, HBM utilization,
-health, and error code. Its native device labels are `id`, `model_name`,
+The Huawei contract emits one series per device. The baseline families cover
+AI Core utilization, temperature, power, HBM used and total memory, HBM
+utilization, health, and error code. Catalog revision `2026-09-05.1` adds 25
+more npu-exporter families anchored to the MindCluster `v26.1.0` sources (see
+[Vendor profile evidence](profile-evidence.md)):
+
+| Meaning | Families | Unit or convention |
+| --- | --- | --- |
+| Overall / vector utilization | `npu_chip_info_overall_utilization`, `npu_chip_info_vector_utilization` | percent, `0`–`100` |
+| Voltage | `npu_chip_info_voltage` | volts, generated in `0.78`–`1.00` |
+| DDR memory | `npu_chip_info_total_memory`, `npu_chip_info_used_memory` | MB |
+| HBM temperature / bandwidth utilization | `npu_chip_info_hbm_temperature`, `npu_chip_info_hbm_bandwidth_utilization` | Celsius / percent |
+| HBM ECC | `npu_chip_info_hbm_ecc_enable_flag`, `npu_chip_info_hbm_ecc_single_bit_error_cnt`, `npu_chip_info_hbm_ecc_double_bit_error_cnt`, `npu_chip_info_hbm_ecc_total_single_bit_error_cnt`, `npu_chip_info_hbm_ecc_total_double_bit_error_cnt`, `npu_chip_info_hbm_ecc_single_bit_isolated_pages_cnt`, `npu_chip_info_hbm_ecc_double_bit_isolated_pages_cnt` | state flag / error counts |
+| Network / link status | `npu_chip_info_network_status`, `npu_chip_info_link_status` | `1=up`, `0=down` |
+| RoCE bandwidth | `npu_chip_info_bandwidth_rx`, `npu_chip_info_bandwidth_tx` | MB/s |
+| PCIe bandwidth | `npu_chip_info_pcie_rx_p_bw`, `npu_chip_info_pcie_rx_np_bw`, `npu_chip_info_pcie_rx_cpl_bw`, `npu_chip_info_pcie_tx_p_bw`, `npu_chip_info_pcie_tx_np_bw`, `npu_chip_info_pcie_tx_cpl_bw` | MB/ms |
+| Chip identity | `npu_chip_info_name` | constant `1` per the native exporter convention |
+
+Its native device labels are `id`, `model_name`,
 `vdie_id`, `pcie_bus_info`, `namespace`, `pod_name`, and `container_name`.
 The compatibility `uuid` is the stable synthetic device identity; the native
 `vdie_id` remains the exporter-compatible virtual-die value. The three

@@ -60,6 +60,11 @@ family 名、`TYPE` 和原生 label 来自所选 exporter 契约；除明确记�
 `kasim_*`。单 family 专属 label 也会保留，例如 `DCGM_FI_DEV_XID_ERRORS` 额外带
 `err_code` 和 `err_msg`。
 
+NVIDIA DCGM 契约锚定到 dcgm-exporter 4.6.0～4.8.3 版本线。该版本线内，上游将
+NVLink 带宽 family 从 counter 修正为 gauge（#658）。自遥测目录修订
+`2026-09-05.1` 起，`DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL` 因此导出
+`TYPE = GAUGE`，与锚定契约一致，而非旧版 counter 类型的抓取样本。
+
 每个 Synthetic Node 都带
 `feature.node.cloud.xiaoshiai.cn/accelerator-model.name=<catalog-model-id>`。
 Telemetry Catalog 绑定的 exporter 型号标签使用同一个 catalog model ID，因此 NVIDIA
@@ -78,8 +83,24 @@ exporter Pod 或 Service。
 
 ## 华为昇腾与海光 DCU 契约
 
-华为契约按设备分别生成 AI Core 使用率、温度、功耗、HBM 已用量、HBM 总量、HBM
-使用率、健康状态和错误码。原生设备 label 为 `id`、`model_name`、`vdie_id`、
+华为契约按设备分别生成 series。基础 family 覆盖 AI Core 使用率、温度、功耗、
+HBM 已用量与总量、HBM 使用率、健康状态和错误码。自目录修订 `2026-09-05.1`
+起，新增 25 个 npu-exporter family，全部锚定到 MindCluster `v26.1.0` 来源
+（见[厂商档案证据](profile-evidence.md)）：
+
+| 含义 | Family | 单位或约定 |
+| --- | --- | --- |
+| 整卡 / 向量使用率 | `npu_chip_info_overall_utilization`、`npu_chip_info_vector_utilization` | percent，`0`～`100` |
+| 电压 | `npu_chip_info_voltage` | 伏特，生成区间 `0.78`～`1.00` |
+| DDR 显存 | `npu_chip_info_total_memory`、`npu_chip_info_used_memory` | MB |
+| HBM 温度 / 带宽使用率 | `npu_chip_info_hbm_temperature`、`npu_chip_info_hbm_bandwidth_utilization` | 摄氏度 / percent |
+| HBM ECC | `npu_chip_info_hbm_ecc_enable_flag`、`npu_chip_info_hbm_ecc_single_bit_error_cnt`、`npu_chip_info_hbm_ecc_double_bit_error_cnt`、`npu_chip_info_hbm_ecc_total_single_bit_error_cnt`、`npu_chip_info_hbm_ecc_total_double_bit_error_cnt`、`npu_chip_info_hbm_ecc_single_bit_isolated_pages_cnt`、`npu_chip_info_hbm_ecc_double_bit_isolated_pages_cnt` | 状态位 / 错误计数 |
+| 网络 / 链路状态 | `npu_chip_info_network_status`、`npu_chip_info_link_status` | `1=正常`，`0=异常` |
+| RoCE 带宽 | `npu_chip_info_bandwidth_rx`、`npu_chip_info_bandwidth_tx` | MB/s |
+| PCIe 带宽 | `npu_chip_info_pcie_rx_p_bw`、`npu_chip_info_pcie_rx_np_bw`、`npu_chip_info_pcie_rx_cpl_bw`、`npu_chip_info_pcie_tx_p_bw`、`npu_chip_info_pcie_tx_np_bw`、`npu_chip_info_pcie_tx_cpl_bw` | MB/ms |
+| 芯片标识 | `npu_chip_info_name` | 按 exporter 原生约定恒为 `1` |
+
+原生设备 label 为 `id`、`model_name`、`vdie_id`、
 `pcie_bus_info`、`namespace`、`pod_name` 和 `container_name`。兼容层 `uuid`
 是稳定的模拟设备身份，原生 `vdie_id` 保持 exporter 兼容的虚拟 die 值；三个工作
 负载 label 保持空值，因为集中式 telemetry Pod 不是模拟业务负载。

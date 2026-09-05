@@ -41,7 +41,7 @@ spec:
         - name: training
           profile:
             id: nvidia
-            revision: 2026-09-05
+            revision: 2026-09-05.1
             digest: sha256:a04f86407d43998b667d61e6d2bbbc91a3ef004634e776dfc2fe330716a2a479
           model: nvidia-h100
           contract: device-plugin
@@ -111,7 +111,7 @@ spec:
         - name: training
           profile:
             id: nvidia
-            revision: 2026-09-05
+            revision: 2026-09-05.1
             digest: sha256:a04f86407d43998b667d61e6d2bbbc91a3ef004634e776dfc2fe330716a2a479
           model: nvidia-h100
           contract: device-plugin
@@ -169,7 +169,7 @@ func TestCompileCanonicalGolden(t *testing.T) {
 	if !bytes.Equal(compiled.Bytes(), want) {
 		t.Fatalf("canonical golden drifted:\n%s\n%s", compiled.Bytes(), want)
 	}
-	const wantDigest = "sha256:bee9e5223b823b03258111e51020f15a5ec643d55ba0d54c64b98fa1c4060f60"
+	const wantDigest = "sha256:3f31f66755409d6d5d7a8822fe6678b05c156a6ac3afcbf77505e27dc929a90e"
 	if compiled.Digest().String() != wantDigest {
 		t.Fatalf("digest = %s, want %s", compiled.Digest(), wantDigest)
 	}
@@ -327,7 +327,7 @@ func TestCompileRejectsScalarResourceCollisionOnOneNode(t *testing.T) {
         - name: inference
           profile:
             id: nvidia
-            revision: 2026-09-05
+            revision: 2026-09-05.1
             digest: sha256:a04f86407d43998b667d61e6d2bbbc91a3ef004634e776dfc2fe330716a2a479
           model: nvidia-h100
           contract: device-plugin
@@ -357,7 +357,7 @@ func TestCompileRejectsMultipleAcceleratorModelsOnOneNodeGroup(t *testing.T) {
         - name: inference
           profile:
             id: amd
-            revision: 2026-09-05
+            revision: 2026-09-05.1
             digest: sha256:c165c4b0616a2f4064e6a1805e14d97ed76b66d632a9c050fda89cd8b15d2bea
           model: amd-mi300x
           contract: device-plugin
@@ -431,7 +431,7 @@ func TestCompileRejectsConflictingDRAIdentitySignalsOnOneNode(t *testing.T) {
         - name: inference
           profile:
             id: nvidia
-            revision: 2026-09-05
+            revision: 2026-09-05.1
             digest: sha256:a04f86407d43998b667d61e6d2bbbc91a3ef004634e776dfc2fe330716a2a479
           model: nvidia-h200
           contract: dra
@@ -496,7 +496,7 @@ spec:
         - name: accelerators
           profile:
             id: nvidia
-            revision: 2026-09-05
+            revision: 2026-09-05.1
             digest: sha256:a04f86407d43998b667d61e6d2bbbc91a3ef004634e776dfc2fe330716a2a479
           model: nvidia-h100
           contract: device-plugin

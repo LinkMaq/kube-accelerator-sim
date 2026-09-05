@@ -256,6 +256,7 @@ func supportedSemantic(semantic string) bool {
 		"packet-tx-counter", "power", "temperature",
 		"traffic-rx-counter", "traffic-tx-counter", "throughput-rx", "throughput-tx",
 		"uncorrectable-error-count", "utilization", "utilization-ratio", "utilization-sparse", "last-error",
+		"voltage",
 	}, semantic)
 }
 

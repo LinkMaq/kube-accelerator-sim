@@ -1,6 +1,6 @@
 {
   "schemaVersion": "v1alpha2",
-  "revision": "2026-08-12.1",
+  "revision": "2026-09-05.1",
   "profiles": [
     {
       "id": "nvidia",
@@ -52,7 +52,7 @@
         {"name": "DCGM_FI_DEV_UNCORRECTABLE_REMAPPED_ROWS", "type": "counter", "help": "Number of remapped rows for uncorrectable errors", "semantic": "constant-zero", "unit": "count"},
         {"name": "DCGM_FI_DEV_CORRECTABLE_REMAPPED_ROWS", "type": "counter", "help": "Number of remapped rows for correctable errors", "semantic": "constant-zero", "unit": "count"},
         {"name": "DCGM_FI_DEV_ROW_REMAP_FAILURE", "type": "gauge", "help": "Whether remapping of rows has failed", "semantic": "constant-zero", "unit": "state"},
-        {"name": "DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL", "type": "counter", "help": "Total number of NVLink bandwidth counters for all lanes.", "semantic": "constant-zero", "unit": "count"},
+        {"name": "DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL", "type": "gauge", "help": "Total number of NVLink bandwidth counters for all lanes.", "semantic": "constant-zero", "unit": "count"},
         {"name": "DCGM_FI_DEV_VGPU_LICENSE_STATUS", "type": "gauge", "help": "vGPU License status", "semantic": "constant-zero", "unit": "state"}
       ]
     },
@@ -120,7 +120,7 @@
     },
     {
       "id": "huawei-ascend", "displayName": "Huawei Ascend", "state": "verified", "exporter": "Ascend npu-exporter",
-      "evidence": [{"source": "https://gitee.com/ascend/mind-cluster/blob/97641a5566914158b9c0eb227c05a223d275e68d/component/npu-exporter/collector/metrics/collector_for_npu.go", "revision": "97641a5566914158b9c0eb227c05a223d275e68d", "checkedAt": "2026-08-07"}],
+      "evidence": [{"source": "https://gitee.com/ascend/mind-cluster/blob/97641a5566914158b9c0eb227c05a223d275e68d/component/npu-exporter/collector/metrics/collector_for_npu.go", "revision": "97641a5566914158b9c0eb227c05a223d275e68d", "checkedAt": "2026-08-07"}, {"source": "https://gitcode.com/ascend/mind-cluster/blob/v26.1.0/component/npu-exporter/collector/metrics", "revision": "v26.1.0", "checkedAt": "2026-09-05"}],
       "defaults": {"memoryMiB": 65536, "idlePowerW": 55, "maxPowerW": 600, "idleTempC": 31, "maxTempC": 86, "coreClockMHz": 1800, "memoryClockMHz": 1200},
       "deviceLabels": [
         {"name": "id", "valueFrom": "device-index"}, {"name": "model_name", "valueFrom": "model-name"},
@@ -137,7 +137,32 @@
         {"name": "npu_chip_info_hbm_total_memory", "type": "gauge", "help": "the npu hbm total memory", "semantic": "memory-total", "unit": "MB"},
         {"name": "npu_chip_info_hbm_utilization", "type": "gauge", "help": "the npu hbm utilization", "semantic": "memory-utilization-percent", "unit": "percent"},
         {"name": "npu_chip_info_health_status", "type": "gauge", "help": "the npu health status", "semantic": "health-one-healthy", "unit": "state"},
-        {"name": "npu_chip_info_error_code", "type": "gauge", "help": "the npu error code", "semantic": "last-error", "unit": "code"}
+        {"name": "npu_chip_info_error_code", "type": "gauge", "help": "the npu error code", "semantic": "last-error", "unit": "code"},
+        {"name": "npu_chip_info_overall_utilization", "type": "gauge", "help": "the overall utilization of npu", "semantic": "utilization", "unit": "vendor-value"},
+        {"name": "npu_chip_info_vector_utilization", "type": "gauge", "help": "the vector ai core utilization", "semantic": "utilization", "unit": "vendor-value"},
+        {"name": "npu_chip_info_voltage", "type": "gauge", "help": "the npu voltage", "semantic": "voltage", "unit": "vendor-value"},
+        {"name": "npu_chip_info_total_memory", "type": "gauge", "help": "the npu total memory", "semantic": "memory-total", "unit": "MB"},
+        {"name": "npu_chip_info_used_memory", "type": "gauge", "help": "the npu used memory", "semantic": "memory-used", "unit": "MB"},
+        {"name": "npu_chip_info_hbm_temperature", "type": "gauge", "help": "the npu hbm temperature", "semantic": "temperature", "unit": "vendor-value"},
+        {"name": "npu_chip_info_hbm_bandwidth_utilization", "type": "gauge", "help": "the npu hbm bandwidth util rate", "semantic": "memory-utilization-percent", "unit": "percent"},
+        {"name": "npu_chip_info_hbm_ecc_enable_flag", "type": "gauge", "help": "whether HBM ecc detection is enabled", "semantic": "info", "unit": "state"},
+        {"name": "npu_chip_info_hbm_ecc_single_bit_error_cnt", "type": "gauge", "help": "HBM Single Bit Error Count", "semantic": "correctable-error-count", "unit": "count"},
+        {"name": "npu_chip_info_hbm_ecc_double_bit_error_cnt", "type": "gauge", "help": "HBM Double Bit Error Count", "semantic": "uncorrectable-error-count", "unit": "count"},
+        {"name": "npu_chip_info_hbm_ecc_total_single_bit_error_cnt", "type": "gauge", "help": "HBM Single Bit Aggregate Total Err Cnt", "semantic": "correctable-error-count", "unit": "count"},
+        {"name": "npu_chip_info_hbm_ecc_total_double_bit_error_cnt", "type": "gauge", "help": "HBM Double Bit Aggregate Total Err Cnt", "semantic": "uncorrectable-error-count", "unit": "count"},
+        {"name": "npu_chip_info_hbm_ecc_single_bit_isolated_pages_cnt", "type": "gauge", "help": "HBM Single Bit Isolated Pages Count", "semantic": "correctable-error-count", "unit": "count"},
+        {"name": "npu_chip_info_hbm_ecc_double_bit_isolated_pages_cnt", "type": "gauge", "help": "HBM Double Bit Isolated Pages Count", "semantic": "uncorrectable-error-count", "unit": "count"},
+        {"name": "npu_chip_info_network_status", "type": "gauge", "help": "the npu network health status", "semantic": "health-one-healthy", "unit": "state"},
+        {"name": "npu_chip_info_link_status", "type": "gauge", "help": "the npu link status", "semantic": "health-one-healthy", "unit": "state"},
+        {"name": "npu_chip_info_bandwidth_rx", "type": "gauge", "help": "the npu interface receive speed, unit is 'MB/s'", "semantic": "throughput-rx", "unit": "MB/s"},
+        {"name": "npu_chip_info_bandwidth_tx", "type": "gauge", "help": "the npu interface transport speed, unit is 'MB/s'", "semantic": "throughput-tx", "unit": "MB/s"},
+        {"name": "npu_chip_info_pcie_rx_p_bw", "type": "gauge", "help": "the npu write bw to remote‘s speed, unit is 'MB/ms'", "semantic": "throughput-rx", "unit": "MB/ms"},
+        {"name": "npu_chip_info_pcie_rx_np_bw", "type": "gauge", "help": "the npu read bw's speed from remote, unit is 'MB/ms'", "semantic": "throughput-rx", "unit": "MB/ms"},
+        {"name": "npu_chip_info_pcie_rx_cpl_bw", "type": "gauge", "help": "the npu reply remote read operate cpl's speed, unit is 'MB/ms'", "semantic": "throughput-rx", "unit": "MB/ms"},
+        {"name": "npu_chip_info_pcie_tx_p_bw", "type": "gauge", "help": "the npu receive remote write operate's speed, unit is 'MB/ms'", "semantic": "throughput-tx", "unit": "MB/ms"},
+        {"name": "npu_chip_info_pcie_tx_np_bw", "type": "gauge", "help": "the npu receive remote read operate's speed, unit is 'MB/ms'", "semantic": "throughput-tx", "unit": "MB/ms"},
+        {"name": "npu_chip_info_pcie_tx_cpl_bw", "type": "gauge", "help": "the npu read cpl's responese bw speed from remote, unit is 'MB/ms'", "semantic": "throughput-tx", "unit": "MB/ms"},
+        {"name": "npu_chip_info_name", "type": "gauge", "help": "the Ascend npu name with value '1'", "semantic": "info", "unit": "state"}
       ]
     },
     {

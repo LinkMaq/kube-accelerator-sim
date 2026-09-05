@@ -306,9 +306,9 @@ func metricValue(
 	case "clock-memory":
 		return limits.MemoryClockMHz * (0.55 + 0.45*latent), limits.MemoryClockMHz > 0
 	case "throughput-rx":
-		return 32e9 * latent * (0.7 + 0.3*seedUnit(deviceIdentityKey(device)+metric.Name)), true
+		return scaleThroughput(32e9*latent*(0.7+0.3*seedUnit(deviceIdentityKey(device)+metric.Name)), metric.Unit), true
 	case "throughput-tx":
-		return 32e9 * latent * (0.65 + 0.35*seedUnit(deviceIdentityKey(device)+metric.Name)), true
+		return scaleThroughput(32e9*latent*(0.65+0.35*seedUnit(deviceIdentityKey(device)+metric.Name)), metric.Unit), true
 	case "energy":
 		ageBuckets := counterBuckets(now)
 		power := limits.IdlePowerW + (limits.MaxPowerW-limits.IdlePowerW)*(0.25+0.5*seedUnit(deviceIdentityKey(device)))
@@ -359,10 +359,24 @@ func metricValue(
 			return 5, true
 		}
 		return 3, true
+	case "voltage":
+		return 0.78 + 0.22*latent, true
 	case "info":
 		return 1, true
 	default:
 		return 0, false
+	}
+}
+
+// scaleThroughput expresses the simulated bytes-per-second stream in the
+// family's declared unit so vendor families reporting MB/s or MB/ms stay
+// plausible instead of emitting raw byte counts in scaled units.
+func scaleThroughput(bytesPerSecond float64, unit string) float64 {
+	switch unit {
+	case "MB/s", "MB/ms":
+		return bytesPerSecond / 1e6
+	default:
+		return bytesPerSecond
 	}
 }
 

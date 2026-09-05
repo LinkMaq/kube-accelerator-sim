@@ -1,6 +1,6 @@
 {
   "schemaVersion": "v1alpha2",
-  "revision": "2026-09-05",
+  "revision": "2026-09-05.1",
   "profiles": [
     {
       "id": "nvidia",
@@ -344,20 +344,20 @@
       "id":"huawei-ascend",
       "displayName":"Huawei Ascend",
       "class":"verified",
-      "evidence":[{"id":"contract","grade":"A","source":"https://gitee.com/ascend/mind-cluster/tree/97641a5566914158b9c0eb227c05a223d275e68d","revision":"97641a5566914158b9c0eb227c05a223d275e68d","checkedAt":"2026-07-30"}],
+      "evidence":[{"id":"contract","grade":"A","source":"https://gitcode.com/ascend/mind-cluster/blob/v26.1.0/component/ascend-device-plugin/pkg/common/constants.go","revision":"v26.1.0","checkedAt":"2026-09-05"},{"id":"device-specs","grade":"B","source":"https://www.hiascend.com/document/detail/zh/Ascend910B/specifications","revision":"unversioned-public-documentation","checkedAt":"2026-09-05"}],
       "contracts":[{
         "id":"device-plugin","kind":"extended-resource","providerScope":"any-kubernetes","fidelityModes":["scheduling"],
-        "resources":[{"alias":"ascend310","name":"huawei.com/Ascend310","unit":"device"},{"alias":"ascend310p","name":"huawei.com/Ascend310P","unit":"device"},{"alias":"ascend910","name":"huawei.com/Ascend910","unit":"device"},{"alias":"npu-core","name":"huawei.com/npu-core","unit":"virtual-core"}],
-        "identitySignals":[],
+        "resources":[{"alias":"ascend310","name":"huawei.com/Ascend310","unit":"device"},{"alias":"ascend310p","name":"huawei.com/Ascend310P","unit":"device"},{"alias":"ascend910","name":"huawei.com/Ascend910","unit":"device"},{"alias":"npu-core","name":"huawei.com/npu-core","unit":"virtual-core"},{"alias":"ascend910-2c","name":"huawei.com/Ascend910-2c","unit":"partition"},{"alias":"ascend910-4c","name":"huawei.com/Ascend910-4c","unit":"partition"},{"alias":"ascend910-8c","name":"huawei.com/Ascend910-8c","unit":"partition"},{"alias":"ascend910-16c","name":"huawei.com/Ascend910-16c","unit":"partition"},{"alias":"ascend910-3c-1cpu-8g","name":"huawei.com/Ascend910-3c.1cpu.8g","unit":"partition"},{"alias":"ascend910-5c-1cpu-8g","name":"huawei.com/Ascend910-5c.1cpu.8g","unit":"partition"},{"alias":"ascend910-5c-1cpu-16g","name":"huawei.com/Ascend910-5c.1cpu.16g","unit":"partition"},{"alias":"ascend910-6c-1cpu-16g","name":"huawei.com/Ascend910-6c.1cpu.16g","unit":"partition"},{"alias":"ascend910-10c-3cpu-16g","name":"huawei.com/Ascend910-10c.3cpu.16g","unit":"partition"},{"alias":"ascend910-10c-3cpu-16g-ndvpp","name":"huawei.com/Ascend910-10c.3cpu.16g.ndvpp","unit":"partition"},{"alias":"ascend910-10c-3cpu-32g","name":"huawei.com/Ascend910-10c.3cpu.32g","unit":"partition"},{"alias":"ascend910-10c-4cpu-16g-dvpp","name":"huawei.com/Ascend910-10c.4cpu.16g.dvpp","unit":"partition"},{"alias":"ascend910-12c-3cpu-32g","name":"huawei.com/Ascend910-12c.3cpu.32g","unit":"partition"},{"alias":"ascend310p-1c","name":"huawei.com/Ascend310P-1c","unit":"partition"},{"alias":"ascend310p-2c","name":"huawei.com/Ascend310P-2c","unit":"partition"},{"alias":"ascend310p-4c","name":"huawei.com/Ascend310P-4c","unit":"partition"},{"alias":"ascend310p-2c-1cpu","name":"huawei.com/Ascend310P-2c.1cpu","unit":"partition"},{"alias":"ascend310p-4c-3cpu","name":"huawei.com/Ascend310P-4c.3cpu","unit":"partition"},{"alias":"ascend310p-4c-3cpu-ndvpp","name":"huawei.com/Ascend310P-4c.3cpu.ndvpp","unit":"partition"},{"alias":"ascend310p-4c-4cpu-dvpp","name":"huawei.com/Ascend310P-4c.4cpu.dvpp","unit":"partition"}],
+        "identitySignals":[{"kind":"node-label","key":"node.kubernetes.io/npu.chip.name"},{"kind":"node-label","key":"servertype"}],
         "capabilities":{"health":"verified","topology":"not-public","sharing":"not-public","partitioning":"verified"},
-        "evidenceRefs":["contract"]
+        "evidenceRefs":["contract","device-specs"]
       }],
       "models":[
-        {"id":"huawei-ascend-310","displayName":"Huawei Ascend 310","aliases":["Ascend 310"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend310"],"evidenceRefs":["contract"]},
-        {"id":"huawei-ascend-310p","displayName":"Huawei Ascend 310P","aliases":["Ascend 310P"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend310p","npu-core"],"evidenceRefs":["contract"]},
-        {"id":"huawei-ascend-910","displayName":"Huawei Ascend 910","aliases":["Ascend 910"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend910"],"evidenceRefs":["contract"]},
-        {"id":"huawei-atlas-a2","displayName":"Huawei Atlas A2","aliases":["Atlas A2"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend910"],"evidenceRefs":["contract"]},
-        {"id":"huawei-atlas-a3","displayName":"Huawei Atlas A3","aliases":["Atlas A3"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend910"],"evidenceRefs":["contract"]}
+        {"id":"huawei-ascend-310","displayName":"Huawei Ascend 310","aliases":["Ascend 310"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend310"],"nodeLabels":[{"key":"node.kubernetes.io/npu.chip.name","value":"310"},{"key":"servertype","value":"Ascend310-4"}],"evidenceRefs":["contract","device-specs"]},
+        {"id":"huawei-ascend-310p","displayName":"Huawei Ascend 310P","aliases":["Ascend 310P"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend310p","ascend310p-1c","ascend310p-2c","ascend310p-4c","ascend310p-2c-1cpu","ascend310p-4c-3cpu","ascend310p-4c-3cpu-ndvpp","ascend310p-4c-4cpu-dvpp"],"nodeLabels":[{"key":"node.kubernetes.io/npu.chip.name","value":"310P"},{"key":"servertype","value":"Ascend310P-8"}],"evidenceRefs":["contract","device-specs"]},
+        {"id":"huawei-ascend-910","displayName":"Huawei Ascend 910","aliases":["Ascend 910"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend910","ascend910-2c","ascend910-4c","ascend910-8c","ascend910-16c","ascend910-3c-1cpu-8g","ascend910-5c-1cpu-8g","ascend910-5c-1cpu-16g","ascend910-6c-1cpu-16g","ascend910-10c-3cpu-16g","ascend910-10c-3cpu-16g-ndvpp","ascend910-10c-3cpu-32g","ascend910-10c-4cpu-16g-dvpp","ascend910-12c-3cpu-32g"],"nodeLabels":[{"key":"node.kubernetes.io/npu.chip.name","value":"910A"},{"key":"servertype","value":"Ascend910-32"}],"evidenceRefs":["contract","device-specs"]},
+        {"id":"huawei-atlas-a2","displayName":"Huawei Atlas A2","aliases":["Atlas A2"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend910","npu-core"],"nodeLabels":[{"key":"node.kubernetes.io/npu.chip.name","value":"910B"},{"key":"servertype","value":"Ascend910B-20"}],"evidenceRefs":["contract","device-specs"]},
+        {"id":"huawei-atlas-a3","displayName":"Huawei Atlas A3","aliases":["Atlas A3"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend910","npu-core"],"evidenceRefs":["contract"]}
       ]
     },
     {

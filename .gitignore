@@ -5,3 +5,7 @@
 /test-results/
 *.test
 coverage.out
+
+# Local-only operational files
+/target.kubeconfig
+/.workbuddy/

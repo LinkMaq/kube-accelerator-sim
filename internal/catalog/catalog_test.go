@@ -270,7 +270,8 @@ func TestBundledCatalogResolvesSourceBackedResourceSignalVariants(t *testing.T) 
 		{"nvidia-mig", "nvidia", "nvidia-a100-80gb", "device-plugin", "mig-1g-10gb", "nvidia.com/mig-1g.10gb", false},
 		{"nvidia-shared", "nvidia", "nvidia-l40s", "device-plugin", "gpu-shared", "nvidia.com/gpu.shared", false},
 		{"amd-partition", "amd", "amd-mi300x", "device-plugin", "cpx-nps1", "amd.com/cpx_nps1", false},
-		{"ascend-vnpu", "huawei-ascend", "huawei-ascend-310p", "device-plugin", "npu-core", "huawei.com/npu-core", false},
+		{"ascend-vnpu", "huawei-ascend", "huawei-atlas-a2", "device-plugin", "npu-core", "huawei.com/npu-core", false},
+		{"ascend-310p-vnpu", "huawei-ascend", "huawei-ascend-310p", "device-plugin", "ascend310p-4c", "huawei.com/Ascend310P-4c", false},
 		{"cambricon-shared", "cambricon", "cambricon-mlu370", "device-plugin", "mlu370-share", "cambricon.com/mlu370.share", false},
 		{"metax-sgpu", "metax", "metax-c500", "device-plugin", "sgpu", "metax-tech.com/sgpu", false},
 		{"metax-vfio", "metax", "metax-c500", "device-plugin", "vfio-gpu", "metax-tech.com/vfio-gpu", false},
@@ -317,7 +318,7 @@ func TestProfileViewExposesImmutableOfflineContractEvidence(t *testing.T) {
 	if profile.ID() != "nvidia" ||
 		profile.DisplayName() != "NVIDIA" ||
 		profile.Class() != "verified" ||
-		profile.Revision() != "2026-09-05" ||
+		profile.Revision() != "2026-09-05.1" ||
 		profile.Digest().String() == "" {
 		t.Fatalf("incomplete profile identity: %#v", profile)
 	}

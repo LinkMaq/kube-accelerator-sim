@@ -1,0 +1,513 @@
+# Every selectable Ascend vNPU resource signal, one node group per preset
+# template, plus the dynamic npu-core signal used by Ascend 910B/910A3.
+metadata:
+  name: ascend-vnpu-templates
+spec:
+  fidelity: scheduling
+  acceptance:
+    provisionalProfiles: false
+  nodeGroups:
+    - name: ascend310p-1c
+      replicas: 1
+      node:
+        discoveryLabels: true
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: vnpu-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: ascend310p-1c
+          profile:
+            id: huawei-ascend
+            revision: 2026-09-05.1
+            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+          model: huawei-ascend-310p
+          contract: device-plugin
+          resource: ascend310p-1c
+          variant: {}
+          count: 4
+          healthy: 4
+    - name: ascend310p-2c
+      replicas: 1
+      node:
+        discoveryLabels: true
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: vnpu-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: ascend310p-2c
+          profile:
+            id: huawei-ascend
+            revision: 2026-09-05.1
+            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+          model: huawei-ascend-310p
+          contract: device-plugin
+          resource: ascend310p-2c
+          variant: {}
+          count: 4
+          healthy: 4
+    - name: ascend310p-4c
+      replicas: 1
+      node:
+        discoveryLabels: true
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: vnpu-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: ascend310p-4c
+          profile:
+            id: huawei-ascend
+            revision: 2026-09-05.1
+            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+          model: huawei-ascend-310p
+          contract: device-plugin
+          resource: ascend310p-4c
+          variant: {}
+          count: 4
+          healthy: 4
+    - name: ascend310p-2c-1cpu
+      replicas: 1
+      node:
+        discoveryLabels: true
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: vnpu-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: ascend310p-2c-1cpu
+          profile:
+            id: huawei-ascend
+            revision: 2026-09-05.1
+            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+          model: huawei-ascend-310p
+          contract: device-plugin
+          resource: ascend310p-2c-1cpu
+          variant: {}
+          count: 4
+          healthy: 4
+    - name: ascend310p-4c-3cpu
+      replicas: 1
+      node:
+        discoveryLabels: true
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: vnpu-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: ascend310p-4c-3cpu
+          profile:
+            id: huawei-ascend
+            revision: 2026-09-05.1
+            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+          model: huawei-ascend-310p
+          contract: device-plugin
+          resource: ascend310p-4c-3cpu
+          variant: {}
+          count: 4
+          healthy: 4
+    - name: ascend310p-4c-3cpu-ndvpp
+      replicas: 1
+      node:
+        discoveryLabels: true
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: vnpu-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: ascend310p-4c-3cpu-ndvpp
+          profile:
+            id: huawei-ascend
+            revision: 2026-09-05.1
+            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+          model: huawei-ascend-310p
+          contract: device-plugin
+          resource: ascend310p-4c-3cpu-ndvpp
+          variant: {}
+          count: 4
+          healthy: 4
+    - name: ascend310p-4c-4cpu-dvpp
+      replicas: 1
+      node:
+        discoveryLabels: true
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: vnpu-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: ascend310p-4c-4cpu-dvpp
+          profile:
+            id: huawei-ascend
+            revision: 2026-09-05.1
+            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+          model: huawei-ascend-310p
+          contract: device-plugin
+          resource: ascend310p-4c-4cpu-dvpp
+          variant: {}
+          count: 4
+          healthy: 4
+    - name: ascend910-2c
+      replicas: 1
+      node:
+        discoveryLabels: true
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: vnpu-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: ascend910-2c
+          profile:
+            id: huawei-ascend
+            revision: 2026-09-05.1
+            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+          model: huawei-ascend-910
+          contract: device-plugin
+          resource: ascend910-2c
+          variant: {}
+          count: 4
+          healthy: 4
+    - name: ascend910-4c
+      replicas: 1
+      node:
+        discoveryLabels: true
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: vnpu-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: ascend910-4c
+          profile:
+            id: huawei-ascend
+            revision: 2026-09-05.1
+            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+          model: huawei-ascend-910
+          contract: device-plugin
+          resource: ascend910-4c
+          variant: {}
+          count: 4
+          healthy: 4
+    - name: ascend910-8c
+      replicas: 1
+      node:
+        discoveryLabels: true
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: vnpu-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: ascend910-8c
+          profile:
+            id: huawei-ascend
+            revision: 2026-09-05.1
+            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+          model: huawei-ascend-910
+          contract: device-plugin
+          resource: ascend910-8c
+          variant: {}
+          count: 4
+          healthy: 4
+    - name: ascend910-16c
+      replicas: 1
+      node:
+        discoveryLabels: true
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: vnpu-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: ascend910-16c
+          profile:
+            id: huawei-ascend
+            revision: 2026-09-05.1
+            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+          model: huawei-ascend-910
+          contract: device-plugin
+          resource: ascend910-16c
+          variant: {}
+          count: 4
+          healthy: 4
+    - name: ascend910-3c-1cpu-8g
+      replicas: 1
+      node:
+        discoveryLabels: true
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: vnpu-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: ascend910-3c-1cpu-8g
+          profile:
+            id: huawei-ascend
+            revision: 2026-09-05.1
+            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+          model: huawei-ascend-910
+          contract: device-plugin
+          resource: ascend910-3c-1cpu-8g
+          variant: {}
+          count: 4
+          healthy: 4
+    - name: ascend910-5c-1cpu-8g
+      replicas: 1
+      node:
+        discoveryLabels: true
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: vnpu-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: ascend910-5c-1cpu-8g
+          profile:
+            id: huawei-ascend
+            revision: 2026-09-05.1
+            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+          model: huawei-ascend-910
+          contract: device-plugin
+          resource: ascend910-5c-1cpu-8g
+          variant: {}
+          count: 4
+          healthy: 4
+    - name: ascend910-5c-1cpu-16g
+      replicas: 1
+      node:
+        discoveryLabels: true
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: vnpu-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: ascend910-5c-1cpu-16g
+          profile:
+            id: huawei-ascend
+            revision: 2026-09-05.1
+            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+          model: huawei-ascend-910
+          contract: device-plugin
+          resource: ascend910-5c-1cpu-16g
+          variant: {}
+          count: 4
+          healthy: 4
+    - name: ascend910-6c-1cpu-16g
+      replicas: 1
+      node:
+        discoveryLabels: true
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: vnpu-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: ascend910-6c-1cpu-16g
+          profile:
+            id: huawei-ascend
+            revision: 2026-09-05.1
+            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+          model: huawei-ascend-910
+          contract: device-plugin
+          resource: ascend910-6c-1cpu-16g
+          variant: {}
+          count: 4
+          healthy: 4
+    - name: ascend910-10c-3cpu-16g
+      replicas: 1
+      node:
+        discoveryLabels: true
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: vnpu-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: ascend910-10c-3cpu-16g
+          profile:
+            id: huawei-ascend
+            revision: 2026-09-05.1
+            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+          model: huawei-ascend-910
+          contract: device-plugin
+          resource: ascend910-10c-3cpu-16g
+          variant: {}
+          count: 4
+          healthy: 4
+    - name: ascend910-10c-3cpu-16g-ndvpp
+      replicas: 1
+      node:
+        discoveryLabels: true
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: vnpu-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: ascend910-10c-3cpu-16g-ndvpp
+          profile:
+            id: huawei-ascend
+            revision: 2026-09-05.1
+            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+          model: huawei-ascend-910
+          contract: device-plugin
+          resource: ascend910-10c-3cpu-16g-ndvpp
+          variant: {}
+          count: 4
+          healthy: 4
+    - name: ascend910-10c-3cpu-32g
+      replicas: 1
+      node:
+        discoveryLabels: true
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: vnpu-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: ascend910-10c-3cpu-32g
+          profile:
+            id: huawei-ascend
+            revision: 2026-09-05.1
+            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+          model: huawei-ascend-910
+          contract: device-plugin
+          resource: ascend910-10c-3cpu-32g
+          variant: {}
+          count: 4
+          healthy: 4
+    - name: ascend910-10c-4cpu-16g-dvpp
+      replicas: 1
+      node:
+        discoveryLabels: true
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: vnpu-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: ascend910-10c-4cpu-16g-dvpp
+          profile:
+            id: huawei-ascend
+            revision: 2026-09-05.1
+            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+          model: huawei-ascend-910
+          contract: device-plugin
+          resource: ascend910-10c-4cpu-16g-dvpp
+          variant: {}
+          count: 4
+          healthy: 4
+    - name: ascend910-12c-3cpu-32g
+      replicas: 1
+      node:
+        discoveryLabels: true
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: vnpu-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: ascend910-12c-3cpu-32g
+          profile:
+            id: huawei-ascend
+            revision: 2026-09-05.1
+            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+          model: huawei-ascend-910
+          contract: device-plugin
+          resource: ascend910-12c-3cpu-32g
+          variant: {}
+          count: 4
+          healthy: 4
+    - name: atlas-a2-npu-core
+      replicas: 1
+      node:
+        discoveryLabels: true
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: vnpu-lab
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: atlas-a2-npu-core
+          profile:
+            id: huawei-ascend
+            revision: 2026-09-05.1
+            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+          model: huawei-atlas-a2
+          contract: device-plugin
+          resource: npu-core
+          variant: {}
+          count: 160
+          healthy: 160

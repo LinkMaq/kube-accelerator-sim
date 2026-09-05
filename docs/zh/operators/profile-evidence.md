@@ -16,7 +16,7 @@ Vendor Profile 是描述准确 Kubernetes 可见契约的不可变数据记录�
 
 ## 内置生态覆盖
 
-目录修订为 `2026-09-04`。使用 `kasim profile show <id> -o json` 查看准确来源、
+目录修订为 `2026-09-05.1`。使用 `kasim profile show <id> -o json` 查看准确来源、
 修订、检查日期、资源契约、型号、限制和摘要。
 
 | 生态 | Profile ID | 等级 | 代表性可选型号或状态 |
@@ -43,6 +43,23 @@ Vendor Profile 是描述准确 Kubernetes 可见契约的不可变数据记录�
 
 当前研究输入见[加速器厂商信号与型号](../../research/accelerator-vendor-signals-and-models.md)，
 准确发布输入为 [`profiles/catalog.json`](../../../profiles/catalog.json)。
+
+## 版本锚点
+
+证据一律锚定到不可变的上游修订，优先使用 release tag 而非漂移的 commit。截至
+目录修订 `2026-09-05.1` 的关键锚点：
+
+| 证据来源 | 锚点 | 覆盖范围 |
+| --- | --- | --- |
+| MindCluster / ascend-device-plugin | [v26.1.0](https://gitcode.com/ascend/mind-cluster/tree/v26.1.0)，与固定 master commit `97641a55` 逐字节比对一致 | 昇腾节点发现标签键、vNPU 资源名（`Ascend310P-*` / `Ascend910-*` 预置模板、910B `npu-core`）、npu-exporter 指标 family |
+| 昇腾公开设备规格 | hiascend.com 无版本号公开文档（B 级） | `node.kubernetes.io/npu.chip.name` 的芯片族取值；不编造子型号变体 |
+| dcgm-exporter | 4.6.0～4.8.3 版本线（固定 commit `181290c`） | DCGM family 名称、类型与标签；包含 #658 对 NVLink 带宽 family 的 counter→gauge 修正 |
+| k8s-device-plugin（资源契约） | `5f27eee`，v0.19.3 之后的 master tip | NVIDIA 资源命名 |
+| k8s-device-plugin（GFD 标签） | `3c6be40`，v0.20.0 之后的 master tip | GPU Feature Discovery 节点标签键 |
+| dra-driver-nvidia-gpu | `16c671c`（2026-07-30，约 `v25.8.x` 系列） | DRA 设备类与 claim 命名 |
+
+目录修订变更时会重新核验锚点；`profile show` 输出中的 `checkedAt` 记录最近一次
+核验日期。
 
 ## 使用前检查
 

@@ -31,7 +31,7 @@ func TestBundledCatalogHasEvidenceGatedCoverage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadBundled() error = %v", err)
 	}
-	if catalog.Revision() != "2026-08-12.1" || !strings.HasPrefix(catalog.Digest(), "sha256:") {
+	if catalog.Revision() != "2026-09-05.1" || !strings.HasPrefix(catalog.Digest(), "sha256:") {
 		t.Fatalf("unexpected catalog identity: %s %s", catalog.Revision(), catalog.Digest())
 	}
 	states := catalog.ProfileStates()
@@ -200,14 +200,25 @@ func TestNVIDIARenderMatchesSuppliedDCGMExpositionSchema(t *testing.T) {
 		testObservation("nvidia", "nvidia-h200", 1, 1),
 		time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC),
 	)
+	// The supplied capture predates dcgm-exporter 4.6.0-4.8.3, which corrected
+	// NVLink bandwidth metrics from counters to gauges (PR #658). The bundled
+	// catalog follows the pinned 4.8.3 evidence, so this legacy capture family
+	// is exempt from strict TYPE equality.
+	typeOverrides := map[string]dto.MetricType{
+		"DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL": dto.MetricType_GAUGE,
+	}
 	for name, want := range reference {
 		got := actual[name]
 		if got == nil {
 			t.Errorf("rendered exposition lacks supplied DCGM family %s", name)
 			continue
 		}
-		if got.GetType() != want.GetType() {
-			t.Errorf("%s TYPE = %s, want %s", name, got.GetType(), want.GetType())
+		wantType := want.GetType()
+		if override, exempt := typeOverrides[name]; exempt {
+			wantType = override
+		}
+		if got.GetType() != wantType {
+			t.Errorf("%s TYPE = %s, want %s", name, got.GetType(), wantType)
 		}
 		if got.GetHelp() != want.GetHelp() {
 			t.Errorf("%s HELP = %q, want %q", name, got.GetHelp(), want.GetHelp())

@@ -56,6 +56,15 @@ Start from `examples/` and preserve its exact profile revision and digest.
 For RDMA or SR-IOV signals, start from
 `examples/signals/auxiliary-rdma-sriov.yaml`; preserve the local Accelerator
 Pool association and require the user-provided fully qualified resource name.
+For every Ascend vNPU preset-template resource signal, start from
+`examples/signals/ascend-vnpu-templates.yaml`.
+
+Vendor discovery node labels (the gpu-operator/GFD set for NVIDIA,
+`node.kubernetes.io/npu.chip.name` + `servertype` for Ascend) are opt-in per
+Node Group: set `discoveryLabels: true` under `node:` in a Scenario document,
+or pass `--discovery-labels` to the `apply demo` shortcut. Without the flag,
+label keys are reserved with empty values by design; do not treat that as a
+regression.
 
 Always inspect the catalog before choosing identifiers:
 
@@ -83,7 +92,14 @@ reviewed the evidence and explicitly accepts them.
    build is available. Report the chosen source and version; ask about it only
    when multiple valid choices would materially change the result. Use the
    same explicit kubeconfig/context as the CLI, and wait for both controller
-   Deployments.
+   Deployments. When the upgrade ships a new bundled catalog (new profile
+   revision or digest), existing Scenario Instances that pin the old profile
+   digest fail telemetry compilation and the telemetry Deployment never
+   becomes ready, which fails the Helm upgrade with `Pending termination`.
+   Upgrade in this order: delete every existing Scenario Instance with the
+   guarded `kasim delete` first, run the Helm upgrade while no scenario
+   exists (telemetry is ready on an empty cluster), then resubmit scenarios
+   with the new `kasim` binary.
 4. Enable Prometheus scraping whenever the target supports it. Check for the
    Prometheus Operator API `monitoring.coreos.com/v1 ServiceMonitor`
    (`kubectl api-resources --api-group=monitoring.coreos.com`) on the exact
@@ -118,6 +134,39 @@ For read-only inspection, distinguish scalar resource signals from native DRA
 device identities. Keep health unknown unless the selected source reports it.
 An Auxiliary Device Pool is a scheduling token and never proves a physical
 NIC, link, CNI, network fabric, GPUDirect path, or data-plane connectivity.
+
+## Deliver images to the target node without Docker
+
+The Simulation Target may run containerd only (kubeadm default) with no Docker
+daemon, and the operator workstation may lack a working Docker or SSH client.
+Delivery path that only needs `kubectl` plus local cross-compilation:
+
+1. Cross-compile: `CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build` both
+   binaries with the same ldflags as the Makefile.
+2. Create a privileged Pod on the target node (`nodeName`, `tolerations:
+   [{operator: Exists}]`, `securityContext.privileged: true`) mounting the
+   host root at `/host`.
+3. Fetch the pinned distroless base image through the registry API from the
+   Pod (anonymous token + manifest by digest), `kubectl cp` the blobs local,
+   assemble an OCI layout tar (base layers + one application layer with the
+   binaries; config carries `User 65532:65532`, the entrypoint, exposed ports,
+   and OCI labels), `kubectl cp` it back, then
+   `chroot /host ctr -n k8s.io images import <tar>` and
+   `ctr -n k8s.io images tag ... <repo>@sha256:<manifest-digest>` so a
+   digest-pinned Helm value resolves. containerd v2 unpacks lazily (CRI
+   deferred unpack), so imported images start without an explicit unpack.
+
+## Resolve CleanupBlocked from platform DaemonSets
+
+`CleanupBlocked: cleanup is blocked by bound Pods` lists any non-terminal Pod
+bound to an owned Synthetic Node. Cluster platform DaemonSets without node
+selectors (exporters, log collectors, proxy pods) schedule onto every Ready
+Synthetic Node and permanently block scenario deletion. The scoped fix is to
+patch each offending DaemonSet template with a required nodeAffinity of
+`simulation.kasim.io/scenario DoesNotExist`; Pods on the real node are
+unaffected and Pods on Synthetic Nodes are removed by the DaemonSet
+controller. Report the patch to the user; do not delete user workloads or
+broaden deletion scope.
 
 ## Revise and remove safely
 
