@@ -20,8 +20,8 @@ spec:
         - name: ppu
           profile:
             id: alibaba-ppu
-            revision: 2026-09-16.1
-            digest: sha256:f9f228f86c70d9600ab7984a8d796c866c1aa07dadd38f0aeb24b98d4ce6f8f1
+            revision: 2026-09-16.2
+            digest: sha256:7eedda6fe675e8a1d4b80d555ebd523bbb17efa06d612abe3f31cee2b547d8cc
           model: alibaba-ppu-zw810e
           contract: device-plugin
           resource: ppu

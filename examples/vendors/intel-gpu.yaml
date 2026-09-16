@@ -20,8 +20,8 @@ spec:
         - name: max-1550
           profile:
             id: intel-gpu
-            revision: 2026-09-16.1
-            digest: sha256:b7f8a6a57cbf8b21451fb6a34694da00cf9203d3ed2ff4ab3e29cb19cc08c64c
+            revision: 2026-09-16.2
+            digest: sha256:d65ae6d59cce7482c785fd9f1d88b13da167aa6e5b58c72a3266d6dd1288bf03
           model: intel-max-1550
           contract: device-plugin
           resource: xe

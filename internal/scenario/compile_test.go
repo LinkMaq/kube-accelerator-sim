@@ -41,7 +41,7 @@ spec:
         - name: training
           profile:
             id: nvidia
-            revision: 2026-09-16.1
+            revision: 2026-09-16.2
             digest: sha256:a04f86407d43998b667d61e6d2bbbc91a3ef004634e776dfc2fe330716a2a479
           model: nvidia-h100
           contract: device-plugin
@@ -111,7 +111,7 @@ spec:
         - name: training
           profile:
             id: nvidia
-            revision: 2026-09-16.1
+            revision: 2026-09-16.2
             digest: sha256:a04f86407d43998b667d61e6d2bbbc91a3ef004634e776dfc2fe330716a2a479
           model: nvidia-h100
           contract: device-plugin
@@ -169,7 +169,7 @@ func TestCompileCanonicalGolden(t *testing.T) {
 	if !bytes.Equal(compiled.Bytes(), want) {
 		t.Fatalf("canonical golden drifted:\n%s\n%s", compiled.Bytes(), want)
 	}
-	const wantDigest = "sha256:faec5e3473427b0d1e6f4f4c0cfdc64c241dde9cd75534f2aa7aa4488b2be961"
+	const wantDigest = "sha256:9ed010733fa6f6ebaf90bbf39a31615f0d5703f788ac8cd2e74f1dadbd902f81"
 	if compiled.Digest().String() != wantDigest {
 		t.Fatalf("digest = %s, want %s", compiled.Digest(), wantDigest)
 	}
@@ -327,7 +327,7 @@ func TestCompileRejectsScalarResourceCollisionOnOneNode(t *testing.T) {
         - name: inference
           profile:
             id: nvidia
-            revision: 2026-09-16.1
+            revision: 2026-09-16.2
             digest: sha256:a04f86407d43998b667d61e6d2bbbc91a3ef004634e776dfc2fe330716a2a479
           model: nvidia-h100
           contract: device-plugin
@@ -357,8 +357,8 @@ func TestCompileRejectsMultipleAcceleratorModelsOnOneNodeGroup(t *testing.T) {
         - name: inference
           profile:
             id: amd
-            revision: 2026-09-16.1
-            digest: sha256:c165c4b0616a2f4064e6a1805e14d97ed76b66d632a9c050fda89cd8b15d2bea
+            revision: 2026-09-16.2
+            digest: sha256:c168ffb6c6d5447062a8c512ecfbbb04f1c4d52c54e868deeb05bb9a6a544046
           model: amd-mi300x
           contract: device-plugin
           resource: gpu
@@ -431,7 +431,7 @@ func TestCompileRejectsConflictingDRAIdentitySignalsOnOneNode(t *testing.T) {
         - name: inference
           profile:
             id: nvidia
-            revision: 2026-09-16.1
+            revision: 2026-09-16.2
             digest: sha256:a04f86407d43998b667d61e6d2bbbc91a3ef004634e776dfc2fe330716a2a479
           model: nvidia-h200
           contract: dra
@@ -496,7 +496,7 @@ spec:
         - name: accelerators
           profile:
             id: nvidia
-            revision: 2026-09-16.1
+            revision: 2026-09-16.2
             digest: sha256:a04f86407d43998b667d61e6d2bbbc91a3ef004634e776dfc2fe330716a2a479
           model: nvidia-h100
           contract: device-plugin

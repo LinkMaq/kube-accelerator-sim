@@ -1,6 +1,6 @@
 {
   "schemaVersion": "v1alpha2",
-  "revision": "2026-09-16.1",
+  "revision": "2026-09-16.2",
   "profiles": [
     {
       "id": "nvidia",
@@ -276,14 +276,14 @@
       "id":"amd",
       "displayName":"AMD Instinct",
       "class":"verified",
-      "evidence":[{"id":"contract","grade":"A","source":"https://github.com/ROCm/k8s-device-plugin/commit/2af2fdbf29472b9e9c84087118c87e1bf2f804cd","revision":"2af2fdbf29472b9e9c84087118c87e1bf2f804cd","checkedAt":"2026-07-30"},{"id":"dra","grade":"A","source":"https://github.com/ROCm/k8s-gpu-dra-driver/commit/ecb882a4fda352a282e845ec1c0ed62a73793f68","revision":"ecb882a4fda352a282e845ec1c0ed62a73793f68","checkedAt":"2026-07-30"}],
+      "evidence":[{"id":"contract","grade":"A","source":"https://github.com/ROCm/k8s-device-plugin/commit/2af2fdbf29472b9e9c84087118c87e1bf2f804cd","revision":"2af2fdbf29472b9e9c84087118c87e1bf2f804cd","checkedAt":"2026-07-30"},{"id":"labeller","grade":"A","source":"https://github.com/ROCm/k8s-device-plugin/blob/2af2fdbf29472b9e9c84087118c87e1bf2f804cd/cmd/k8s-node-labeller/README.md","revision":"2af2fdbf29472b9e9c84087118c87e1bf2f804cd","checkedAt":"2026-09-16"},{"id":"dra","grade":"A","source":"https://github.com/ROCm/k8s-gpu-dra-driver/commit/ecb882a4fda352a282e845ec1c0ed62a73793f68","revision":"ecb882a4fda352a282e845ec1c0ed62a73793f68","checkedAt":"2026-07-30"}],
       "contracts":[
         {
           "id":"device-plugin","kind":"extended-resource","providerScope":"any-kubernetes","fidelityModes":["scheduling"],
           "resources":[{"alias":"gpu","name":"amd.com/gpu","unit":"device"},{"alias":"cpx-nps4","name":"amd.com/cpx_nps4","unit":"partition"},{"alias":"spx-nps1","name":"amd.com/spx_nps1","unit":"partition"},{"alias":"cpx-nps1","name":"amd.com/cpx_nps1","unit":"partition"}],
-          "identitySignals":[{"kind":"node-label","key":"amd.com/gpu.product-name"},{"kind":"node-label","key":"amd.com/gpu.vram"}],
+          "identitySignals":[{"kind":"node-label","key":"amd.com/gpu.cu-count"},{"kind":"node-label","key":"amd.com/gpu.device-id"},{"kind":"node-label","key":"amd.com/gpu.family"},{"kind":"node-label","key":"amd.com/gpu.product-name"},{"kind":"node-label","key":"amd.com/gpu.simd-count"},{"kind":"node-label","key":"amd.com/gpu.vram"}],
           "capabilities":{"health":"verified","topology":"verified","sharing":"not-public","partitioning":"verified"},
-          "evidenceRefs":["contract"]
+          "evidenceRefs":["contract","labeller"]
         },
         {
           "id":"dra","kind":"dra","providerScope":"any-kubernetes","fidelityModes":["dra-control-plane"],
@@ -297,7 +297,7 @@
         {"id":"amd-mi210","displayName":"AMD Instinct MI210","aliases":["MI210"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","cpx-nps1","device"],"evidenceRefs":["contract","dra"]},
         {"id":"amd-mi250x","displayName":"AMD Instinct MI250X","aliases":["MI250X"],"lifecycle":"deployed-retention","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","cpx-nps1","device"],"evidenceRefs":["contract","dra"]},
         {"id":"amd-mi300a","displayName":"AMD Instinct MI300A","aliases":["MI300A"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","cpx-nps1","device"],"evidenceRefs":["contract","dra"]},
-        {"id":"amd-mi300x","displayName":"AMD Instinct MI300X","aliases":["MI300X"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","cpx-nps1","device"],"evidenceRefs":["contract","dra"]},
+        {"id":"amd-mi300x","displayName":"AMD Instinct MI300X","aliases":["MI300X"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","cpx-nps1","device"],"nodeLabels":[{"key":"amd.com/gpu.cu-count","value":"304"},{"key":"amd.com/gpu.device-id","value":"74a1"},{"key":"amd.com/gpu.product-name","value":"AMD_Instinct_MI300X_OAM"},{"key":"amd.com/gpu.simd-count","value":"1216"}],"evidenceRefs":["contract","labeller","dra"]},
         {"id":"amd-mi325x","displayName":"AMD Instinct MI325X","aliases":["MI325X"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","cpx-nps1","device"],"evidenceRefs":["contract","dra"]},
         {"id":"amd-mi350x","displayName":"AMD Instinct MI350X","aliases":["MI350X"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","cpx-nps1","device"],"evidenceRefs":["contract","dra"]},
         {"id":"amd-mi355x","displayName":"AMD Instinct MI355X","aliases":["MI355X"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin","dra"],"resourceAliases":["gpu","cpx-nps4","spx-nps1","cpx-nps1","device"],"evidenceRefs":["contract","dra"]}
@@ -307,20 +307,21 @@
       "id":"intel-gpu",
       "displayName":"Intel Data Center GPU",
       "class":"verified",
-      "evidence":[{"id":"contract","grade":"A","source":"https://github.com/intel/intel-device-plugins-for-kubernetes/commit/6460392f95275dd68774aeef3c39f14538ddb3d9","revision":"6460392f95275dd68774aeef3c39f14538ddb3d9","checkedAt":"2026-07-30"}],
+      "evidence":[{"id":"contract","grade":"A","source":"https://github.com/intel/intel-device-plugins-for-kubernetes/commit/6460392f95275dd68774aeef3c39f14538ddb3d9","revision":"6460392f95275dd68774aeef3c39f14538ddb3d9","checkedAt":"2026-07-30"},{"id":"labels","grade":"A","source":"https://github.com/intel/intel-device-plugins-for-kubernetes/blob/6460392f95275dd68774aeef3c39f14538ddb3d9/cmd/gpu_plugin/labels.md","revision":"6460392f95275dd68774aeef3c39f14538ddb3d9","checkedAt":"2026-09-16"}],
       "contracts":[{
         "id":"device-plugin","kind":"extended-resource","providerScope":"any-kubernetes","fidelityModes":["scheduling"],
         "resources":[{"alias":"i915","name":"gpu.intel.com/i915","unit":"device"},{"alias":"xe","name":"gpu.intel.com/xe","unit":"device"}],
-        "identitySignals":[],
+        "identitySignals":[{"kind":"node-label","key":"gpu.intel.com/family"},{"kind":"node-label","key":"gpu.intel.com/product"}],
+        "derivedNodeLabels":[{"key":"gpu.intel.com/device.count","valueFrom":"pool-total-capacity"}],
         "capabilities":{"health":"verified","topology":"verified","sharing":"verified","partitioning":"verified"},
-        "evidenceRefs":["contract"]
+        "evidenceRefs":["contract","labels"]
       }],
       "models":[
         {"id":"intel-flex-140","displayName":"Intel Data Center GPU Flex 140","aliases":["Flex 140"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["i915","xe"],"evidenceRefs":["contract"]},
-        {"id":"intel-flex-170","displayName":"Intel Data Center GPU Flex 170","aliases":["Flex 170"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["i915","xe"],"evidenceRefs":["contract"]},
+        {"id":"intel-flex-170","displayName":"Intel Data Center GPU Flex 170","aliases":["Flex 170"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["i915","xe"],"nodeLabels":[{"key":"gpu.intel.com/family","value":"Flex_Series"},{"key":"gpu.intel.com/product","value":"Flex_170"}],"evidenceRefs":["contract","labels"]},
         {"id":"intel-flex-170v","displayName":"Intel Data Center GPU Flex 170V","aliases":["Flex 170V"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["i915","xe"],"evidenceRefs":["contract"]},
         {"id":"intel-max-1100","displayName":"Intel Data Center GPU Max 1100","aliases":["Max 1100"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["i915","xe"],"evidenceRefs":["contract"]},
-        {"id":"intel-max-1550","displayName":"Intel Data Center GPU Max 1550","aliases":["Max 1550"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["i915","xe"],"evidenceRefs":["contract"]}
+        {"id":"intel-max-1550","displayName":"Intel Data Center GPU Max 1550","aliases":["Max 1550"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["i915","xe"],"nodeLabels":[{"key":"gpu.intel.com/family","value":"Max_Series"},{"key":"gpu.intel.com/product","value":"Max_1550"}],"evidenceRefs":["contract","labels"]}
       ]
     },
     {
@@ -348,14 +349,14 @@
       "contracts":[{
         "id":"device-plugin","kind":"extended-resource","providerScope":"any-kubernetes","fidelityModes":["scheduling"],
         "resources":[{"alias":"ascend310","name":"huawei.com/Ascend310","unit":"device"},{"alias":"ascend310p","name":"huawei.com/Ascend310P","unit":"device"},{"alias":"ascend910","name":"huawei.com/Ascend910","unit":"device"},{"alias":"npu-core","name":"huawei.com/npu-core","unit":"virtual-core"},{"alias":"ascend910-2c","name":"huawei.com/Ascend910-2c","unit":"partition"},{"alias":"ascend910-4c","name":"huawei.com/Ascend910-4c","unit":"partition"},{"alias":"ascend910-8c","name":"huawei.com/Ascend910-8c","unit":"partition"},{"alias":"ascend910-16c","name":"huawei.com/Ascend910-16c","unit":"partition"},{"alias":"ascend910-3c-1cpu-8g","name":"huawei.com/Ascend910-3c.1cpu.8g","unit":"partition"},{"alias":"ascend910-5c-1cpu-8g","name":"huawei.com/Ascend910-5c.1cpu.8g","unit":"partition"},{"alias":"ascend910-5c-1cpu-16g","name":"huawei.com/Ascend910-5c.1cpu.16g","unit":"partition"},{"alias":"ascend910-6c-1cpu-16g","name":"huawei.com/Ascend910-6c.1cpu.16g","unit":"partition"},{"alias":"ascend910-10c-3cpu-16g","name":"huawei.com/Ascend910-10c.3cpu.16g","unit":"partition"},{"alias":"ascend910-10c-3cpu-16g-ndvpp","name":"huawei.com/Ascend910-10c.3cpu.16g.ndvpp","unit":"partition"},{"alias":"ascend910-10c-3cpu-32g","name":"huawei.com/Ascend910-10c.3cpu.32g","unit":"partition"},{"alias":"ascend910-10c-4cpu-16g-dvpp","name":"huawei.com/Ascend910-10c.4cpu.16g.dvpp","unit":"partition"},{"alias":"ascend910-12c-3cpu-32g","name":"huawei.com/Ascend910-12c.3cpu.32g","unit":"partition"},{"alias":"ascend310p-1c","name":"huawei.com/Ascend310P-1c","unit":"partition"},{"alias":"ascend310p-2c","name":"huawei.com/Ascend310P-2c","unit":"partition"},{"alias":"ascend310p-4c","name":"huawei.com/Ascend310P-4c","unit":"partition"},{"alias":"ascend310p-2c-1cpu","name":"huawei.com/Ascend310P-2c.1cpu","unit":"partition"},{"alias":"ascend310p-4c-3cpu","name":"huawei.com/Ascend310P-4c.3cpu","unit":"partition"},{"alias":"ascend310p-4c-3cpu-ndvpp","name":"huawei.com/Ascend310P-4c.3cpu.ndvpp","unit":"partition"},{"alias":"ascend310p-4c-4cpu-dvpp","name":"huawei.com/Ascend310P-4c.4cpu.dvpp","unit":"partition"}],
-        "identitySignals":[{"kind":"node-label","key":"node.kubernetes.io/npu.chip.name"},{"kind":"node-label","key":"servertype"}],
+        "identitySignals":[{"kind":"node-label","key":"accelerator"},{"kind":"node-label","key":"node.kubernetes.io/npu.chip.name"},{"kind":"node-label","key":"servertype"}],
         "capabilities":{"health":"verified","topology":"not-public","sharing":"not-public","partitioning":"verified"},
         "evidenceRefs":["contract","device-specs"]
       }],
       "models":[
-        {"id":"huawei-ascend-310","displayName":"Huawei Ascend 310","aliases":["Ascend 310"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend310"],"nodeLabels":[{"key":"node.kubernetes.io/npu.chip.name","value":"310"},{"key":"servertype","value":"Ascend310-4"}],"evidenceRefs":["contract","device-specs"]},
-        {"id":"huawei-ascend-310p","displayName":"Huawei Ascend 310P","aliases":["Ascend 310P"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend310p","ascend310p-1c","ascend310p-2c","ascend310p-4c","ascend310p-2c-1cpu","ascend310p-4c-3cpu","ascend310p-4c-3cpu-ndvpp","ascend310p-4c-4cpu-dvpp"],"nodeLabels":[{"key":"node.kubernetes.io/npu.chip.name","value":"310P"},{"key":"servertype","value":"Ascend310P-8"}],"evidenceRefs":["contract","device-specs"]},
-        {"id":"huawei-ascend-910","displayName":"Huawei Ascend 910","aliases":["Ascend 910"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend910","ascend910-2c","ascend910-4c","ascend910-8c","ascend910-16c","ascend910-3c-1cpu-8g","ascend910-5c-1cpu-8g","ascend910-5c-1cpu-16g","ascend910-6c-1cpu-16g","ascend910-10c-3cpu-16g","ascend910-10c-3cpu-16g-ndvpp","ascend910-10c-3cpu-32g","ascend910-10c-4cpu-16g-dvpp","ascend910-12c-3cpu-32g"],"nodeLabels":[{"key":"node.kubernetes.io/npu.chip.name","value":"910A"},{"key":"servertype","value":"Ascend910-32"}],"evidenceRefs":["contract","device-specs"]},
+        {"id":"huawei-ascend-310","displayName":"Huawei Ascend 310","aliases":["Ascend 310"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend310"],"nodeLabels":[{"key":"accelerator","value":"huawei-Ascend310"},{"key":"node.kubernetes.io/npu.chip.name","value":"310"},{"key":"servertype","value":"Ascend310-4"}],"evidenceRefs":["contract","device-specs"]},
+        {"id":"huawei-ascend-310p","displayName":"Huawei Ascend 310P","aliases":["Ascend 310P"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend310p","ascend310p-1c","ascend310p-2c","ascend310p-4c","ascend310p-2c-1cpu","ascend310p-4c-3cpu","ascend310p-4c-3cpu-ndvpp","ascend310p-4c-4cpu-dvpp"],"nodeLabels":[{"key":"accelerator","value":"huawei-Ascend310P"},{"key":"node.kubernetes.io/npu.chip.name","value":"310P"},{"key":"servertype","value":"Ascend310P-8"}],"evidenceRefs":["contract","device-specs"]},
+        {"id":"huawei-ascend-910","displayName":"Huawei Ascend 910","aliases":["Ascend 910"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend910","ascend910-2c","ascend910-4c","ascend910-8c","ascend910-16c","ascend910-3c-1cpu-8g","ascend910-5c-1cpu-8g","ascend910-5c-1cpu-16g","ascend910-6c-1cpu-16g","ascend910-10c-3cpu-16g","ascend910-10c-3cpu-16g-ndvpp","ascend910-10c-3cpu-32g","ascend910-10c-4cpu-16g-dvpp","ascend910-12c-3cpu-32g"],"nodeLabels":[{"key":"accelerator","value":"huawei-Ascend910"},{"key":"node.kubernetes.io/npu.chip.name","value":"910A"},{"key":"servertype","value":"Ascend910-32"}],"evidenceRefs":["contract","device-specs"]},
         {"id":"huawei-atlas-a2","displayName":"Huawei Atlas A2","aliases":["Atlas A2"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend910","npu-core"],"nodeLabels":[{"key":"node.kubernetes.io/npu.chip.name","value":"910B"},{"key":"servertype","value":"Ascend910B-20"}],"evidenceRefs":["contract","device-specs"]},
         {"id":"huawei-atlas-a3","displayName":"Huawei Atlas A3","aliases":["Atlas A3"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ascend910","npu-core"],"evidenceRefs":["contract"]}
       ]
@@ -582,12 +583,13 @@
       "contracts":[{
         "id":"device-plugin","kind":"extended-resource","providerScope":"alibaba-cloud-ack","fidelityModes":["scheduling"],
         "resources":[{"alias":"ppu","name":"alibabacloud.com/ppu","unit":"device"},{"alias":"ppu-4u-4g48gb","name":"alibabacloud.com/ppu-4u.4g48gb","unit":"partition"},{"alias":"ppu-16u-4g48gb","name":"alibabacloud.com/ppu-16u.4g48gb","unit":"partition"}],
-        "identitySignals":[{"kind":"node-label","key":"aliyun.accelerator/xpu_type"},{"kind":"node-label","key":"aliyun.accelerator/ppu_name"},{"kind":"node-label","key":"aliyun.accelerator/ppu_count"},{"kind":"node-label","key":"aliyun.accelerator/ppu_mem"}],
+        "identitySignals":[{"kind":"node-label","key":"aliyun.accelerator/ppu_name"},{"kind":"node-label","key":"aliyun.accelerator/ppu_mem"}],
+        "derivedNodeLabels":[{"key":"aliyun.accelerator/xpu_type","valueFrom":"static","value":"ppu"},{"key":"aliyun.accelerator/ppu_count","valueFrom":"pool-total-capacity"}],
         "capabilities":{"health":"verified","topology":"verified","sharing":"not-public","partitioning":"verified"},
         "evidenceRefs":["contract","node-labels"]
       }],
       "models":[
-        {"id":"alibaba-ppu-zw810e","displayName":"Alibaba Cloud PPU ZW810E","aliases":["PPU-ZW810E","ZW810E"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ppu","ppu-4u-4g48gb","ppu-16u-4g48gb"],"evidenceRefs":["contract","node-labels"]},
+        {"id":"alibaba-ppu-zw810e","displayName":"Alibaba Cloud PPU ZW810E","aliases":["PPU-ZW810E","ZW810E"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ppu","ppu-4u-4g48gb","ppu-16u-4g48gb"],"nodeLabels":[{"key":"aliyun.accelerator/ppu_name","value":"PPU-ZW810E"},{"key":"aliyun.accelerator/ppu_mem","value":"98304MiB"}],"evidenceRefs":["contract","node-labels"]},
         {"id":"alibaba-ppu-m890p","displayName":"Alibaba Cloud PPU M890P","aliases":["M890P"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ppu","ppu-4u-4g48gb","ppu-16u-4g48gb"],"evidenceRefs":["contract"]}
       ]
     },

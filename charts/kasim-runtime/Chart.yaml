@@ -2,8 +2,8 @@ apiVersion: v2
 name: kasim-runtime
 description: Existing-cluster runtime for Kubernetes accelerator simulation
 type: application
-version: 0.7.0
-appVersion: 0.7.0
+version: 0.7.1
+appVersion: 0.7.1
 kubeVersion: ">=1.30.0-0 <1.37.0-0"
 home: https://github.com/LinkMaq/kube-accelerator-sim
 sources:
@@ -11,8 +11,8 @@ sources:
 annotations:
   simulation.kasim.io/schema-version: v1alpha1
   simulation.kasim.io/product-crd-sha256: fc4162c4d9b3137fa5c195e22c6604c625abb55b8a29c839856e1120467d3bd4
-  simulation.kasim.io/catalog-revision: "2026-09-16.1"
-  simulation.kasim.io/catalog-sha256: d2139ae426ce2c3de02c9103752640d418db53092578e033cbe20420882375dc
+  simulation.kasim.io/catalog-revision: "2026-09-16.2"
+  simulation.kasim.io/catalog-sha256: 9d62e9fb8f50eca1030eb91b29a6dc3d141d56e79c205d5e9fc81e3288833ae2
   simulation.kasim.io/telemetry-catalog-revision: "2026-09-16.1"
   simulation.kasim.io/telemetry-catalog-sha256: 80157a7e1720cb5e064a6dbd5e444845d540e8cf43854156a838dec43737786e
   simulation.kasim.io/kubernetes-range: "1.30-1.36"

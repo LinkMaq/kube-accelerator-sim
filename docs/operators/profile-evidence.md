@@ -19,7 +19,7 @@ or vendor preference. Model lifecycle such as `current-product`,
 
 ## Bundled ecosystem coverage
 
-The catalog revision is `2026-09-16.1`. Use `kasim profile show <id> -o json` for
+The catalog revision is `2026-09-16.2`. Use `kasim profile show <id> -o json` for
 the exact source URLs, immutable revisions, checked dates, contract spellings,
 models, limitations, and digest.
 
@@ -58,7 +58,7 @@ release input.
 ## Version anchors
 
 Evidence is anchored to immutable upstream revisions, preferring release tags
-over floating commits. The key anchors as of catalog revision `2026-09-16.1`:
+over floating commits. The key anchors as of catalog revision `2026-09-16.2`:
 
 | Evidence source | Anchor | Covers |
 | --- | --- | --- |
@@ -67,12 +67,33 @@ over floating commits. The key anchors as of catalog revision `2026-09-16.1`:
 | dcgm-exporter | releases 4.6.0 through 4.8.3 (pinned commit `181290c`) | DCGM family names, types, and labels; includes the #658 counter-to-gauge correction of NVLink bandwidth families |
 | k8s-device-plugin (resource contract) | `5f27eee`, master tip following v0.19.3 | NVIDIA resource naming |
 | k8s-device-plugin (GFD labels) | `3c6be40`, master tip following v0.20.0 | GPU Feature Discovery node label keys |
+| k8s-device-plugin (Node Labeller) | `2af2fdb`, master tip following v0.19.x | `amd.com/gpu.*` node label keys and published sample values |
+| intel-device-plugins-for-kubernetes (gpu_plugin labels) | `6460392` | `gpu.intel.com/*` NFD rule label keys and per-platform sample values |
 | dra-driver-nvidia-gpu | `16c671c` (2026-07-30, `~v25.8.x` series) | DRA device class and claim naming |
 | ack-ppu-device-plugin | `v1.4.0-8a13b6d4-topology-aliyun`, initial full release on 2026-08-05 | PPU whole-device and partition resource names, health and topology claims |
 | Lingjun node pool PPU guide | unversioned alibabacloud.com documentation | `aliyun.accelerator/*` node label keys and published sample values |
 
 Anchors are re-verified whenever a catalog revision changes; the `checkedAt`
 dates in `profile show` output record the last verification.
+
+## Node discovery label coverage
+
+Vendor Node discovery labels are carried only where the vendor publishes them
+and the keys are publicly evidenced. Coverage as of catalog revision
+`2026-09-16.2`:
+
+| Profile | Models with evidenced values | Route and note |
+| --- | --- | --- |
+| `nvidia` | all 10 selectable models | GFD through NFD; the full 36-label set |
+| `amd` | MI300X | Node Labeller patches Nodes directly; 4 of 6 declared keys have values |
+| `intel-gpu` | Max 1550, Flex 170 | NFD rules; Flex 140 and Max 1100 have no published sample values |
+| `huawei-ascend` | 310, 310P, 910, Atlas A2 | Ascend Device Plugin; Atlas A3 publishes no chip identity |
+| `alibaba-ppu` | PPU-ZW810E | ACK PPU device plugin; M890P has no published sample values |
+
+Other profiles either declare label keys without model values (for example
+`cambricon`, `hygon`, `metax`, `moore-threads`) or declare none at all. See
+[Node discovery labels](node-discovery-labels.md) for the emission rules and
+the meaning of a declared key with an empty value.
 
 ## Inspect before use
 

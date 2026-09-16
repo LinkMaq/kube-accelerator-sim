@@ -30,6 +30,8 @@
 | 节点发现标签 | [discovery-labels.yaml](../../../examples/discovery-labels.yaml) | 两个携带证据化 `nvidia.com/*` GFD 标签集的 H100 Synthetic Node |
 | 参考规模 | [reference-scale.yaml](../../../test/e2e/testdata/reference-scale.yaml) | 1,000 个 Synthetic Node、8,000 个单位的发布门禁 |
 
+`discovery-labels.yaml` 演示的是 NVIDIA 标签集；同一 `discoveryLabels` 开关也覆盖所有带有取证取值的 AMD、Intel、华为昇腾与阿里云 PPU 型号。详见[节点发现标签](node-discovery-labels.md)。
+
 完整厂商/资源矩阵及其证据性省略项见[示例索引](../../../examples/README.md)。例如：
 
 ```sh

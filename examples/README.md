@@ -84,6 +84,17 @@ and Qualcomm Cloud AI 100 likewise have no selectable bundled model. They are
 intentionally not turned into runnable examples until the missing public
 evidence exists.
 
+## Node discovery labels
+
+[`discovery-labels.yaml`](discovery-labels.yaml) sets `discoveryLabels: true`
+on an H100 Node Group, which projects the 36-label `nvidia.com/*` set a GPU
+Operator-managed node carries. The same switch covers the AMD MI300X, Intel
+Max 1550 and Flex 170, Huawei Ascend, and Alibaba Cloud PPU models that carry
+evidenced label values. Vendor labels are opt-in per Node Group, and every
+other model keeps the declared keys with empty values so a placement test never
+matches a label no real node carries. See
+[Node discovery labels](../docs/operators/node-discovery-labels.md).
+
 ## Topology examples
 
 The root examples retain small topology-focused scenarios:

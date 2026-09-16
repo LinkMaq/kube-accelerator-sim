@@ -16,7 +16,7 @@ Vendor Profile 是描述准确 Kubernetes 可见契约的不可变数据记录�
 
 ## 内置生态覆盖
 
-目录修订为 `2026-09-16.1`。使用 `kasim profile show <id> -o json` 查看准确来源、
+目录修订为 `2026-09-16.2`。使用 `kasim profile show <id> -o json` 查看准确来源、
 修订、检查日期、资源契约、型号、限制和摘要。
 
 | 生态 | Profile ID | 等级 | 代表性可选型号或状态 |
@@ -48,7 +48,7 @@ Vendor Profile 是描述准确 Kubernetes 可见契约的不可变数据记录�
 ## 版本锚点
 
 证据一律锚定到不可变的上游修订，优先使用 release tag 而非漂移的 commit。截至
-目录修订 `2026-09-16.1` 的关键锚点：
+目录修订 `2026-09-16.2` 的关键锚点：
 
 | 证据来源 | 锚点 | 覆盖范围 |
 | --- | --- | --- |
@@ -57,12 +57,31 @@ Vendor Profile 是描述准确 Kubernetes 可见契约的不可变数据记录�
 | dcgm-exporter | 4.6.0～4.8.3 版本线（固定 commit `181290c`） | DCGM family 名称、类型与标签；包含 #658 对 NVLink 带宽 family 的 counter→gauge 修正 |
 | k8s-device-plugin（资源契约） | `5f27eee`，v0.19.3 之后的 master tip | NVIDIA 资源命名 |
 | k8s-device-plugin（GFD 标签） | `3c6be40`，v0.20.0 之后的 master tip | GPU Feature Discovery 节点标签键 |
+| k8s-device-plugin（Node Labeller） | `2af2fdb`，v0.19.x 之后的 master tip | `amd.com/gpu.*` 节点标签键与已公开的样值 |
+| intel-device-plugins-for-kubernetes（gpu_plugin 标签） | `6460392` | `gpu.intel.com/*` NFD rule 标签键与逐平台样值 |
 | dra-driver-nvidia-gpu | `16c671c`（2026-07-30，约 `v25.8.x` 系列） | DRA 设备类与 claim 命名 |
 | ack-ppu-device-plugin | `v1.4.0-8a13b6d4-topology-aliyun`，2026-08-05 首次全量发布 | PPU 整卡与分区资源名、健康与拓扑声明 |
 | 灵骏节点池 PPU 使用指南 | alibabacloud.com 无版本号公开文档 | `aliyun.accelerator/*` 节点标签键与已公开的样值 |
 
 目录修订变更时会重新核验锚点；`profile show` 输出中的 `checkedAt` 记录最近一次
 核验日期。
+
+## 节点发现标签覆盖范围
+
+只有当厂商确实发布、且键有公开证据时，档案才携带厂商节点发现标签。截至目录
+修订版 `2026-09-16.2` 的覆盖情况：
+
+| 档案 | 有取证取值的型号 | 路线与说明 |
+| --- | --- | --- |
+| `nvidia` | 全部 10 个可选型号 | GFD 经 NFD 发布；完整 36 标签集 |
+| `amd` | MI300X | Node Labeller 直接 patch Node；6 个已声明键中 4 个有取值 |
+| `intel-gpu` | Max 1550、Flex 170 | NFD rule；Flex 140 与 Max 1100 未公布样值 |
+| `huawei-ascend` | 310、310P、910、Atlas A2 | Ascend Device Plugin；Atlas A3 未公布芯片身份 |
+| `alibaba-ppu` | PPU-ZW810E | ACK PPU 设备插件；M890P 未公布样值 |
+
+其余档案要么只声明标签键而无型号取值（如 `cambricon`、`hygon`、`metax`、
+`moore-threads`），要么完全不声明。投射规则与「已声明但值为空」的语义见
+[节点发现标签](node-discovery-labels.md)。
 
 ## 使用前检查
 

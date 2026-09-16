@@ -20,8 +20,8 @@ spec:
         - name: atlas-a2
           profile:
             id: huawei-ascend
-            revision: 2026-09-16.1
-            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+            revision: 2026-09-16.2
+            digest: sha256:4ab31ee00ace74e77613a8de8163dd3030d82e479da59b22fbf08b0b8f9c8868
           model: huawei-atlas-a2
           contract: device-plugin
           resource: ascend910

@@ -31,6 +31,11 @@ Connected apply always names the existing target explicitly:
 | Node discovery labels | [discovery-labels.yaml](../../examples/discovery-labels.yaml) | Two H100 Synthetic Nodes carrying the evidence-backed `nvidia.com/*` GFD label set |
 | Reference scale | [reference-scale.yaml](../../test/e2e/testdata/reference-scale.yaml) | Release gate with 1,000 Synthetic Nodes and 8,000 units |
 
+`discovery-labels.yaml` exercises the NVIDIA set; the same `discoveryLabels`
+switch covers every AMD, Intel, Huawei Ascend, and Alibaba Cloud PPU model that
+carries evidenced label values. See
+[Node discovery labels](node-discovery-labels.md).
+
 The complete vendor/resource matrix, including exact resource names and
 evidence-driven omissions, is documented in the
 [examples index](../../examples/README.md). For example:

@@ -23,8 +23,8 @@ spec:
         - name: ascend310p-1c
           profile:
             id: huawei-ascend
-            revision: 2026-09-16.1
-            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+            revision: 2026-09-16.2
+            digest: sha256:4ab31ee00ace74e77613a8de8163dd3030d82e479da59b22fbf08b0b8f9c8868
           model: huawei-ascend-310p
           contract: device-plugin
           resource: ascend310p-1c
@@ -47,8 +47,8 @@ spec:
         - name: ascend310p-2c
           profile:
             id: huawei-ascend
-            revision: 2026-09-16.1
-            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+            revision: 2026-09-16.2
+            digest: sha256:4ab31ee00ace74e77613a8de8163dd3030d82e479da59b22fbf08b0b8f9c8868
           model: huawei-ascend-310p
           contract: device-plugin
           resource: ascend310p-2c
@@ -71,8 +71,8 @@ spec:
         - name: ascend310p-4c
           profile:
             id: huawei-ascend
-            revision: 2026-09-16.1
-            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+            revision: 2026-09-16.2
+            digest: sha256:4ab31ee00ace74e77613a8de8163dd3030d82e479da59b22fbf08b0b8f9c8868
           model: huawei-ascend-310p
           contract: device-plugin
           resource: ascend310p-4c
@@ -95,8 +95,8 @@ spec:
         - name: ascend310p-2c-1cpu
           profile:
             id: huawei-ascend
-            revision: 2026-09-16.1
-            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+            revision: 2026-09-16.2
+            digest: sha256:4ab31ee00ace74e77613a8de8163dd3030d82e479da59b22fbf08b0b8f9c8868
           model: huawei-ascend-310p
           contract: device-plugin
           resource: ascend310p-2c-1cpu
@@ -119,8 +119,8 @@ spec:
         - name: ascend310p-4c-3cpu
           profile:
             id: huawei-ascend
-            revision: 2026-09-16.1
-            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+            revision: 2026-09-16.2
+            digest: sha256:4ab31ee00ace74e77613a8de8163dd3030d82e479da59b22fbf08b0b8f9c8868
           model: huawei-ascend-310p
           contract: device-plugin
           resource: ascend310p-4c-3cpu
@@ -143,8 +143,8 @@ spec:
         - name: ascend310p-4c-3cpu-ndvpp
           profile:
             id: huawei-ascend
-            revision: 2026-09-16.1
-            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+            revision: 2026-09-16.2
+            digest: sha256:4ab31ee00ace74e77613a8de8163dd3030d82e479da59b22fbf08b0b8f9c8868
           model: huawei-ascend-310p
           contract: device-plugin
           resource: ascend310p-4c-3cpu-ndvpp
@@ -167,8 +167,8 @@ spec:
         - name: ascend310p-4c-4cpu-dvpp
           profile:
             id: huawei-ascend
-            revision: 2026-09-16.1
-            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+            revision: 2026-09-16.2
+            digest: sha256:4ab31ee00ace74e77613a8de8163dd3030d82e479da59b22fbf08b0b8f9c8868
           model: huawei-ascend-310p
           contract: device-plugin
           resource: ascend310p-4c-4cpu-dvpp
@@ -191,8 +191,8 @@ spec:
         - name: ascend910-2c
           profile:
             id: huawei-ascend
-            revision: 2026-09-16.1
-            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+            revision: 2026-09-16.2
+            digest: sha256:4ab31ee00ace74e77613a8de8163dd3030d82e479da59b22fbf08b0b8f9c8868
           model: huawei-ascend-910
           contract: device-plugin
           resource: ascend910-2c
@@ -215,8 +215,8 @@ spec:
         - name: ascend910-4c
           profile:
             id: huawei-ascend
-            revision: 2026-09-16.1
-            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+            revision: 2026-09-16.2
+            digest: sha256:4ab31ee00ace74e77613a8de8163dd3030d82e479da59b22fbf08b0b8f9c8868
           model: huawei-ascend-910
           contract: device-plugin
           resource: ascend910-4c
@@ -239,8 +239,8 @@ spec:
         - name: ascend910-8c
           profile:
             id: huawei-ascend
-            revision: 2026-09-16.1
-            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+            revision: 2026-09-16.2
+            digest: sha256:4ab31ee00ace74e77613a8de8163dd3030d82e479da59b22fbf08b0b8f9c8868
           model: huawei-ascend-910
           contract: device-plugin
           resource: ascend910-8c
@@ -263,8 +263,8 @@ spec:
         - name: ascend910-16c
           profile:
             id: huawei-ascend
-            revision: 2026-09-16.1
-            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+            revision: 2026-09-16.2
+            digest: sha256:4ab31ee00ace74e77613a8de8163dd3030d82e479da59b22fbf08b0b8f9c8868
           model: huawei-ascend-910
           contract: device-plugin
           resource: ascend910-16c
@@ -287,8 +287,8 @@ spec:
         - name: ascend910-3c-1cpu-8g
           profile:
             id: huawei-ascend
-            revision: 2026-09-16.1
-            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+            revision: 2026-09-16.2
+            digest: sha256:4ab31ee00ace74e77613a8de8163dd3030d82e479da59b22fbf08b0b8f9c8868
           model: huawei-ascend-910
           contract: device-plugin
           resource: ascend910-3c-1cpu-8g
@@ -311,8 +311,8 @@ spec:
         - name: ascend910-5c-1cpu-8g
           profile:
             id: huawei-ascend
-            revision: 2026-09-16.1
-            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+            revision: 2026-09-16.2
+            digest: sha256:4ab31ee00ace74e77613a8de8163dd3030d82e479da59b22fbf08b0b8f9c8868
           model: huawei-ascend-910
           contract: device-plugin
           resource: ascend910-5c-1cpu-8g
@@ -335,8 +335,8 @@ spec:
         - name: ascend910-5c-1cpu-16g
           profile:
             id: huawei-ascend
-            revision: 2026-09-16.1
-            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+            revision: 2026-09-16.2
+            digest: sha256:4ab31ee00ace74e77613a8de8163dd3030d82e479da59b22fbf08b0b8f9c8868
           model: huawei-ascend-910
           contract: device-plugin
           resource: ascend910-5c-1cpu-16g
@@ -359,8 +359,8 @@ spec:
         - name: ascend910-6c-1cpu-16g
           profile:
             id: huawei-ascend
-            revision: 2026-09-16.1
-            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+            revision: 2026-09-16.2
+            digest: sha256:4ab31ee00ace74e77613a8de8163dd3030d82e479da59b22fbf08b0b8f9c8868
           model: huawei-ascend-910
           contract: device-plugin
           resource: ascend910-6c-1cpu-16g
@@ -383,8 +383,8 @@ spec:
         - name: ascend910-10c-3cpu-16g
           profile:
             id: huawei-ascend
-            revision: 2026-09-16.1
-            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+            revision: 2026-09-16.2
+            digest: sha256:4ab31ee00ace74e77613a8de8163dd3030d82e479da59b22fbf08b0b8f9c8868
           model: huawei-ascend-910
           contract: device-plugin
           resource: ascend910-10c-3cpu-16g
@@ -407,8 +407,8 @@ spec:
         - name: ascend910-10c-3cpu-16g-ndvpp
           profile:
             id: huawei-ascend
-            revision: 2026-09-16.1
-            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+            revision: 2026-09-16.2
+            digest: sha256:4ab31ee00ace74e77613a8de8163dd3030d82e479da59b22fbf08b0b8f9c8868
           model: huawei-ascend-910
           contract: device-plugin
           resource: ascend910-10c-3cpu-16g-ndvpp
@@ -431,8 +431,8 @@ spec:
         - name: ascend910-10c-3cpu-32g
           profile:
             id: huawei-ascend
-            revision: 2026-09-16.1
-            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+            revision: 2026-09-16.2
+            digest: sha256:4ab31ee00ace74e77613a8de8163dd3030d82e479da59b22fbf08b0b8f9c8868
           model: huawei-ascend-910
           contract: device-plugin
           resource: ascend910-10c-3cpu-32g
@@ -455,8 +455,8 @@ spec:
         - name: ascend910-10c-4cpu-16g-dvpp
           profile:
             id: huawei-ascend
-            revision: 2026-09-16.1
-            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+            revision: 2026-09-16.2
+            digest: sha256:4ab31ee00ace74e77613a8de8163dd3030d82e479da59b22fbf08b0b8f9c8868
           model: huawei-ascend-910
           contract: device-plugin
           resource: ascend910-10c-4cpu-16g-dvpp
@@ -479,8 +479,8 @@ spec:
         - name: ascend910-12c-3cpu-32g
           profile:
             id: huawei-ascend
-            revision: 2026-09-16.1
-            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+            revision: 2026-09-16.2
+            digest: sha256:4ab31ee00ace74e77613a8de8163dd3030d82e479da59b22fbf08b0b8f9c8868
           model: huawei-ascend-910
           contract: device-plugin
           resource: ascend910-12c-3cpu-32g
@@ -503,8 +503,8 @@ spec:
         - name: atlas-a2-npu-core
           profile:
             id: huawei-ascend
-            revision: 2026-09-16.1
-            digest: sha256:912bb392e8d5c6b411bd757e0cc55f0635d7cac8f06fc7729014fc7a394d77f9
+            revision: 2026-09-16.2
+            digest: sha256:4ab31ee00ace74e77613a8de8163dd3030d82e479da59b22fbf08b0b8f9c8868
           model: huawei-atlas-a2
           contract: device-plugin
           resource: npu-core
