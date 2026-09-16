@@ -648,7 +648,7 @@ func TestModuleServesCachedMetricsAndReadiness(t *testing.T) {
 	go func() { runDone <- module.Run(ctx) }()
 
 	baseURL := "http://" + listener.Addr().String()
-	body := eventuallyGET(t, baseURL+"/metrics")
+	body := eventuallyGET(t, baseURL+"/metrics", "gpu_gfx_activity")
 	if !strings.Contains(body, "gpu_gfx_activity") || strings.Contains(nativeMetricLine(body, "gpu_gfx_activity"), "kasim_") {
 		t.Fatalf("unexpected metrics body:\n%s", body)
 	}
@@ -901,22 +901,43 @@ func metricByLabel(t *testing.T, family *dto.MetricFamily, labelName, labelValue
 	return nil
 }
 
-func eventuallyGET(t *testing.T, url string) string {
+// eventuallyGET waits until the endpoint answers 200 with a non-empty body.
+// Every want substring must also be present, because the exposition starts
+// with the kasim_telemetry_* skeleton and gains vendor families only after the
+// first source refresh; returning the skeleton early would make a caller
+// assert against a body that is still initializing.
+func eventuallyGET(t *testing.T, url string, want ...string) string {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
+	last := ""
 	for time.Now().Before(deadline) {
 		response, err := http.Get(url)
 		if err == nil {
 			body, readErr := io.ReadAll(response.Body)
 			_ = response.Body.Close()
 			if readErr == nil && response.StatusCode == http.StatusOK && len(body) > 0 {
-				return string(body)
+				last = string(body)
+				if containsAll(last, want) {
+					return last
+				}
 			}
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+	if last != "" {
+		t.Fatalf("GET %s never contained %v:\n%s", url, want, last)
+	}
 	t.Fatalf("GET %s did not become ready", url)
 	return ""
+}
+
+func containsAll(body string, want []string) bool {
+	for _, fragment := range want {
+		if !strings.Contains(body, fragment) {
+			return false
+		}
+	}
+	return true
 }
 
 func eventuallyStatus(t *testing.T, url string) int {
