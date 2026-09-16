@@ -62,7 +62,10 @@ spec:
 ```
 
 Omitting the field preserves the exact prior canonical Scenario bytes and
-digests; existing revisions are unaffected.
+digests; existing revisions are unaffected. The declared vendor keys still
+appear on every Synthetic Node of that group, carrying empty values, because
+the key set is fixed by the Contract while only the values are opt-in: the
+switch decides whether a value is projected, not whether the key exists.
 
 ## NVIDIA GPU Operator labels
 
@@ -196,7 +199,9 @@ for PPU-ZW810E only.
 Vendor label keys are declared at the contract level and values at the model
 level. A declared key with no model-specific evidence is still projected, but
 with an empty value — for example `amd.com/gpu.family` on MI300X, `accelerator`
-on Atlas A2, and every `hygon.com/dcu*` key. This is deliberate:
+on Atlas A2, and every `hygon.com/dcu*` key. A Node whose Node Group never
+enabled `discoveryLabels` reaches the same observable state: every declared key
+is present and empty. Both cases are deliberate:
 
 - The key keeps its collision reservation, so a Scenario that supplies the same
   key manually still fails compilation instead of silently disagreeing with the
