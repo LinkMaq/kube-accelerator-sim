@@ -1,6 +1,6 @@
 # Accelerator telemetry metric evidence
 
-Checked: 2026-08-12
+Checked: 2026-08-12; extended 2026-09-16 for Alibaba Cloud PPU
 
 ## Question and evidence rule
 
@@ -414,11 +414,17 @@ revisionable Prometheus metric contract with exact names and types was found:
 | Kunlunxin (HAMi integration) | unavailable; the [HAMi scheduling integration](https://github.com/Project-HAMi/HAMi/tree/e831337db299f331b170a46d6ca3dba256b9d6f1) is not evidence of a Kunlunxin-native telemetry namespace. |
 | Vastai (HAMi integration) | unavailable; the [HAMi scheduling integration](https://github.com/Project-HAMi/HAMi/tree/e831337db299f331b170a46d6ca3dba256b9d6f1) is not evidence of a Vastai-native telemetry namespace. |
 | Qualcomm Cloud AI 100 | unavailable; the [official Kubernetes deployment documentation](https://quic.github.io/cloud-ai-sdk-pages/1.20/Getting-Started/Installation/Docker/k8s/index.html) does not define a Prometheus exporter contract with exact metric names/types. |
+| Alibaba Cloud PPU | unavailable, but for a different reason than the entries above: a first-party exporter contract **does** exist in the ACK [Zhenwu PPU monitoring metric page](https://help.aliyun.com/en/ack/ack-managed-and-ack-dedicated/user-guide/configure-zhenwu-ppu-monitoring-indicators), which documents `DCGM_FI_DEV_GPU_UTIL`, `DCGM_FI_DEV_MEM_COPY_UTIL`, `DCGM_FI_DEV_ENC_UTIL`, `DCGM_FI_DEV_DEC_UTIL`, `DCGM_FI_DEV_FB_FREE`, `DCGM_FI_DEV_FB_USED`, the `DCGM_FI_PROF_*` profiling set, and the `DCGM_FI_DEV_*_CLOCK` families as gauges. The page states that the exporter is "compatible with the metrics of the open-source DCGM Exporter", so it reuses the exact family names already bound to the verified NVIDIA DCGM contract above. The page does not publish exact `HELP` strings or a complete label schema, the documentation is not revision-pinned, and the catalog admits only one owner per metric family; a second verified claim on the same names would have to resolve that collision first. |
 | SR-IOV Network Device Plugin | unavailable as a device-pool telemetry contract; the [official Device Plugin](https://github.com/k8snetworkplumbingwg/sriov-network-device-plugin/blob/efe22f8722ceae918c6703830107b3e82b089ef1/README.md) exposes allocatable resources, not per-VF hardware metrics. Generic host/network metrics must not be presented as the plugin's native names. |
 
 “Unavailable” is a safe implementation result, not a claim that no proprietary
 exporter exists. A later version can promote one of these profiles after adding
-first-party, revision-pinned evidence to the telemetry catalog.
+first-party, revision-pinned evidence to the telemetry catalog. There are two
+distinct ways to be unavailable: no public contract was found at all, or a
+public contract exists but cannot be admitted as written — for example because
+it claims metric families that an already-verified profile owns. The second case
+is recorded with the evidence that was found so the gap is auditable rather than
+silently dropped.
 
 ## Findings that constrain implementation
 

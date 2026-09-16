@@ -62,7 +62,7 @@ family 名、`TYPE` 和原生 label 来自所选 exporter 契约；除明确记�
 
 NVIDIA DCGM 契约锚定到 dcgm-exporter 4.6.0～4.8.3 版本线。该版本线内，上游将
 NVLink 带宽 family 从 counter 修正为 gauge（#658）。自遥测目录修订
-`2026-09-05.1` 起，`DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL` 因此导出
+`2026-09-16.1` 起，`DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL` 因此导出
 `TYPE = GAUGE`，与锚定契约一致，而非旧版 counter 类型的抓取样本。
 
 每个 Synthetic Node 都带
@@ -84,7 +84,7 @@ exporter Pod 或 Service。
 ## 华为昇腾与海光 DCU 契约
 
 华为契约按设备分别生成 series。基础 family 覆盖 AI Core 使用率、温度、功耗、
-HBM 已用量与总量、HBM 使用率、健康状态和错误码。自目录修订 `2026-09-05.1`
+HBM 已用量与总量、HBM 使用率、健康状态和错误码。自目录修订 `2026-09-16.1`
 起，新增 25 个 npu-exporter family，全部锚定到 MindCluster `v26.1.0` 来源
 （见[厂商档案证据](profile-evidence.md)）：
 
@@ -161,7 +161,7 @@ Kasim 每 15 秒生成一次不可变快照。同一时间桶内重复抓取数�
 | --- | --- |
 | 已启用原生 family | NVIDIA DCGM、AMD Device Metrics Exporter、Intel XPU Manager、Huawei Ascend npu-exporter、Hygon DCU-Exporter、Cambricon mlu-exporter、Iluvatar ix-exporter、Enflame gcu-exporter、Furiosa metrics exporter、Prometheus node_exporter InfiniBand collector |
 | 可发现但因 provisional 暂不启用 | Intel Gaudi、AWS Neuron、Google TPU provider telemetry、Moore Threads、Graphcore、MetaX |
-| 明确 unavailable | Biren、Kunlunxin through HAMi、Vastai through HAMi、Qualcomm Cloud AI 100、SR-IOV Device Plugin 原生遥测 |
+| 明确 unavailable | 阿里云 PPU、Biren、Kunlunxin through HAMi、Vastai through HAMi、Qualcomm Cloud AI 100、SR-IOV Device Plugin 原生遥测 |
 
 覆盖范围只由证据决定。支持调度资源并不等于支持遥测。精确指标名、类型、单位、
 原生标签、来源版本和产品限制见[加速器遥测研究](../../research/accelerator-telemetry-metrics.md)。

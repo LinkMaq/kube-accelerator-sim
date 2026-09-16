@@ -16,7 +16,7 @@ Vendor Profile 是描述准确 Kubernetes 可见契约的不可变数据记录�
 
 ## 内置生态覆盖
 
-目录修订为 `2026-09-05.1`。使用 `kasim profile show <id> -o json` 查看准确来源、
+目录修订为 `2026-09-16.1`。使用 `kasim profile show <id> -o json` 查看准确来源、
 修订、检查日期、资源契约、型号、限制和摘要。
 
 | 生态 | Profile ID | 等级 | 代表性可选型号或状态 |
@@ -37,6 +37,7 @@ Vendor Profile 是描述准确 Kubernetes 可见契约的不可变数据记录�
 | Google Cloud TPU | `google-tpu` | verified | TPU v4、v5e、v5p、v6e、TPU7x |
 | 沐曦 | `metax` | verified | C500/C500-P/C500X、C280/C290/C550/C600、N260 |
 | 海光 DCU | `hygon` | verified | K100_AI、BW200、BW1000、Z100L、BW1100 |
+| 阿里云 PPU | `alibaba-ppu` | verified | PPU-ZW810E、M890P |
 | 昆仑芯（HAMi） | `kunlunxin-hami` | provisional | P800、R480 |
 | Vastai（HAMi） | `vastai-hami` | provisional/catalog-only | 无内置可选型号种子 |
 | Qualcomm Cloud AI 100 | `qualcomm-cloud-ai-100` | provisional/catalog-only | 记录型号族，暂无完整可调度契约 |
@@ -47,7 +48,7 @@ Vendor Profile 是描述准确 Kubernetes 可见契约的不可变数据记录�
 ## 版本锚点
 
 证据一律锚定到不可变的上游修订，优先使用 release tag 而非漂移的 commit。截至
-目录修订 `2026-09-05.1` 的关键锚点：
+目录修订 `2026-09-16.1` 的关键锚点：
 
 | 证据来源 | 锚点 | 覆盖范围 |
 | --- | --- | --- |
@@ -57,6 +58,8 @@ Vendor Profile 是描述准确 Kubernetes 可见契约的不可变数据记录�
 | k8s-device-plugin（资源契约） | `5f27eee`，v0.19.3 之后的 master tip | NVIDIA 资源命名 |
 | k8s-device-plugin（GFD 标签） | `3c6be40`，v0.20.0 之后的 master tip | GPU Feature Discovery 节点标签键 |
 | dra-driver-nvidia-gpu | `16c671c`（2026-07-30，约 `v25.8.x` 系列） | DRA 设备类与 claim 命名 |
+| ack-ppu-device-plugin | `v1.4.0-8a13b6d4-topology-aliyun`，2026-08-05 首次全量发布 | PPU 整卡与分区资源名、健康与拓扑声明 |
+| 灵骏节点池 PPU 使用指南 | alibabacloud.com 无版本号公开文档 | `aliyun.accelerator/*` 节点标签键与已公开的样值 |
 
 目录修订变更时会重新核验锚点；`profile show` 输出中的 `checkedAt` 记录最近一次
 核验日期。

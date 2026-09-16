@@ -19,7 +19,7 @@ hero:
 features:
   - icon: ◈
     title: Evidence-backed vendors
-    details: Exact Kubernetes resource contracts for NVIDIA, AMD, Ascend, Hygon, Cambricon, and a broad accelerator catalog.
+    details: Exact Kubernetes resource contracts for NVIDIA, AMD, Ascend, Hygon, Cambricon, Alibaba Cloud PPU, and a broad accelerator catalog.
   - icon: ◎
     title: Safe target selection
     details: Lifecycle commands name both kubeconfig and context; the read-only UI can use your current target. The CLI never owns Kubernetes cluster lifecycle.

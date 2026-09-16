@@ -1,6 +1,6 @@
 {
   "schemaVersion": "v1alpha2",
-  "revision": "2026-09-05.1",
+  "revision": "2026-09-16.1",
   "profiles": [
     {
       "id": "nvidia",
@@ -299,6 +299,7 @@
     {"id": "kunlunxin-hami", "displayName": "Kunlunxin through HAMi", "state": "unavailable"},
     {"id": "vastai-hami", "displayName": "Vastai through HAMi", "state": "unavailable"},
     {"id": "qualcomm-cloud-ai-100", "displayName": "Qualcomm Cloud AI 100", "state": "unavailable"},
-    {"id": "sriov-network-device-plugin", "displayName": "SR-IOV Network Device Plugin", "state": "unavailable"}
+    {"id": "sriov-network-device-plugin", "displayName": "SR-IOV Network Device Plugin", "state": "unavailable"},
+    {"id": "alibaba-ppu", "displayName": "Alibaba Cloud PPU", "state": "unavailable"}
   ]
 }

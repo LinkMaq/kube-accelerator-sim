@@ -1,6 +1,6 @@
 {
   "schemaVersion": "v1alpha2",
-  "revision": "2026-09-05.1",
+  "revision": "2026-09-16.1",
   "profiles": [
     {
       "id": "nvidia",
@@ -572,6 +572,23 @@
         {"id":"hygon-bw1000","displayName":"Hygon BW1000","aliases":["BW1000"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu"],"evidenceRefs":["models"]},
         {"id":"hygon-z100l","displayName":"Hygon Z100L","aliases":["Z100L"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu"],"evidenceRefs":["models"]},
         {"id":"hygon-bw1100","displayName":"Hygon BW1100","aliases":["BW1100"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu"],"evidenceRefs":["models"]}
+      ]
+    },
+    {
+      "id":"alibaba-ppu",
+      "displayName":"Alibaba Cloud PPU",
+      "class":"verified",
+      "evidence":[{"id":"contract","grade":"A","source":"https://help.aliyun.com/zh/ack/product-overview/ack-ppu-device-plugin","revision":"v1.4.0-8a13b6d4-topology-aliyun","checkedAt":"2026-09-16"},{"id":"node-labels","grade":"A","source":"https://www.alibabacloud.com/help/zh/ack/ack-managed-and-ack-dedicated/user-guide/use-ppu-in-lingjun-node-pool","revision":"checked-page-2026-09-16","checkedAt":"2026-09-16"}],
+      "contracts":[{
+        "id":"device-plugin","kind":"extended-resource","providerScope":"alibaba-cloud-ack","fidelityModes":["scheduling"],
+        "resources":[{"alias":"ppu","name":"alibabacloud.com/ppu","unit":"device"},{"alias":"ppu-4u-4g48gb","name":"alibabacloud.com/ppu-4u.4g48gb","unit":"partition"},{"alias":"ppu-16u-4g48gb","name":"alibabacloud.com/ppu-16u.4g48gb","unit":"partition"}],
+        "identitySignals":[{"kind":"node-label","key":"aliyun.accelerator/xpu_type"},{"kind":"node-label","key":"aliyun.accelerator/ppu_name"},{"kind":"node-label","key":"aliyun.accelerator/ppu_count"},{"kind":"node-label","key":"aliyun.accelerator/ppu_mem"}],
+        "capabilities":{"health":"verified","topology":"verified","sharing":"not-public","partitioning":"verified"},
+        "evidenceRefs":["contract","node-labels"]
+      }],
+      "models":[
+        {"id":"alibaba-ppu-zw810e","displayName":"Alibaba Cloud PPU ZW810E","aliases":["PPU-ZW810E","ZW810E"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ppu","ppu-4u-4g48gb","ppu-16u-4g48gb"],"evidenceRefs":["contract","node-labels"]},
+        {"id":"alibaba-ppu-m890p","displayName":"Alibaba Cloud PPU M890P","aliases":["M890P"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["ppu","ppu-4u-4g48gb","ppu-16u-4g48gb"],"evidenceRefs":["contract"]}
       ]
     },
     {

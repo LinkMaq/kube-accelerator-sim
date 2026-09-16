@@ -72,7 +72,7 @@ Family-specific labels are preserved; for example,
 The NVIDIA DCGM contract is anchored to dcgm-exporter releases 4.6.0 through
 4.8.3. Within that release line upstream corrected the NVLink bandwidth
 families from counters to gauges (#658). Since telemetry catalog revision
-`2026-09-05.1`, `DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL` therefore exports
+`2026-09-16.1`, `DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL` therefore exports
 `TYPE = GAUGE`, matching the pinned contract rather than the older
 counter-typed capture.
 
@@ -100,7 +100,7 @@ prove that the Pod owns, reserves, or uses those devices.
 
 The Huawei contract emits one series per device. The baseline families cover
 AI Core utilization, temperature, power, HBM used and total memory, HBM
-utilization, health, and error code. Catalog revision `2026-09-05.1` adds 25
+utilization, health, and error code. Catalog revision `2026-09-16.1` adds 25
 more npu-exporter families anchored to the MindCluster `v26.1.0` sources (see
 [Vendor profile evidence](profile-evidence.md)):
 
@@ -193,7 +193,7 @@ comparison.
 | --- | --- |
 | Native families enabled | NVIDIA DCGM, AMD Device Metrics Exporter, Intel XPU Manager, Huawei Ascend npu-exporter, Hygon DCU-Exporter, Cambricon mlu-exporter, Iluvatar ix-exporter, Enflame gcu-exporter, Furiosa metrics exporter, Prometheus node_exporter InfiniBand collector |
 | Discoverable but disabled as provisional | Intel Gaudi, AWS Neuron, Google TPU provider telemetry, Moore Threads, Graphcore, MetaX |
-| Explicitly unavailable | Biren, Kunlunxin through HAMi, Vastai through HAMi, Qualcomm Cloud AI 100, SR-IOV Device Plugin native telemetry |
+| Explicitly unavailable | Alibaba Cloud PPU, Biren, Kunlunxin through HAMi, Vastai through HAMi, Qualcomm Cloud AI 100, SR-IOV Device Plugin native telemetry |
 
 Coverage is intentionally evidence-driven. Scheduling support does not imply
 telemetry support. See the exact names, types, units, labels, source revisions,

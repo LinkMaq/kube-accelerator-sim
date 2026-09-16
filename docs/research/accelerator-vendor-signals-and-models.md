@@ -1,7 +1,7 @@
 # Accelerator vendor signals and model seeds
 
 - Status: research snapshot
-- Cut-off date: 2026-07-31
+- Cut-off date: 2026-09-16
 - Target: Kubernetes 1.30+ simulation scenarios
 - Scope: Kubernetes Device Plugin extended resources, provider-managed equivalents, and model identities suitable for `kube-accelerator-sim` examples
 
@@ -27,6 +27,7 @@ documentation, or a cloud-provider document:
 | Google Cloud TPU | `google.com/tpu` | TPU chips on a GKE TPU slice node | TPU v5e, v5p, Trillium v6e, Ironwood TPU7x | provider-specific |
 | Hygon DCU | `hygon.com/dcu`; selected `hygon.com/dcu-share-*` and `hygon.com/dcu-mig-*` profiles | physical DCU; pre-created vDCU; MIG partition | K100-AI, BW1000; Z100L/BW1100 as newer model identities | default |
 | MetaX | `metax-tech.com/gpu`, `metax-tech.com/vfio-gpu`, `metax-tech.com/sgpu` | physical GPU; VFIO-bound passthrough GPU; software-split GPU | C500/C500X/C550/C600; N260 inference | default |
+| Alibaba Cloud PPU | `alibabacloud.com/ppu`; selected `alibabacloud.com/ppu-<units>u.<n>g<memory>gb` profiles | physical PPU; pre-created hardware partition | PPU-ZW810E, M890P | provider-specific |
 | Kunlunxin | **unconfirmed** | no exact first-party public resource contract found | P800, R480-X8 | model-only |
 
 This produces three catalog gates:
@@ -394,6 +395,63 @@ Use v5e, v5p, Trillium v6e, and Ironwood TPU7x examples with
 `providerScope: gke`; do not describe `google.com/tpu` as an on-premises Device
 Plugin contract.
 
+### Alibaba Cloud PPU
+
+Zhenwu PPU is an Alibaba Cloud accelerator whose Kubernetes contract is
+delivered by an ACK-managed device plugin rather than a portable vendor
+package. The ACK
+[`ack-ppu-device-plugin` product page](https://help.aliyun.com/zh/ack/product-overview/ack-ppu-device-plugin)
+documents the plugin as the standard Zhenwu PPU device plugin, released
+2026-08-05 as image `ppu-device-plugin:v1.4.0-8a13b6d4-topology-aliyun` with
+full M890P support, and states two native scheduling modes: in-node device
+topology-aware scheduling and MIG-style partitioning.
+
+The same page enumerates the exact allocatable resource keys:
+
+- `alibabacloud.com/ppu` for the whole PPU;
+- fifteen pre-created partition profiles shaped
+  `alibabacloud.com/ppu-<compute-units>u.<memory-slices>g<memory>gb`, from
+  `alibabacloud.com/ppu-1u.2g24gb` through `alibabacloud.com/ppu-64u.4g48gb`.
+
+The
+[Lingjun node-pool PPU guide](https://www.alibabacloud.com/help/zh/ack/ack-managed-and-ack-dedicated/user-guide/use-ppu-in-lingjun-node-pool)
+adds the model identity layer. Readiness is probed with
+`kubectl get nodes -l aliyun.accelerator/xpu_type=ppu`, and a ready PPU Node
+carries:
+
+| Label | Meaning | Documented sample value |
+| --- | --- | --- |
+| `aliyun.accelerator/xpu_type` | accelerator type | `ppu` |
+| `aliyun.accelerator/ppu_name` | PPU model name | `PPU-ZW810E` |
+| `aliyun.accelerator/ppu_count` | PPUs per Node | `16` |
+| `aliyun.accelerator/ppu_mem` | memory per PPU | `98304MiB` |
+
+The
+[hypernode M890 guide](https://www.alibabacloud.com/help/zh/ack/ack-managed-and-ack-dedicated/user-guide/using-super-node-zhenwu-ppu-m890-through-network-topology-aware-scheduling)
+confirms the same four labels for the M890 generation, with `ppu_name` value
+`ZW-M890P` and `ppu_count` value `8`, alongside the super-node labels
+`alibabacloud.com/lingjun-hypernode-id` and
+`alibabacloud.com/hypernode-link.version`.
+
+Three rules follow, and they mirror the pattern already used for Cambricon
+device-type keys and Biren SVI:
+
+1. A partition resource is a scheduler-visible identity, not an additional
+   physical PPU. Partitions never raise the recorded device count.
+2. `ppu_name` is the model identity and must not be fused into the resource
+   key. `PPU-ZW810E` and `ZW-M890P` are model metadata behind the same
+   `alibabacloud.com/ppu` family.
+3. The contract is `providerScope: alibaba-cloud-ack`. It is valid only inside
+   ACK with the plugin installed; it does not prove a portable on-premises
+   Device Plugin contract, and the project must not restate these keys as
+   generic `alibaba.com/*` resources.
+
+Telemetry is deliberately **not** promoted from this page. See
+[accelerator telemetry metric evidence](./accelerator-telemetry-metrics.md):
+ACK does publish a Zhenwu PPU metric page, but it declares compatibility with
+the open-source DCGM Exporter and therefore reuses family names that already
+belong to the verified NVIDIA DCGM contract.
+
 ## Recommended example matrix
 
 These examples exercise distinct scheduler-visible semantics rather than
@@ -483,6 +541,12 @@ The following evidence would change admission status:
   exact whole-device and virtual-device resources.
 - Huawei: a current public matrix mapping 910B/910A3 hardware to registered
   resource names across plugin versions.
+- Alibaba Cloud PPU: a revision-pinned plugin source or a published mapping from
+  the fifteen partition profiles to specific ZW810E/M890P hardware revisions.
+  The whole-PPU key, the partition key shape, and the four `aliyun.accelerator/*`
+  labels are confirmed; the per-model partition matrix is not. A Zhenwu PPU
+  metric page also exists but claims DCGM-compatible family names, so telemetry
+  promotion additionally needs an ownership decision on those families.
 - Newer Chinese accelerator SKUs: product identity alone is insufficient;
   each needs a separate Kubernetes signal review before entering the default
   catalog.

@@ -31,7 +31,7 @@ func TestBundledCatalogHasEvidenceGatedCoverage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadBundled() error = %v", err)
 	}
-	if catalog.Revision() != "2026-09-05.1" || !strings.HasPrefix(catalog.Digest(), "sha256:") {
+	if catalog.Revision() != "2026-09-16.1" || !strings.HasPrefix(catalog.Digest(), "sha256:") {
 		t.Fatalf("unexpected catalog identity: %s %s", catalog.Revision(), catalog.Digest())
 	}
 	states := catalog.ProfileStates()

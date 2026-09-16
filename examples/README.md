@@ -42,6 +42,7 @@ Resource Contract.
 | Google Cloud TPU | [`google-tpu.yaml`](vendors/google-tpu.yaml) | TPU v6e | `google.com/tpu` | verified, GKE-scoped |
 | MetaX | [`metax.yaml`](vendors/metax.yaml) | C500 | `metax-tech.com/gpu` | verified |
 | Hygon DCU | [`hygon.yaml`](vendors/hygon.yaml) | K100_AI | `hygon.com/dcu` | verified |
+| Alibaba Cloud PPU | [`alibaba-ppu.yaml`](vendors/alibaba-ppu.yaml) | PPU-ZW810E | `alibabacloud.com/ppu` | verified, ACK-scoped |
 | Kunlunxin through HAMi | [`kunlunxin.yaml`](vendors/kunlunxin.yaml) | P800 | `kunlunxin.com/xpu` | provisional, HAMi integration |
 
 The Kunlunxin file deliberately sets
@@ -59,7 +60,7 @@ one-whole-device-per-vendor examples:
 | Signal kind | Kubernetes resources |
 | --- | --- |
 | Alternate device generations or drivers | `gpu.intel.com/i915`, `huawei.com/Ascend310`, `huawei.com/Ascend310P`, `cambricon.com/mlu370`, `iluvatar.ai/gpu` |
-| Hardware partitions | `nvidia.com/mig-1g.10gb`, `nvidia.com/mig-2g.20gb`, `nvidia.com/mig-7g.80gb`, `amd.com/cpx_nps4`, `amd.com/spx_nps1`, `amd.com/cpx_nps1`, `cambricon.com/mlu370.mim-2m.8gb`, `birentech.com/1-4-gpu`, `birentech.com/1-2-gpu`, selected `hygon.com/dcu-share-*` profiles |
+| Hardware partitions | `nvidia.com/mig-1g.10gb`, `nvidia.com/mig-2g.20gb`, `nvidia.com/mig-7g.80gb`, `amd.com/cpx_nps4`, `amd.com/spx_nps1`, `amd.com/cpx_nps1`, `cambricon.com/mlu370.mim-2m.8gb`, `birentech.com/1-4-gpu`, `birentech.com/1-2-gpu`, selected `hygon.com/dcu-share-*` profiles, `alibabacloud.com/ppu-4u.4g48gb`, `alibabacloud.com/ppu-16u.4g48gb` |
 | Shared or virtual devices | `nvidia.com/gpu.shared`, `huawei.com/npu-core`, `cambricon.com/mlu370.share`, `enflame.com/shared-gcu`, `enflame.com/drs-gcu`, `mthreads.com/sgpu-core`, `mthreads.com/sgpu-memory`, `metax-tech.com/sgpu`, `kunlunxin.com/vxpu`, `kunlunxin.com/vxpu-memory` |
 | Passthrough devices | `metax-tech.com/vfio-gpu` |
 | Device cores | `aws.amazon.com/neuroncore` |
@@ -114,12 +115,13 @@ kubectl --kubeconfig ./target.kubeconfig --context target \
 curl --fail http://127.0.0.1:9400/metrics | grep DCGM_FI_DEV_GPU_UTIL
 ```
 
-The AMD, Intel GPU, Huawei Ascend, Cambricon, Iluvatar, Enflame, and Furiosa
-vendor examples similarly emit their verified native families. The RDMA half
-of `signals/auxiliary-rdma-sriov.yaml` emits upstream node_exporter
+The AMD, Intel GPU, Huawei Ascend, Hygon DCU, Cambricon, Iluvatar, Enflame, and
+Furiosa vendor examples similarly emit their verified native families. The RDMA
+half of `signals/auxiliary-rdma-sriov.yaml` emits upstream node_exporter
 `node_infiniband_*` families; the SR-IOV half reports telemetry unavailable
 because a schedulable VF token is not evidence of a native hardware exporter.
 Intel Gaudi, AWS Neuron, Google TPU, Moore Threads, Graphcore, and MetaX are
-reported as provisional, while Biren, Hygon, and Kunlunxin are unavailable in
-v0.4. Kasim never derives a metric name from the scheduling resource merely to
-make an example look covered.
+reported as provisional, while Alibaba Cloud PPU, Biren, Kunlunxin through HAMi,
+Vastai through HAMi, and Qualcomm Cloud AI 100 are unavailable. Kasim never
+derives a metric name from the scheduling resource merely to make an example
+look covered.

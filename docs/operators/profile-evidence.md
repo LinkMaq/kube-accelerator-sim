@@ -19,7 +19,7 @@ or vendor preference. Model lifecycle such as `current-product`,
 
 ## Bundled ecosystem coverage
 
-The catalog revision is `2026-09-05.1`. Use `kasim profile show <id> -o json` for
+The catalog revision is `2026-09-16.1`. Use `kasim profile show <id> -o json` for
 the exact source URLs, immutable revisions, checked dates, contract spellings,
 models, limitations, and digest.
 
@@ -41,6 +41,7 @@ models, limitations, and digest.
 | Google Cloud TPU | `google-tpu` | verified | TPU v4, v5e, v5p, v6e, TPU7x |
 | MetaX | `metax` | verified | C500/C500-P/C500X, C280/C290/C550/C600, N260 |
 | Hygon DCU | `hygon` | verified | K100_AI, BW200, BW1000, Z100L, BW1100 |
+| Alibaba Cloud PPU | `alibaba-ppu` | verified | PPU-ZW810E, M890P |
 | Kunlunxin through HAMi | `kunlunxin-hami` | provisional | P800, R480 |
 | Vastai through HAMi | `vastai-hami` | provisional/catalog-only | No built-in selectable model seed |
 | Qualcomm Cloud AI 100 | `qualcomm-cloud-ai-100` | provisional/catalog-only | Recorded model family; no selectable fully-qualified schedulable contract |
@@ -57,7 +58,7 @@ release input.
 ## Version anchors
 
 Evidence is anchored to immutable upstream revisions, preferring release tags
-over floating commits. The key anchors as of catalog revision `2026-09-05.1`:
+over floating commits. The key anchors as of catalog revision `2026-09-16.1`:
 
 | Evidence source | Anchor | Covers |
 | --- | --- | --- |
@@ -67,6 +68,8 @@ over floating commits. The key anchors as of catalog revision `2026-09-05.1`:
 | k8s-device-plugin (resource contract) | `5f27eee`, master tip following v0.19.3 | NVIDIA resource naming |
 | k8s-device-plugin (GFD labels) | `3c6be40`, master tip following v0.20.0 | GPU Feature Discovery node label keys |
 | dra-driver-nvidia-gpu | `16c671c` (2026-07-30, `~v25.8.x` series) | DRA device class and claim naming |
+| ack-ppu-device-plugin | `v1.4.0-8a13b6d4-topology-aliyun`, initial full release on 2026-08-05 | PPU whole-device and partition resource names, health and topology claims |
+| Lingjun node pool PPU guide | unversioned alibabacloud.com documentation | `aliyun.accelerator/*` node label keys and published sample values |
 
 Anchors are re-verified whenever a catalog revision changes; the `checkedAt`
 dates in `profile show` output record the last verification.
