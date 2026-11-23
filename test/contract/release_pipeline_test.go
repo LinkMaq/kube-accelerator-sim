@@ -179,10 +179,10 @@ func TestReleaseInputsDeclareExplicitPublicSurfaceVersions(t *testing.T) {
 		`"compatibilityMatrix": "2026-07-30"`,
 		`"controllerImage": "v1"`,
 		`"telemetry": "v1alpha5"`,
-		`"chart": "0.7.5"`,
+		`"chart": "0.7.6"`,
 		`"telemetryCatalog"`,
 		`"revision": "2026-11-23.3"`,
-		`"sha256": "001d944a4171baa4ec0ac9f682621e0876719e22bf14f05f60f7720822762df7"`,
+		`"sha256": "83ace78871d43d55c59e2dc64f1a3e8669f4eb5d68a66c28b239711b04a8fafe"`,
 	} {
 		if !strings.Contains(inputs, required) {
 			t.Errorf("release inputs are missing explicit surface %s", required)

@@ -53,9 +53,10 @@ exporter Pod。
 `<release>-ix-exporter` 的标签是 `app.kubernetes.io/name=iluvatar-support` 和
 `app.kubernetes.io/component=exporter`，端口名是 `metrics`。这是
 `accelerator-exporter` 的 `iluvatar-ix` 规则用来发现 IX Exporter 的 Service
-形状。IX Exporter 4.3.0 的样本带 `gpu`、`name` 和 `uuid`，规则使用抓取目标的
-节点，而不是样本里的 `node_name`。因此契约指标留在运行 telemetry Pod 的真实
-节点上。Synthetic Node 仍然持有可调度的 `iluvatar.com/gpu`。
+形状。这个 Service 没有 selector。它的 EndpointSlice 把 `nodeName` 写成
+Synthetic Node，地址指向集中式 telemetry Pod。桥接 exporter 跑在真实节点上，
+但 `NODE_NAME` 设成这台 Synthetic Node，因此本地发现把 `accelerator_*` 归到
+模拟的 MRC-V100 节点。IX 4.3.0 的样本没有可信任的节点标签，`node_name` 只作参考。
 
 ## 一条指标代表什么
 
@@ -113,14 +114,21 @@ HBM 已用量与总量、HBM 使用率、健康状态和错误码。自目录修
 | 网络 / 链路状态 | `npu_chip_info_network_status`、`npu_chip_info_link_status` | `1=正常`，`0=异常` |
 | RoCE 带宽 | `npu_chip_info_bandwidth_rx`、`npu_chip_info_bandwidth_tx` | MB/s |
 | PCIe 带宽 | `npu_chip_info_pcie_rx_p_bw`、`npu_chip_info_pcie_rx_np_bw`、`npu_chip_info_pcie_rx_cpl_bw`、`npu_chip_info_pcie_tx_p_bw`、`npu_chip_info_pcie_tx_np_bw`、`npu_chip_info_pcie_tx_cpl_bw` | MB/ms |
+| 功耗上限 | `npu_chip_info_power_limit` | 瓦特，档案最大值 |
 | 芯片标识 | `npu_chip_info_name` | 按 exporter 原生约定恒为 `1` |
 
 原生设备 label 为 `id`、`model_name`、`vdie_id`、
 `pcie_bus_info`、`namespace`、`pod_name` 和 `container_name`。兼容层 `uuid`
-是稳定的模拟设备身份，原生 `vdie_id` 保持 exporter 兼容的虚拟 die 值；三个工作
-负载 label 保持空值，因为集中式 telemetry Pod 不是模拟业务负载。
-`npu_chip_info_health_status` 遵循原生约定：`1=健康`、`0=故障`；
-`npu_chip_info_error_code` 在健康时为零、故障时为非零。
+仍然保留。原生 `vdie_id` 是当前 Rune `ascend-npu` 规则读取的 `device_id`，
+因此每张模拟芯片各有一个稳定 UUID。三个工作负载 label 保持空值，因为集中式
+telemetry Pod 不是模拟业务负载。`npu_chip_info_health_status` 遵循原生约定：
+`1=健康`、`0=故障`；`npu_chip_info_error_code` 在健康时为零、故障时为非零。
+
+Rune 按 Pod 发现 npu-exporter：命名空间 `npu-exporter`，标签
+`app=npu-exporter`，容器端口名 `http`，路径 `/metrics`，并且只抓
+`spec.nodeName` 等于 exporter 进程所在节点的 Pod。Chart 在真实节点上的该
+命名空间里再跑一个 telemetry 进程。每条样本的 `node` 标签是合成节点，规则
+优先使用这个标签，芯片因此落在模拟服务器上。
 
 海光契约遵循 DCU-Exporter 的名称和 gauge 类型：
 

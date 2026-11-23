@@ -1,0 +1,96 @@
+{{- if .Values.telemetry.enabled }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: npu-exporter
+  labels:
+    {{- include "kasim-runtime.labels" . | nindent 4 }}
+    app.kubernetes.io/component: npu-exporter
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "kasim-runtime.fullname" . }}-npu-exporter
+  namespace: npu-exporter
+  labels:
+    {{- include "kasim-runtime.labels" . | nindent 4 }}
+    app.kubernetes.io/component: npu-exporter
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "kasim-runtime.fullname" . }}-npu-exporter
+  labels:
+    {{- include "kasim-runtime.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "kasim-runtime.fullname" . }}-telemetry
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "kasim-runtime.fullname" . }}-npu-exporter
+    namespace: npu-exporter
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kasim-runtime.fullname" . }}-npu-exporter
+  namespace: npu-exporter
+  labels:
+    {{- include "kasim-runtime.labels" . | nindent 4 }}
+    app.kubernetes.io/component: npu-exporter
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: npu-exporter
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: npu-exporter
+        app.kubernetes.io/component: npu-exporter
+        {{- include "kasim-runtime.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "kasim-runtime.fullname" . }}-npu-exporter
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        {{- include "kasim-runtime.realNodeAffinity" . | nindent 8 }}
+      containers:
+        - name: npu-exporter
+          image: {{ include "kasim-runtime.controllerImage" . }}
+          imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
+          command: [/kasim-telemetry]
+          args:
+            - --listen-address=:9400
+            - --refresh-interval={{ .Values.telemetry.refreshInterval }}
+            - --stale-after={{ .Values.telemetry.staleAfter }}
+          ports:
+            - name: http
+              containerPort: 9400
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            {{- toYaml .Values.telemetry.resources | nindent 12 }}
+{{- end }}

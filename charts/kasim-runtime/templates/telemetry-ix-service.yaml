@@ -14,9 +14,6 @@ metadata:
     simulation.kasim.io/runtime-contract: v1alpha1
 spec:
   type: ClusterIP
-  selector:
-    {{- include "kasim-runtime.selectorLabels" . | nindent 4 }}
-    app.kubernetes.io/component: telemetry
   ports:
     - name: metrics
       port: {{ .Values.telemetry.service.port }}

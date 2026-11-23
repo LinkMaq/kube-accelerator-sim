@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	productVersion = "0.7.5"
+	productVersion = "0.7.6"
 	chartPath      = "../../charts/kasim-runtime"
 )
 
@@ -215,6 +215,32 @@ func TestChartRendersOwnershipBoundedSecureRuntime(t *testing.T) {
 	if !ok || ixPort["name"] != "metrics" || ixPort["targetPort"] != "telemetry" {
 		t.Fatalf("IX exporter Service port = %#v, want name metrics and target telemetry", ixPorts[0])
 	}
+	npuPod := requireObject(
+		t,
+		objects,
+		"Deployment",
+		"contract-kasim-runtime-npu-exporter",
+	)
+	if npuPod.Metadata["namespace"] != "npu-exporter" {
+		t.Errorf("npu-exporter Deployment namespace = %#v", npuPod.Metadata["namespace"])
+	}
+	assertSecureDeployment(t, npuPod)
+	assertRealNodeAffinity(t, npuPod)
+	npuTemplate := mapValue(t, npuPod.Spec, "template")
+	npuLabels := mapValue(t, mapValue(t, npuTemplate, "metadata"), "labels")
+	if npuLabels["app"] != "npu-exporter" {
+		t.Errorf("npu-exporter Pod labels = %#v", npuLabels)
+	}
+	npuContainers := sliceValue(t, mapValue(t, npuTemplate, "spec"), "containers")
+	npuContainer, ok := npuContainers[0].(map[string]any)
+	if !ok {
+		t.Fatalf("npu-exporter container has type %T", npuContainers[0])
+	}
+	npuPorts := sliceValue(t, npuContainer, "ports")
+	npuPort, ok := npuPorts[0].(map[string]any)
+	if !ok || npuPort["name"] != "http" {
+		t.Fatalf("npu-exporter port = %#v, want name http", npuPorts[0])
+	}
 }
 
 func TestTelemetryDeliveryModesFailClosed(t *testing.T) {
@@ -240,6 +266,9 @@ func TestTelemetryDeliveryModesFailClosed(t *testing.T) {
 	}
 	if objectByKindName(disabled, "Service", "contract-kasim-runtime-ix-exporter") != nil {
 		t.Error("telemetry.enabled=false rendered the IX exporter Service")
+	}
+	if objectByKindName(disabled, "Deployment", "contract-kasim-runtime-npu-exporter") != nil {
+		t.Error("telemetry.enabled=false rendered the npu-exporter Deployment")
 	}
 
 	command := exec.Command(
@@ -391,8 +420,8 @@ func TestChartVersionsAndImmutableRuntimeInputsStayExplicit(t *testing.T) {
 		"simulation.kasim.io/schema-version":             "v1alpha1",
 		"simulation.kasim.io/product-crd-sha256":         "fc4162c4d9b3137fa5c195e22c6604c625abb55b8a29c839856e1120467d3bd4",
 		"simulation.kasim.io/catalog-revision":           "2026-11-23.3",
-		"simulation.kasim.io/telemetry-catalog-revision": "2026-11-23.3",
-		"simulation.kasim.io/telemetry-catalog-sha256":   "001d944a4171baa4ec0ac9f682621e0876719e22bf14f05f60f7720822762df7",
+		"simulation.kasim.io/telemetry-catalog-revision": "2026-11-23.4",
+		"simulation.kasim.io/telemetry-catalog-sha256":   "83ace78871d43d55c59e2dc64f1a3e8669f4eb5d68a66c28b239711b04a8fafe",
 		"simulation.kasim.io/kubernetes-range":           "1.30-1.36",
 		"simulation.kasim.io/kwok-version":               "v0.8.0",
 		"simulation.kasim.io/kwok-manifest-sha256":       "a4c16e6431e382dcb5c1903139344b7a68652f16a6460337fe17a678a426f405",

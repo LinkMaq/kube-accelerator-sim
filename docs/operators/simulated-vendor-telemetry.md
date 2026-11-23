@@ -59,11 +59,12 @@ Node.
 
 `<release>-ix-exporter` uses `app.kubernetes.io/name=iluvatar-support` and
 `app.kubernetes.io/component=exporter`, with port name `metrics`. That is the
-Service shape `accelerator-exporter` uses for `iluvatar-ix`. IX Exporter 4.3.0
-samples carry `gpu`, `name`, and `uuid`; the rule takes the node from the
-scrape target, not from `node_name`. The canonical series therefore stay on
-the real Node that runs the telemetry Pod. The Synthetic Node still owns the
-schedulable `iluvatar.com/gpu` capacity.
+Service shape `accelerator-exporter` uses for `iluvatar-ix`. The Service has no
+selector. Its EndpointSlice sets `nodeName` to the Synthetic Node and the
+address to the centralized telemetry Pod. A bridge exporter runs on a real
+Node with `NODE_NAME` set to that Synthetic Node, so local discovery attributes
+`accelerator_*` to the simulated MRC-V100 node. IX 4.3.0 samples do not carry
+a trusted node label; `node_name` stays informational.
 
 ## What one sample means
 
@@ -131,16 +132,25 @@ more npu-exporter families anchored to the MindCluster `v26.1.0` sources (see
 | Network / link status | `npu_chip_info_network_status`, `npu_chip_info_link_status` | `1=up`, `0=down` |
 | RoCE bandwidth | `npu_chip_info_bandwidth_rx`, `npu_chip_info_bandwidth_tx` | MB/s |
 | PCIe bandwidth | `npu_chip_info_pcie_rx_p_bw`, `npu_chip_info_pcie_rx_np_bw`, `npu_chip_info_pcie_rx_cpl_bw`, `npu_chip_info_pcie_tx_p_bw`, `npu_chip_info_pcie_tx_np_bw`, `npu_chip_info_pcie_tx_cpl_bw` | MB/ms |
+| Power limit | `npu_chip_info_power_limit` | watts, the profile maximum |
 | Chip identity | `npu_chip_info_name` | constant `1` per the native exporter convention |
 
 Its native device labels are `id`, `model_name`,
 `vdie_id`, `pcie_bus_info`, `namespace`, `pod_name`, and `container_name`.
-The compatibility `uuid` is the stable synthetic device identity; the native
-`vdie_id` remains the exporter-compatible virtual-die value. The three
-workload labels remain empty because the centralized telemetry Pod is
-not a simulated workload. `npu_chip_info_health_status` uses the native
-convention `1=healthy`, `0=faulty`; `npu_chip_info_error_code` is zero while
-healthy and non-zero while faulty.
+The compatibility `uuid` remains available. Native `vdie_id` is the per-chip
+identity the current Rune `ascend-npu` rule reads as `device_id`, so each
+simulated chip gets its own stable UUID. The three workload labels remain
+empty because the centralized telemetry Pod is not a simulated workload.
+`npu_chip_info_health_status` uses the native convention `1=healthy`,
+`0=faulty`; `npu_chip_info_error_code` is zero while healthy and non-zero
+while faulty.
+
+Rune discovers npu-exporter as a Pod: namespace `npu-exporter`, label
+`app=npu-exporter`, container port name `http`, path `/metrics`, and only a
+Pod whose `spec.nodeName` equals the exporter process node. The chart runs a
+second telemetry process there on a real Node. Each sample's `node` label is
+the Synthetic Node, and the rule prefers that label over the scrape target,
+so the chips stay on the simulated server.
 
 The Hygon contract follows the DCU-Exporter names and gauge types:
 

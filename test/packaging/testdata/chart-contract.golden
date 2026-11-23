@@ -6,6 +6,7 @@ ClusterRole/contract-kasim-runtime-stage-installer
 ClusterRole/contract-kasim-runtime-telemetry
 ClusterRoleBinding/contract-kasim-runtime-controller
 ClusterRoleBinding/contract-kasim-runtime-kwok-controller
+ClusterRoleBinding/contract-kasim-runtime-npu-exporter
 ClusterRoleBinding/contract-kasim-runtime-observer
 ClusterRoleBinding/contract-kasim-runtime-operator
 ClusterRoleBinding/contract-kasim-runtime-stage-installer
@@ -13,14 +14,17 @@ ClusterRoleBinding/contract-kasim-runtime-telemetry
 ConfigMap/contract-kasim-runtime-kwok
 Deployment/contract-kasim-runtime-controller
 Deployment/contract-kasim-runtime-kwok-controller
+Deployment/contract-kasim-runtime-npu-exporter
 Deployment/contract-kasim-runtime-telemetry
 Job/contract-kasim-runtime-stage-apply
 Job/contract-kasim-runtime-stage-delete
+Namespace/npu-exporter
 Service/contract-kasim-runtime-dcu-exporter
 Service/contract-kasim-runtime-ix-exporter
 Service/contract-kasim-runtime-telemetry
 ServiceAccount/contract-kasim-runtime-controller
 ServiceAccount/contract-kasim-runtime-kwok
+ServiceAccount/contract-kasim-runtime-npu-exporter
 ServiceAccount/contract-kasim-runtime-observer
 ServiceAccount/contract-kasim-runtime-operator
 ServiceAccount/contract-kasim-runtime-stage-installer

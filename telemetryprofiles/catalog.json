@@ -1,6 +1,6 @@
 {
   "schemaVersion": "v1alpha2",
-  "revision": "2026-11-23.3",
+  "revision": "2026-11-23.4",
   "profiles": [
     {
       "id": "nvidia",
@@ -124,7 +124,7 @@
       "defaults": {"memoryMiB": 65536, "idlePowerW": 55, "maxPowerW": 600, "idleTempC": 31, "maxTempC": 86, "coreClockMHz": 1800, "memoryClockMHz": 1200},
       "deviceLabels": [
         {"name": "id", "valueFrom": "device-index"}, {"name": "model_name", "valueFrom": "model-name"},
-        {"name": "vdie_id", "valueFrom": "fixed", "value": "0"}, {"name": "pcie_bus_info", "valueFrom": "pci-bdf"},
+        {"name": "vdie_id", "valueFrom": "device-uuid"}, {"name": "pcie_bus_info", "valueFrom": "pci-bdf"},
         {"name": "namespace", "valueFrom": "empty"}, {"name": "pod_name", "valueFrom": "empty"},
         {"name": "container_name", "valueFrom": "empty"}
       ],
@@ -132,6 +132,7 @@
         {"name": "npu_chip_info_utilization", "type": "gauge", "help": "the ai core utilization", "semantic": "utilization", "unit": "vendor-value"},
         {"name": "npu_chip_info_temperature", "type": "gauge", "help": "the npu temperature", "semantic": "temperature", "unit": "vendor-value"},
         {"name": "npu_chip_info_power", "type": "gauge", "help": "the npu power", "semantic": "power", "unit": "vendor-value"},
+        {"name": "npu_chip_info_power_limit", "type": "gauge", "help": "the npu power limit", "semantic": "power-limit", "unit": "vendor-value"},
         {"name": "npu_chip_info_aicore_current_freq", "type": "gauge", "help": "the npu ai core current frequency, unit is 'MHz'", "semantic": "clock-core", "unit": "MHz"},
         {"name": "npu_chip_info_hbm_used_memory", "type": "gauge", "help": "the npu hbm used memory", "semantic": "memory-used", "unit": "MB"},
         {"name": "npu_chip_info_hbm_total_memory", "type": "gauge", "help": "the npu hbm total memory", "semantic": "memory-total", "unit": "MB"},

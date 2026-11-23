@@ -31,7 +31,7 @@ func TestBundledCatalogHasEvidenceGatedCoverage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadBundled() error = %v", err)
 	}
-	if catalog.Revision() != "2026-11-23.3" || !strings.HasPrefix(catalog.Digest(), "sha256:") {
+	if catalog.Revision() != "2026-11-23.4" || !strings.HasPrefix(catalog.Digest(), "sha256:") {
 		t.Fatalf("unexpected catalog identity: %s %s", catalog.Revision(), catalog.Digest())
 	}
 	states := catalog.ProfileStates()
@@ -909,6 +909,37 @@ func TestHygonShareEmitsVDCUSeries(t *testing.T) {
 	healthyUsed := metricValueByLabel(t, used, "minor_number", "0")
 	if healthyUsed <= 0 || healthyUsed > 17179869184 {
 		t.Errorf("healthy vDCU memory = %v, want within the 16GiB cap", healthyUsed)
+	}
+}
+
+func TestHuaweiChipsHaveDistinctVdieIDs(t *testing.T) {
+	t.Parallel()
+
+	families := parseExpositionAt(
+		t,
+		testModule(t),
+		testObservation("huawei-ascend", "huawei-atlas-a2", 8, 8),
+		time.Date(2026, 11, 23, 9, 0, 0, 0, time.UTC),
+	)
+	seen := map[string]struct{}{}
+	for _, sample := range families["npu_chip_info_utilization"].Metric {
+		labels := metricLabels(sample)
+		if labels["node"] != "kasim-node-a" {
+			t.Errorf("node = %q, want the synthetic node", labels["node"])
+		}
+		if labels["vdie_id"] == "" || labels["vdie_id"] == "0" {
+			t.Errorf("vdie_id = %q, want a per-chip identity", labels["vdie_id"])
+		}
+		if _, duplicate := seen[labels["vdie_id"]]; duplicate {
+			t.Errorf("duplicate vdie_id %s", labels["vdie_id"])
+		}
+		seen[labels["vdie_id"]] = struct{}{}
+	}
+	if len(seen) != 8 {
+		t.Errorf("distinct chips = %d, want 8", len(seen))
+	}
+	if families["npu_chip_info_power_limit"] == nil {
+		t.Fatal("npu_chip_info_power_limit was not rendered")
 	}
 }
 
