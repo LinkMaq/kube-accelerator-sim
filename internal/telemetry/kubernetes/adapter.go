@@ -94,7 +94,7 @@ func (adapter *Adapter) Snapshot(ctx context.Context) (telemetry.Observation, er
 			for _, pool := range desiredNode.Pools() {
 				total := observedQuantity(observedNode.Status.Capacity, pool.ResourceName(), pool.Capacity())
 				healthy := observedQuantity(observedNode.Status.Allocatable, pool.ResourceName(), pool.Allocatable())
-				if err := appendDevices(&result, node, pool.Name(), pool.ProfileID(), pool.ModelID(), total, healthy); err != nil {
+				if err := appendDevices(&result, node, pool.Name(), pool.ProfileID(), pool.ModelID(), pool.ResourceName(), total, healthy); err != nil {
 					return telemetry.Observation{}, err
 				}
 			}
@@ -105,7 +105,7 @@ func (adapter *Adapter) Snapshot(ctx context.Context) (telemetry.Observation, er
 				if model == "" {
 					model = "auxiliary-device"
 				}
-				if err := appendDevices(&result, node, pool.Name(), pool.ProfileID(), model, total, available); err != nil {
+				if err := appendDevices(&result, node, pool.Name(), pool.ProfileID(), model, pool.ResourceName(), total, available); err != nil {
 					return telemetry.Observation{}, err
 				}
 			}
@@ -225,7 +225,8 @@ func appendDevices(
 	node telemetry.Node,
 	pool,
 	profile,
-	model string,
+	model,
+	resourceName string,
 	total,
 	healthy uint64,
 ) error {
@@ -252,6 +253,7 @@ func appendDevices(
 			ModelID:      model,
 			Ordinal:      ordinal,
 			Healthy:      ordinal < healthy,
+			ResourceName: resourceName,
 		})
 	}
 	return nil

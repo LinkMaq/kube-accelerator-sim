@@ -19,7 +19,7 @@ or vendor preference. Model lifecycle such as `current-product`,
 
 ## Bundled ecosystem coverage
 
-The catalog revision is `2026-11-23.1`. Use `kasim profile show <id> -o json` for
+The catalog revision is `2026-11-23.2`. Use `kasim profile show <id> -o json` for
 the exact source URLs, immutable revisions, checked dates, contract spellings,
 models, limitations, and digest.
 
@@ -58,7 +58,7 @@ release input.
 ## Version anchors
 
 Evidence is anchored to immutable upstream revisions, preferring release tags
-over floating commits. The key anchors as of catalog revision `2026-11-23.1`:
+over floating commits. The key anchors as of catalog revision `2026-11-23.2`:
 
 | Evidence source | Anchor | Covers |
 | --- | --- | --- |
@@ -80,7 +80,7 @@ dates in `profile show` output record the last verification.
 
 Vendor Node discovery labels are carried only where the vendor publishes them
 and the keys are publicly evidenced. Coverage as of catalog revision
-`2026-11-23.1`:
+`2026-11-23.2`:
 
 | Profile | Models with evidenced values | Route and note |
 | --- | --- | --- |

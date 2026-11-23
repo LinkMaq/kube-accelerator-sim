@@ -20,8 +20,8 @@ spec:
         - name: bw100
           profile:
             id: hygon
-            revision: 2026-11-23.1
-            digest: sha256:294ce1d741ef11524e0a385b7b2b40eb7225065f9750f407f434954dba2909b3
+            revision: 2026-11-23.2
+            digest: sha256:5b24b58ee01c21e9ae57cdc8eb72eb1e910db98e23c468cfb89cbe3a645eec73
           model: hygon-bw100
           contract: device-plugin
           resource: dcu

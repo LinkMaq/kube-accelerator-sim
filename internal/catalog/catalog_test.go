@@ -277,6 +277,7 @@ func TestBundledCatalogResolvesSourceBackedResourceSignalVariants(t *testing.T) 
 		{"metax-vfio", "metax", "metax-c500", "device-plugin", "vfio-gpu", "metax-tech.com/vfio-gpu", false},
 		{"hygon-vdcu", "hygon", "hygon-k100-ai", "device-plugin", "dcu-share-30c-16g", "hygon.com/dcu-share-30c-16g", false},
 		{"hygon-bw100", "hygon", "hygon-bw100", "device-plugin", "dcu", "hygon.com/dcu", false},
+		{"hygon-bw100-vdcu", "hygon", "hygon-bw100", "device-plugin", "dcu-share-30c-16g", "hygon.com/dcu-share-30c-16g", false},
 		{"kunlunxin-hami", "kunlunxin-hami", "kunlunxin-p800", "hami-device", "xpu", "kunlunxin.com/xpu", true},
 	}
 	for _, test := range cases {
@@ -332,7 +333,7 @@ func TestProfileViewExposesImmutableOfflineContractEvidence(t *testing.T) {
 	if profile.ID() != "nvidia" ||
 		profile.DisplayName() != "NVIDIA" ||
 		profile.Class() != "verified" ||
-		profile.Revision() != "2026-11-23.1" ||
+		profile.Revision() != "2026-11-23.2" ||
 		profile.Digest().String() == "" {
 		t.Fatalf("incomplete profile identity: %#v", profile)
 	}

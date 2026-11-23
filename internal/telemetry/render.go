@@ -83,13 +83,20 @@ func (module *Module) render(observation Observation, now time.Time) ([]byte, er
 			diagnosticLabels(device, profile.State), 1)
 		limits := limitsFor(profile, device.ModelID)
 		latent := deviceLatent(device, now)
+		share, virtual := parseHygonShare(device.ResourceName)
 		for _, metric := range profile.MetricFamily {
+			if virtual && strings.HasPrefix(metric.Name, "dcu_") {
+				continue
+			}
 			value, supported := metricValue(metric, device, limits, latent, now)
 			if !supported {
 				continue
 			}
 			labels := nativeLabels(profile, metric, device)
 			addSample(families, metric.Name, metric.Type, metric.Help, labels, value)
+		}
+		if virtual {
+			emitHygonVDCU(families, profile, device, latent, share)
 		}
 	}
 	return encodeExposition(families), nil
@@ -436,6 +443,64 @@ func deviceMemoryFraction(device Device, latent float64) float64 {
 		return clamp(0.90+0.08*latent, 0.90, 0.98)
 	}
 	return clamp(0.08+0.82*latent, 0.08, 0.90)
+}
+
+type hygonShare struct {
+	computeUnits uint64
+	memoryBytes  uint64
+}
+
+func parseHygonShare(resource string) (hygonShare, bool) {
+	const prefix = "hygon.com/dcu-share-"
+	if !strings.HasPrefix(resource, prefix) {
+		return hygonShare{}, false
+	}
+	body := strings.TrimPrefix(resource, prefix)
+	cuText, memoryText, found := strings.Cut(body, "c-")
+	if !found || !strings.HasSuffix(memoryText, "g") {
+		return hygonShare{}, false
+	}
+	computeUnits, cuErr := strconv.ParseUint(cuText, 10, 64)
+	gibibytes, memoryErr := strconv.ParseUint(strings.TrimSuffix(memoryText, "g"), 10, 64)
+	if cuErr != nil || memoryErr != nil || computeUnits == 0 || gibibytes == 0 {
+		return hygonShare{}, false
+	}
+	return hygonShare{
+		computeUnits: computeUnits,
+		memoryBytes:  gibibytes * 1024 * 1024 * 1024,
+	}, true
+}
+
+func emitHygonVDCU(
+	families map[string]*expositionFamily,
+	profile profileRecord,
+	device Device,
+	latent float64,
+	share hygonShare,
+) {
+	labels := map[string]string{
+		"vdcu_minor_number":  "0",
+		"vdcu_computer_unit": strconv.FormatUint(share.computeUnits, 10),
+		"vdcu_memory_cap":    strconv.FormatUint(share.memoryBytes, 10),
+		"device_id":          "DCU-" + strings.ToUpper(shortHash(deviceIdentityKey(device))),
+		"minor_number":       strconv.FormatUint(device.Ordinal, 10),
+		"name":               nativeModelName(profile, device.ModelID),
+		"node":               device.NodeName,
+		"dcu_pod_namespace":  "",
+		"dcu_pod_name":       "",
+		"container":          "",
+	}
+	addIdentityOverlay(labels, profile, device)
+	utilization, _ := metricValue(
+		metricFamily{Name: "vdcu_utilizationrate", Semantic: "utilization"},
+		device, simulationLimits{}, latent, time.Time{},
+	)
+	used := float64(share.memoryBytes) * deviceMemoryFraction(device, latent)
+	if !device.Healthy {
+		used = 0
+	}
+	addSample(families, "vdcu_utilizationrate", "gauge", "vdcu metrics of gauge", labels, utilization)
+	addSample(families, "vdcu_usedmemory_bytes", "gauge", "vdcu metrics of gauge", labels, used)
 }
 
 func syntheticIdentity(device Device) string {

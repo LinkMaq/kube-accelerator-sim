@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	productVersion = "0.7.3"
+	productVersion = "0.7.4"
 	chartPath      = "../../charts/kasim-runtime"
 )
 
@@ -368,7 +368,7 @@ func TestChartVersionsAndImmutableRuntimeInputsStayExplicit(t *testing.T) {
 	for key, want := range map[string]string{
 		"simulation.kasim.io/schema-version":             "v1alpha1",
 		"simulation.kasim.io/product-crd-sha256":         "fc4162c4d9b3137fa5c195e22c6604c625abb55b8a29c839856e1120467d3bd4",
-		"simulation.kasim.io/catalog-revision":           "2026-11-23.1",
+		"simulation.kasim.io/catalog-revision":           "2026-11-23.2",
 		"simulation.kasim.io/telemetry-catalog-revision": "2026-11-23.2",
 		"simulation.kasim.io/telemetry-catalog-sha256":   "f9c7e16e9233e38ada87498a34e29bacf7500d6050a79e296702b7d6b4736496",
 		"simulation.kasim.io/kubernetes-range":           "1.30-1.36",

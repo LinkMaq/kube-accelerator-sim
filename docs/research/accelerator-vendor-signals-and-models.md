@@ -217,7 +217,9 @@ signals:
   `hygon.com/dcu-share-30c-16g`, `hygon.com/dcu-share-36c-16g`, and
   `hygon.com/dcu-share-36c-5g`. The general shape is
   `hygon.com/dcu-share-<compute-units>c-<memory>g`, but the simulator should
-  ship only profiles present in first-party evidence.
+  ship only profiles present in first-party evidence. BW100 selects the
+  evidenced `hygon.com/dcu-share-30c-16g` profile; that alias does not claim a
+  measured BW100 compute-unit count.
 - The
   [MIG-mode chapter](https://developer.sourcefind.cn/document/87ee5c5b-c10d-11f0-b077-0242ac150003?id=4cca45d7-c8d9-11f0-8db6-0242ac150003)
   documents `hygon.com/dcu-mig-2g-15gb` and

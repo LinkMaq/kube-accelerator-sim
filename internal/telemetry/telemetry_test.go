@@ -833,6 +833,49 @@ func testModule(t *testing.T) *Module {
 	return module
 }
 
+func TestHygonShareEmitsVDCUSeries(t *testing.T) {
+	t.Parallel()
+
+	observation := testObservation("hygon", "hygon-bw100", 8, 7)
+	for index := range observation.Devices {
+		observation.Devices[index].ResourceName = "hygon.com/dcu-share-30c-16g"
+	}
+	families := parseExpositionAt(
+		t, testModule(t), observation,
+		time.Date(2026, 11, 23, 12, 0, 0, 0, time.UTC),
+	)
+	for _, absent := range []string{"dcu_utilizationrate", "dcu_usedmemory_bytes", "dcu_memorycap_bytes"} {
+		if families[absent] != nil {
+			t.Fatalf("pre-split device emitted physical family %s", absent)
+		}
+	}
+	utilization := families["vdcu_utilizationrate"]
+	used := families["vdcu_usedmemory_bytes"]
+	if utilization == nil || used == nil || len(utilization.Metric) != 8 || len(used.Metric) != 8 {
+		t.Fatalf("vdcu sample counts util=%v used=%v", utilization, used)
+	}
+	for _, sample := range utilization.Metric {
+		labels := metricLabels(sample)
+		if labels["name"] != "BW100" || labels["node"] != "kasim-node-a" ||
+			labels["vdcu_minor_number"] != "0" || labels["vdcu_computer_unit"] != "30" ||
+			labels["vdcu_memory_cap"] != "17179869184" || !strings.HasPrefix(labels["device_id"], "DCU-") ||
+			labels["pcieBus_number"] != "" {
+			t.Errorf("vdcu labels = %#v", labels)
+		}
+		if labels["minor_number"] == "7" && sample.GetGauge().GetValue() != 0 {
+			t.Errorf("unhealthy vDCU utilization = %v, want 0", sample.GetGauge().GetValue())
+		}
+	}
+	unhealthyUsed := metricValueByLabel(t, used, "minor_number", "7")
+	if unhealthyUsed != 0 {
+		t.Errorf("unhealthy vDCU memory = %v, want 0", unhealthyUsed)
+	}
+	healthyUsed := metricValueByLabel(t, used, "minor_number", "0")
+	if healthyUsed <= 0 || healthyUsed > 17179869184 {
+		t.Errorf("healthy vDCU memory = %v, want within the 16GiB cap", healthyUsed)
+	}
+}
+
 func testObservation(profile, model string, total, healthy int) Observation {
 	node := Node{InstanceName: "lab", InstanceUID: "instance-uid", Name: "kasim-node-a", Group: "workers"}
 	result := Observation{Nodes: []Node{node}}

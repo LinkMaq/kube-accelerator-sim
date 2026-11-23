@@ -53,6 +53,9 @@ type Device struct {
 	ModelID      string
 	Ordinal      uint64
 	Healthy      bool
+	// ResourceName is the extended resource this device represents. A Hygon
+	// pre-split vDCU uses hygon.com/dcu-share-<CU>c-<GiB>g.
+	ResourceName string
 }
 
 // Dependencies are the required production boundaries. The listener is

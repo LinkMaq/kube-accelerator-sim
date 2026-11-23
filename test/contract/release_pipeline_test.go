@@ -175,13 +175,13 @@ func TestReleaseInputsDeclareExplicitPublicSurfaceVersions(t *testing.T) {
 		`"scenarioTransport": "v1alpha1"`,
 		`"productKubernetesTransport": "simulation.kasim.io/v1alpha1"`,
 		`"machineOutput": "v1alpha1"`,
-		`"catalog": "2026-11-23.1"`,
+		`"catalog": "2026-11-23.2"`,
 		`"compatibilityMatrix": "2026-07-30"`,
 		`"controllerImage": "v1"`,
 		`"telemetry": "v1alpha5"`,
-		`"chart": "0.7.3"`,
+		`"chart": "0.7.4"`,
 		`"telemetryCatalog"`,
-		`"revision": "2026-11-23.1"`,
+		`"revision": "2026-11-23.2"`,
 		`"sha256": "f9c7e16e9233e38ada87498a34e29bacf7500d6050a79e296702b7d6b4736496"`,
 	} {
 		if !strings.Contains(inputs, required) {

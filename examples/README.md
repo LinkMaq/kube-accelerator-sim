@@ -49,6 +49,9 @@ Resource Contract.
 BW100 devices. The runtime writes
 `feature.node.cloud.xiaoshiai.cn/accelerator-model.name=bw100`. BW1100 uses
 the same whole-card resource and writes `bw1100`.
+[`hygon-bw100-vdcu.yaml`](hygon-bw100-vdcu.yaml) projects a second BW100 node
+whose only accelerator resource is the evidenced pre-split profile
+`hygon.com/dcu-share-30c-16g`. Telemetry for that resource uses `vdcu_*`.
 
 The Kunlunxin file deliberately sets
 `acceptance.provisionalProfiles: true`. Review its evidence receipts before

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "v1alpha2",
-  "revision": "2026-11-23.1",
+  "revision": "2026-11-23.2",
   "profiles": [
     {
       "id": "nvidia",
@@ -572,7 +572,7 @@
         {"id":"hygon-bw200","displayName":"Hygon BW200","aliases":["BW200"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu"],"evidenceRefs":["models"]},
         {"id":"hygon-bw1000","displayName":"Hygon BW1000","aliases":["BW1000"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu"],"evidenceRefs":["models"]},
         {"id":"hygon-z100l","displayName":"Hygon Z100L","aliases":["Z100L"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu"],"evidenceRefs":["models"]},
-        {"id":"hygon-bw100","displayName":"Hygon BW100","aliases":["BW100"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu"],"acceleratorModelName":"bw100","evidenceRefs":["bw100"]},
+        {"id":"hygon-bw100","displayName":"Hygon BW100","aliases":["BW100"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu","dcu-share-30c-16g"],"acceleratorModelName":"bw100","evidenceRefs":["bw100"]},
         {"id":"hygon-bw1100","displayName":"Hygon BW1100","aliases":["BW1100"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu"],"acceleratorModelName":"bw1100","evidenceRefs":["models"]}
       ]
     },
