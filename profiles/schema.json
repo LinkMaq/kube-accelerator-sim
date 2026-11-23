@@ -190,6 +190,11 @@
           "uniqueItems": true,
           "items": {"$ref": "#/$defs/modelNodeLabel"}
         },
+        "acceleratorModelName": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9](?:[-A-Za-z0-9_.]*[A-Za-z0-9])?$",
+          "maxLength": 63
+        },
         "evidenceRefs": {
           "type": "array",
           "minItems": 1,

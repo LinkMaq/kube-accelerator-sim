@@ -1,6 +1,6 @@
 {
   "schemaVersion": "v1alpha2",
-  "revision": "2026-09-16.1",
+  "revision": "2026-11-23.1",
   "profiles": [
     {
       "id": "nvidia",
@@ -274,11 +274,15 @@
         {"source": "https://github.com/Project-HAMi/dcu-exporter/blob/30408d074cd420729f5698710d54fb30abefb0b1/main.go", "revision": "30408d074cd420729f5698710d54fb30abefb0b1", "checkedAt": "2026-08-12"}
       ],
       "defaults": {"memoryMiB": 32768, "idlePowerW": 45, "maxPowerW": 350, "idleTempC": 30, "maxTempC": 88, "coreClockMHz": 1800, "memoryClockMHz": 1200},
-      "models": [{"id": "hygon-k100-ai", "nativeName": "K100_AI", "memoryMiB": 32768}],
+      "models": [
+        {"id": "hygon-k100-ai", "nativeName": "K100_AI", "memoryMiB": 32768},
+        {"id": "hygon-bw100", "nativeName": "BW100"},
+        {"id": "hygon-bw1100", "nativeName": "BW1100"}
+      ],
       "deviceLabels": [
         {"name": "device_id", "valueFrom": "serial", "prefix": "DCU-"},
         {"name": "minor_number", "valueFrom": "device-index"},
-        {"name": "name", "valueFrom": "model-name"},
+        {"name": "name", "valueFrom": "native-model-name"},
         {"name": "node", "valueFrom": "node-name"},
         {"name": "pcieBus_number", "valueFrom": "pci-bdf"},
         {"name": "dcu_pod_namespace", "valueFrom": "empty"},

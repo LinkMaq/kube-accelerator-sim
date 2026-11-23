@@ -25,7 +25,7 @@ documentation, or a cloud-provider document:
 | Intel Gaudi | `habana.ai/gaudi` | physical Gaudi device | Gaudi2, Gaudi3 | default |
 | AWS Neuron | `aws.amazon.com/neuron`, `aws.amazon.com/neuroncore` | whole Neuron device; Neuron core | Inf2/Inferentia2, Trn2/Trainium2, Trn3/Trainium3 | provider-specific |
 | Google Cloud TPU | `google.com/tpu` | TPU chips on a GKE TPU slice node | TPU v5e, v5p, Trillium v6e, Ironwood TPU7x | provider-specific |
-| Hygon DCU | `hygon.com/dcu`; selected `hygon.com/dcu-share-*` and `hygon.com/dcu-mig-*` profiles | physical DCU; pre-created vDCU; MIG partition | K100-AI, BW1000; Z100L/BW1100 as newer model identities | default |
+| Hygon DCU | `hygon.com/dcu`; selected `hygon.com/dcu-share-*` and `hygon.com/dcu-mig-*` profiles | physical DCU; pre-created vDCU; MIG partition | K100-AI, BW100, BW1000; Z100L/BW1100 as newer model identities | default |
 | MetaX | `metax-tech.com/gpu`, `metax-tech.com/vfio-gpu`, `metax-tech.com/sgpu` | physical GPU; VFIO-bound passthrough GPU; software-split GPU | C500/C500X/C550/C600; N260 inference | default |
 | Alibaba Cloud PPU | `alibabacloud.com/ppu`; selected `alibabacloud.com/ppu-<units>u.<n>g<memory>gb` profiles | physical PPU; pre-created hardware partition | PPU-ZW810E, M890P | provider-specific |
 | Kunlunxin | **unconfirmed** | no exact first-party public resource contract found | P800, R480-X8 | model-only |
@@ -199,7 +199,11 @@ Use Ascend 310, 310P, and 910 as direct model/resource examples. Modern
 The vendor-operated [光合 developer
 site](https://developer.sourcefind.cn/) identifies K100-AI and BW1000 products,
 and its current documentation index additionally exposes Z100L and BW1100 model
-identities. The [service catalog](https://developer.sourcefind.cn/servicelist)
+identities. BW100 is recorded from Rune's published
+[driver compatibility table](https://docs.poxiaoshi.cn/ecosystem/hygon/driver-runtime/),
+which groups it with BW1000, BW1100, BW150, and BW10 and attributes that list
+to Hygon's developer deployment guide. The 2026-07-31 sourcefind index check
+did not list BW100, so that model identity is grade B. The [service catalog](https://developer.sourcefind.cn/servicelist)
 describes separate Device Plugin, shared-device, and vDCU components.
 
 The official DCU Kubernetes deployment document establishes exact scheduling

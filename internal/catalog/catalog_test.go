@@ -207,8 +207,8 @@ func TestBundledCatalogContainsRequiredCommonModelSeeds(t *testing.T) {
 			"metax-c290", "metax-c550", "metax-c600", "metax-n260",
 		},
 		"hygon": {
-			"hygon-k100-ai", "hygon-bw200", "hygon-bw1000", "hygon-z100l",
-			"hygon-bw1100",
+			"hygon-k100-ai", "hygon-bw100", "hygon-bw200", "hygon-bw1000",
+			"hygon-z100l", "hygon-bw1100",
 		},
 		"kunlunxin-hami": {"kunlunxin-p800", "kunlunxin-r480"},
 	}
@@ -276,6 +276,7 @@ func TestBundledCatalogResolvesSourceBackedResourceSignalVariants(t *testing.T) 
 		{"metax-sgpu", "metax", "metax-c500", "device-plugin", "sgpu", "metax-tech.com/sgpu", false},
 		{"metax-vfio", "metax", "metax-c500", "device-plugin", "vfio-gpu", "metax-tech.com/vfio-gpu", false},
 		{"hygon-vdcu", "hygon", "hygon-k100-ai", "device-plugin", "dcu-share-30c-16g", "hygon.com/dcu-share-30c-16g", false},
+		{"hygon-bw100", "hygon", "hygon-bw100", "device-plugin", "dcu", "hygon.com/dcu", false},
 		{"kunlunxin-hami", "kunlunxin-hami", "kunlunxin-p800", "hami-device", "xpu", "kunlunxin.com/xpu", true},
 	}
 	for _, test := range cases {
@@ -300,6 +301,19 @@ func TestBundledCatalogResolvesSourceBackedResourceSignalVariants(t *testing.T) 
 					test.wantResource,
 				)
 			}
+			wantModelName := test.modelID
+			if test.modelID == "hygon-bw100" {
+				wantModelName = "bw100"
+			}
+			if resolved.ModelID() != test.modelID || resolved.AcceleratorModelName() != wantModelName {
+				t.Errorf(
+					"model = %q/%q, want %q/%q",
+					resolved.ModelID(),
+					resolved.AcceleratorModelName(),
+					test.modelID,
+					wantModelName,
+				)
+			}
 		})
 	}
 }
@@ -318,7 +332,7 @@ func TestProfileViewExposesImmutableOfflineContractEvidence(t *testing.T) {
 	if profile.ID() != "nvidia" ||
 		profile.DisplayName() != "NVIDIA" ||
 		profile.Class() != "verified" ||
-		profile.Revision() != "2026-09-16.2" ||
+		profile.Revision() != "2026-11-23.1" ||
 		profile.Digest().String() == "" {
 		t.Fatalf("incomplete profile identity: %#v", profile)
 	}

@@ -82,15 +82,16 @@ type nodeLabelRecord struct {
 }
 
 type modelRecord struct {
-	ID              string            `json:"id"`
-	DisplayName     string            `json:"displayName"`
-	Aliases         []string          `json:"aliases"`
-	Lifecycle       string            `json:"lifecycle"`
-	Selectable      bool              `json:"selectable"`
-	Contracts       []string          `json:"contracts"`
-	ResourceAliases []string          `json:"resourceAliases"`
-	NodeLabels      []nodeLabelRecord `json:"nodeLabels,omitempty"`
-	EvidenceRefs    []string          `json:"evidenceRefs"`
+	ID                   string            `json:"id"`
+	DisplayName          string            `json:"displayName"`
+	Aliases              []string          `json:"aliases"`
+	Lifecycle            string            `json:"lifecycle"`
+	Selectable           bool              `json:"selectable"`
+	Contracts            []string          `json:"contracts"`
+	ResourceAliases      []string          `json:"resourceAliases"`
+	NodeLabels           []nodeLabelRecord `json:"nodeLabels,omitempty"`
+	AcceleratorModelName string            `json:"acceleratorModelName,omitempty"`
+	EvidenceRefs         []string          `json:"evidenceRefs"`
 }
 
 // EvidenceReceipt identifies the exact source and review date supporting a
@@ -198,18 +199,19 @@ type ResolveAuxiliaryRequest struct {
 // ResolvedSelection is the immutable evidence-bearing result consumed by the
 // Scenario Compiler.
 type ResolvedSelection struct {
-	profileClass       string
-	profileDigest      domain.Digest
-	subject            string
-	auxiliaryCategory  string
-	resourceNamePolicy string
-	modelID            string
-	contractID         string
-	resourceAlias      string
-	resourceName       string
-	identity           []ResolvedIdentitySignal
-	derived            []ResolvedDerivedSignal
-	evidence           []EvidenceReceipt
+	profileClass         string
+	profileDigest        domain.Digest
+	subject              string
+	auxiliaryCategory    string
+	resourceNamePolicy   string
+	modelID              string
+	acceleratorModelName string
+	contractID           string
+	resourceAlias        string
+	resourceName         string
+	identity             []ResolvedIdentitySignal
+	derived              []ResolvedDerivedSignal
+	evidence             []EvidenceReceipt
 }
 
 // ResolvedIdentitySignal is one exact source-backed vendor identity key used
@@ -695,6 +697,16 @@ func validateModel(
 	if model.Lifecycle == "catalog-only" && model.Selectable {
 		return fmt.Errorf("profile %q catalog-only model %q is selectable", profileID, model.ID)
 	}
+	if model.AcceleratorModelName != "" &&
+		(len(model.AcceleratorModelName) > 63 ||
+			!qualifiedNamePartPattern.MatchString(model.AcceleratorModelName)) {
+		return fmt.Errorf(
+			"profile %q model %q has invalid accelerator model name %q",
+			profileID,
+			model.ID,
+			model.AcceleratorModelName,
+		)
+	}
 	for _, alias := range model.Aliases {
 		normalized := strings.ToLower(strings.TrimSpace(alias))
 		if normalized == "" {
@@ -966,7 +978,8 @@ func (snapshot Snapshot) Resolve(request ResolveRequest) (ResolvedSelection, err
 	}
 	return ResolvedSelection{
 		profileClass: profile.record.Class, profileDigest: profile.digest,
-		subject: "accelerator", modelID: model.ID, contractID: contract.ID,
+		subject: "accelerator", modelID: model.ID,
+		acceleratorModelName: model.AcceleratorModelName, contractID: contract.ID,
 		resourceAlias: resource.Alias, resourceName: resource.Name,
 		identity: identity, derived: derived, evidence: evidence,
 	}, nil
@@ -1415,6 +1428,17 @@ func (selection ResolvedSelection) ResourceNamePolicy() string {
 
 // ModelID returns the canonical model ID after alias resolution.
 func (selection ResolvedSelection) ModelID() string {
+	return selection.modelID
+}
+
+// AcceleratorModelName returns the value projected onto
+// feature.node.cloud.xiaoshiai.cn/accelerator-model.name. Models whose
+// platform label differs from the catalog ID set it explicitly; every other
+// model keeps the catalog ID.
+func (selection ResolvedSelection) AcceleratorModelName() string {
+	if selection.acceleratorModelName != "" {
+		return selection.acceleratorModelName
+	}
 	return selection.modelID
 }
 

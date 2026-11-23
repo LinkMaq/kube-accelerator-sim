@@ -21,4 +21,10 @@ func TestSingleAcceleratorModelRequiresOneConsistentNodeModel(t *testing.T) {
 	}); err == nil || !strings.Contains(err.Error(), "cannot project accelerator model label") {
 		t.Fatalf("mixed models error = %v", err)
 	}
+	labeled, err := singleAcceleratorModel([]DesiredPool{
+		{modelID: "hygon-bw100", acceleratorModelName: "bw100"},
+	})
+	if err != nil || labeled != "bw100" {
+		t.Fatalf("singleAcceleratorModel() = %q, %v", labeled, err)
+	}
 }

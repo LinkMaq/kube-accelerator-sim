@@ -203,6 +203,8 @@ func nativeLabels(profile profileRecord, metric metricFamily, device Device) map
 			}
 		case "model-name":
 			result[label.Name] = device.ModelID
+		case "native-model-name":
+			result[label.Name] = nativeModelName(profile, device.ModelID)
 		case "node-name":
 			result[label.Name] = device.NodeName
 		case "pci-bdf":
@@ -235,6 +237,15 @@ func addIdentityOverlay(result map[string]string, profile profileRecord, device 
 			result[name] = value
 		}
 	}
+}
+
+func nativeModelName(profile profileRecord, modelID string) string {
+	for _, model := range profile.Models {
+		if model.ID == modelID && model.NativeName != "" {
+			return model.NativeName
+		}
+	}
+	return modelID
 }
 
 func limitsFor(profile profileRecord, modelID string) simulationLimits {

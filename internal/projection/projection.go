@@ -68,14 +68,15 @@ type DesiredNode struct {
 
 // DesiredPool is one source-resolved Accelerator Pool on a Synthetic Node.
 type DesiredPool struct {
-	name            string
-	profileID       string
-	modelID         string
-	contractID      string
-	resourceName    string
-	capacity        uint64
-	allocatable     uint64
-	identitySignals []IdentitySignal
+	name                 string
+	profileID            string
+	modelID              string
+	acceleratorModelName string
+	contractID           string
+	resourceName         string
+	capacity             uint64
+	allocatable          uint64
+	identitySignals      []IdentitySignal
 }
 
 // DesiredAuxiliaryPool is one exact scheduling signal associated with one or
@@ -223,14 +224,15 @@ func Build(input BuildInput) (DesiredGraph, error) {
 				}
 			}
 			pools = append(pools, DesiredPool{
-				name:            pool.Name().String(),
-				profileID:       pool.Profile().ID().String(),
-				modelID:         resolved.ModelID(),
-				contractID:      resolved.ContractID(),
-				resourceName:    resolved.ResourceName(),
-				capacity:        pool.Counts().Total(),
-				allocatable:     pool.Counts().Healthy(),
-				identitySignals: signals,
+				name:                 pool.Name().String(),
+				profileID:            pool.Profile().ID().String(),
+				modelID:              resolved.ModelID(),
+				acceleratorModelName: resolved.AcceleratorModelName(),
+				contractID:           resolved.ContractID(),
+				resourceName:         resolved.ResourceName(),
+				capacity:             pool.Counts().Total(),
+				allocatable:          pool.Counts().Healthy(),
+				identitySignals:      signals,
 			})
 		}
 		for _, pool := range group.AuxiliaryPools() {
@@ -340,6 +342,9 @@ func singleAcceleratorModel(pools []DesiredPool) (string, error) {
 				pool.modelID,
 			)
 		}
+	}
+	if pools[0].acceleratorModelName != "" {
+		return pools[0].acceleratorModelName, nil
 	}
 	return model, nil
 }

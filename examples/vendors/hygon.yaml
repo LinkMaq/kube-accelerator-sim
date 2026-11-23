@@ -20,8 +20,8 @@ spec:
         - name: k100-ai
           profile:
             id: hygon
-            revision: 2026-09-16.2
-            digest: sha256:f9c9a7fc5f06b32dd18759cd6634b53df7ec83e6d0231ede35f39be61cebe242
+            revision: 2026-11-23.1
+            digest: sha256:294ce1d741ef11524e0a385b7b2b40eb7225065f9750f407f434954dba2909b3
           model: hygon-k100-ai
           contract: device-plugin
           resource: dcu

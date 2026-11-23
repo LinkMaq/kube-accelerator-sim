@@ -242,6 +242,7 @@ func supportedLabelSource(source string) bool {
 	return slices.Contains([]string{
 		"device-index", "device-name", "device-name-node-hash", "device-uuid", "empty", "fixed",
 		"health-error-code", "health-error-message", "health-message", "model-name",
+		"native-model-name",
 		"node-name", "pci-bdf", "pci-bdf-domain8", "profile-name", "serial",
 	}, source)
 }

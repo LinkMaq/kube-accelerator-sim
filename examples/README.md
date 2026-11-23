@@ -45,6 +45,11 @@ Resource Contract.
 | Alibaba Cloud PPU | [`alibaba-ppu.yaml`](vendors/alibaba-ppu.yaml) | PPU-ZW810E | `alibabacloud.com/ppu` | verified, ACK-scoped |
 | Kunlunxin through HAMi | [`kunlunxin.yaml`](vendors/kunlunxin.yaml) | P800 | `kunlunxin.com/xpu` | provisional, HAMi integration |
 
+[`hygon-bw100.yaml`](hygon-bw100.yaml) projects one node with eight whole-card
+BW100 devices. The runtime writes
+`feature.node.cloud.xiaoshiai.cn/accelerator-model.name=bw100`. BW1100 uses
+the same whole-card resource and writes `bw1100`.
+
 The Kunlunxin file deliberately sets
 `acceptance.provisionalProfiles: true`. Review its evidence receipts before
 submitting them. A provider-scoped signal can still be projected into a test

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "v1alpha2",
-  "revision": "2026-09-16.2",
+  "revision": "2026-11-23.1",
   "profiles": [
     {
       "id": "nvidia",
@@ -559,7 +559,7 @@
       "id":"hygon",
       "displayName":"Hygon DCU",
       "class":"verified",
-      "evidence":[{"id":"contract","grade":"A","source":"https://developer.sourcefind.cn/document/87ee5c5b-c10d-11f0-b077-0242ac150003?id=44dc5a98-c8d9-11f0-8db6-0242ac150003","revision":"checked-page-2026-07-31","checkedAt":"2026-07-31"},{"id":"mig","grade":"A","source":"https://developer.sourcefind.cn/document/87ee5c5b-c10d-11f0-b077-0242ac150003?id=4cca45d7-c8d9-11f0-8db6-0242ac150003","revision":"checked-page-2026-07-31","checkedAt":"2026-07-31"},{"id":"models","grade":"A","source":"https://developer.sourcefind.cn/document","revision":"checked-page-2026-07-31","checkedAt":"2026-07-31"}],
+      "evidence":[{"id":"contract","grade":"A","source":"https://developer.sourcefind.cn/document/87ee5c5b-c10d-11f0-b077-0242ac150003?id=44dc5a98-c8d9-11f0-8db6-0242ac150003","revision":"checked-page-2026-07-31","checkedAt":"2026-07-31"},{"id":"mig","grade":"A","source":"https://developer.sourcefind.cn/document/87ee5c5b-c10d-11f0-b077-0242ac150003?id=4cca45d7-c8d9-11f0-8db6-0242ac150003","revision":"checked-page-2026-07-31","checkedAt":"2026-07-31"},{"id":"models","grade":"A","source":"https://developer.sourcefind.cn/document","revision":"checked-page-2026-07-31","checkedAt":"2026-07-31"},{"id":"bw100","grade":"B","source":"https://docs.poxiaoshi.cn/ecosystem/hygon/driver-runtime/","revision":"checked-page-2026-11-23","checkedAt":"2026-11-23"}],
       "contracts":[{
         "id":"device-plugin","kind":"extended-resource","providerScope":"any-kubernetes","fidelityModes":["scheduling"],
         "resources":[{"alias":"dcu","name":"hygon.com/dcu","unit":"device"},{"alias":"dcu-share-30c-16g","name":"hygon.com/dcu-share-30c-16g","unit":"partition"},{"alias":"dcu-share-36c-16g","name":"hygon.com/dcu-share-36c-16g","unit":"partition"},{"alias":"dcu-share-36c-5g","name":"hygon.com/dcu-share-36c-5g","unit":"partition"},{"alias":"dcu-mig-2g-15gb","name":"hygon.com/dcu-mig-2g-15gb","unit":"partition"},{"alias":"dcu-mig-4g-31gb","name":"hygon.com/dcu-mig-4g-31gb","unit":"partition"}],
@@ -572,7 +572,8 @@
         {"id":"hygon-bw200","displayName":"Hygon BW200","aliases":["BW200"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu"],"evidenceRefs":["models"]},
         {"id":"hygon-bw1000","displayName":"Hygon BW1000","aliases":["BW1000"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu"],"evidenceRefs":["models"]},
         {"id":"hygon-z100l","displayName":"Hygon Z100L","aliases":["Z100L"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu"],"evidenceRefs":["models"]},
-        {"id":"hygon-bw1100","displayName":"Hygon BW1100","aliases":["BW1100"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu"],"evidenceRefs":["models"]}
+        {"id":"hygon-bw100","displayName":"Hygon BW100","aliases":["BW100"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu"],"acceleratorModelName":"bw100","evidenceRefs":["bw100"]},
+        {"id":"hygon-bw1100","displayName":"Hygon BW1100","aliases":["BW1100"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["dcu"],"acceleratorModelName":"bw1100","evidenceRefs":["models"]}
       ]
     },
     {

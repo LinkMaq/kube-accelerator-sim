@@ -1,0 +1,30 @@
+metadata:
+  name: hygon-bw100
+spec:
+  fidelity: scheduling
+  acceptance:
+    provisionalProfiles: false
+  nodeGroups:
+    - name: bw100
+      replicas: 1
+      node:
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: accelerator-a
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: bw100
+          profile:
+            id: hygon
+            revision: 2026-11-23.1
+            digest: sha256:294ce1d741ef11524e0a385b7b2b40eb7225065f9750f407f434954dba2909b3
+          model: hygon-bw100
+          contract: device-plugin
+          resource: dcu
+          variant: {}
+          count: 8
+          healthy: 8

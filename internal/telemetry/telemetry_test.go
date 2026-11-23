@@ -31,7 +31,7 @@ func TestBundledCatalogHasEvidenceGatedCoverage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadBundled() error = %v", err)
 	}
-	if catalog.Revision() != "2026-09-16.1" || !strings.HasPrefix(catalog.Digest(), "sha256:") {
+	if catalog.Revision() != "2026-11-23.1" || !strings.HasPrefix(catalog.Digest(), "sha256:") {
 		t.Fatalf("unexpected catalog identity: %s %s", catalog.Revision(), catalog.Digest())
 	}
 	states := catalog.ProfileStates()
@@ -779,6 +779,31 @@ type memorySource struct {
 
 func (source memorySource) Snapshot(context.Context) (Observation, error) {
 	return source.observation, source.err
+}
+
+func TestHygonDCUNameUsesNativeProduct(t *testing.T) {
+	t.Parallel()
+
+	module := testModule(t)
+	at := time.Date(2026, 11, 23, 0, 0, 0, 0, time.UTC)
+	cases := []struct {
+		model string
+		want  string
+	}{
+		{model: "hygon-k100-ai", want: "K100_AI"},
+		{model: "hygon-bw100", want: "BW100"},
+		{model: "hygon-bw1100", want: "BW1100"},
+	}
+	for _, test := range cases {
+		families := parseExpositionAt(t, module, testObservation("hygon", test.model, 1, 1), at)
+		family := families["dcu_utilizationrate"]
+		if family == nil || len(family.Metric) != 1 {
+			t.Fatalf("%s: missing utilization sample", test.model)
+		}
+		if got := metricLabels(family.Metric[0])["name"]; got != test.want {
+			t.Errorf("%s name = %q, want %q", test.model, got, test.want)
+		}
+	}
 }
 
 func testModule(t *testing.T) *Module {
