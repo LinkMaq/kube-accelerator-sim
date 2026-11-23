@@ -50,6 +50,13 @@ Pod 仍在真实节点上。该节点上的 exporter 抓取它，并保留样本
 因此契约指标归到 Synthetic Node。Kasim 仍然不会在每台 Synthetic Node 上创建
 exporter Pod。
 
+`<release>-ix-exporter` 的标签是 `app.kubernetes.io/name=iluvatar-support` 和
+`app.kubernetes.io/component=exporter`，端口名是 `metrics`。这是
+`accelerator-exporter` 的 `iluvatar-ix` 规则用来发现 IX Exporter 的 Service
+形状。IX Exporter 4.3.0 的样本带 `gpu`、`name` 和 `uuid`，规则使用抓取目标的
+节点，而不是样本里的 `node_name`。因此契约指标留在运行 telemetry Pod 的真实
+节点上。Synthetic Node 仍然持有可调度的 `iluvatar.com/gpu`。
+
 ## 一条指标代表什么
 
 H200 场景可能生成如下 NVIDIA 原生 family：

@@ -20,8 +20,8 @@ spec:
         - name: bi-v150s
           profile:
             id: iluvatar
-            revision: 2026-11-23.2
-            digest: sha256:f19beef220644dc7bc093f75b91a387867cdaa727e99b5c577d515e9252dbaeb
+            revision: 2026-11-23.3
+            digest: sha256:1f201b2f04eb162350d51efda1c6dde36d185e7f14e65c1fbebdbe297dd9c2ba
           model: iluvatar-bi-v150s
           contract: device-plugin
           resource: gpu

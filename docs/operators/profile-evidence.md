@@ -19,7 +19,7 @@ or vendor preference. Model lifecycle such as `current-product`,
 
 ## Bundled ecosystem coverage
 
-The catalog revision is `2026-11-23.2`. Use `kasim profile show <id> -o json` for
+The catalog revision is `2026-11-23.3`. Use `kasim profile show <id> -o json` for
 the exact source URLs, immutable revisions, checked dates, contract spellings,
 models, limitations, and digest.
 
@@ -32,7 +32,7 @@ models, limitations, and digest.
 | Huawei Ascend | `huawei-ascend` | verified | Ascend 310/310P/910, Atlas A2/A3 |
 | Cambricon | `cambricon` | verified | MLU370, MLU590, MLU270, MLU290 |
 | Biren | `biren` | verified | BR100 family |
-| Iluvatar CoreX | `iluvatar` | verified | BI-V150, BI-V150S |
+| Iluvatar CoreX | `iluvatar` | verified | BI-V150, BI-V150S, MRC-V100 |
 | Enflame | `enflame` | verified | S60, S60G |
 | Moore Threads | `moore-threads` | verified | MTT S3000, S80, S2000, S4000 |
 | FuriosaAI | `furiosa` | verified | RNGD |
@@ -58,7 +58,7 @@ release input.
 ## Version anchors
 
 Evidence is anchored to immutable upstream revisions, preferring release tags
-over floating commits. The key anchors as of catalog revision `2026-11-23.2`:
+over floating commits. The key anchors as of catalog revision `2026-11-23.3`:
 
 | Evidence source | Anchor | Covers |
 | --- | --- | --- |
@@ -80,7 +80,7 @@ dates in `profile show` output record the last verification.
 
 Vendor Node discovery labels are carried only where the vendor publishes them
 and the keys are publicly evidenced. Coverage as of catalog revision
-`2026-11-23.2`:
+`2026-11-23.3`:
 
 | Profile | Models with evidenced values | Route and note |
 | --- | --- | --- |

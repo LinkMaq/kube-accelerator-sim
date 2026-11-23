@@ -20,7 +20,7 @@ func TestProductBinariesReportVersionMetadata(t *testing.T) {
 			want: []string{
 				"kasim dev",
 				"schema=v1alpha1",
-				"catalog=2026-11-23.2",
+				"catalog=2026-11-23.3",
 				"kubernetes=1.30-1.36",
 			},
 		},
@@ -30,7 +30,7 @@ func TestProductBinariesReportVersionMetadata(t *testing.T) {
 			want: []string{
 				"kasim-controller dev",
 				"schema=v1alpha1",
-				"catalog=2026-11-23.2",
+				"catalog=2026-11-23.3",
 				"kubernetes=1.30-1.36",
 			},
 		},
@@ -40,10 +40,10 @@ func TestProductBinariesReportVersionMetadata(t *testing.T) {
 			want: []string{
 				"kasim-telemetry dev",
 				"schema=v1alpha1",
-				"catalog=2026-11-23.2",
+				"catalog=2026-11-23.3",
 				"kubernetes=1.30-1.36",
-				"telemetry-catalog=2026-11-23.2",
-				"digest=sha256:f9c7e16e9233e38ada87498a34e29bacf7500d6050a79e296702b7d6b4736496",
+				"telemetry-catalog=2026-11-23.3",
+				"digest=sha256:001d944a4171baa4ec0ac9f682621e0876719e22bf14f05f60f7720822762df7",
 			},
 		},
 	}

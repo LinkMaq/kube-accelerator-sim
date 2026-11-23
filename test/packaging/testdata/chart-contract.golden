@@ -17,6 +17,7 @@ Deployment/contract-kasim-runtime-telemetry
 Job/contract-kasim-runtime-stage-apply
 Job/contract-kasim-runtime-stage-delete
 Service/contract-kasim-runtime-dcu-exporter
+Service/contract-kasim-runtime-ix-exporter
 Service/contract-kasim-runtime-telemetry
 ServiceAccount/contract-kasim-runtime-controller
 ServiceAccount/contract-kasim-runtime-kwok

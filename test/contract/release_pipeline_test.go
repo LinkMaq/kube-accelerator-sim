@@ -175,14 +175,14 @@ func TestReleaseInputsDeclareExplicitPublicSurfaceVersions(t *testing.T) {
 		`"scenarioTransport": "v1alpha1"`,
 		`"productKubernetesTransport": "simulation.kasim.io/v1alpha1"`,
 		`"machineOutput": "v1alpha1"`,
-		`"catalog": "2026-11-23.2"`,
+		`"catalog": "2026-11-23.3"`,
 		`"compatibilityMatrix": "2026-07-30"`,
 		`"controllerImage": "v1"`,
 		`"telemetry": "v1alpha5"`,
-		`"chart": "0.7.4"`,
+		`"chart": "0.7.5"`,
 		`"telemetryCatalog"`,
-		`"revision": "2026-11-23.2"`,
-		`"sha256": "f9c7e16e9233e38ada87498a34e29bacf7500d6050a79e296702b7d6b4736496"`,
+		`"revision": "2026-11-23.3"`,
+		`"sha256": "001d944a4171baa4ec0ac9f682621e0876719e22bf14f05f60f7720822762df7"`,
 	} {
 		if !strings.Contains(inputs, required) {
 			t.Errorf("release inputs are missing explicit surface %s", required)

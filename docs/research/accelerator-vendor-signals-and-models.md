@@ -323,6 +323,10 @@ schedulable units. Time-slicing also multiplies the same resource name.
 Thus the key stays `iluvatar.com/gpu`, but its unit can be board, chip, or
 time-slice token. Each example must record the mode. Use BI-V150 and BI-V150S;
 do not use the older `iluvatar.ai/gpu` spelling as the new default.
+Rune's current physical target is a single-chip MRC-V100. IX Device Plugin
+4.3.0 with `splitboard=true` still registers `iluvatar.com/gpu` per chip, and
+the driver name `MRC-V100-0x1B` normalizes to `mrc-v100`. That alias is
+evidenced by GPU Manager v3.0.8; it does not change the BI-V150 resource unit.
 
 ### Moore Threads
 

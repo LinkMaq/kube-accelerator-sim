@@ -63,7 +63,7 @@ declared/emitted by the cited implementation.
 | Cambricon | `mlu_power_usage`, `mlu_temperature` | gauge | watts, Celsius | same as above | MLU370 cluster temperature is reported as unsupported/zero. |
 | Iluvatar | `ix_gpu_utilization` | gauge | percent | `name`, `gpu`, `uuid`, `driver`, `ixml`, `serial`, `node_name`; Kubernetes enrichment adds `namespace`, `pod`, `container` | Metric list and labels are YAML-driven; unsupported fields are omitted. |
 | Iluvatar | `ix_mem_total`, `ix_mem_used`, `ix_mem_free` | gauge | MiB | same as above | Preserve memory arithmetic. |
-| Iluvatar | `ix_power_usage`, `ix_gpu_temperature`, `ix_mem_temperature`, `ix_fan_speed` | gauge | watts, Celsius, RPM | same as above | Product-dependent. |
+| Iluvatar | `ix_power_usage`, `ix_temperature`, `ix_mem_utilization`, `ix_ecc_sbe_vol_status`, `ix_ecc_dbe_vol_status` | gauge | watts, Celsius, percent, status | IX 4.3.0 uses `gpu`, `name`, `uuid` | `ix_mem_utilization` is memory activity, not capacity. Healthy ECC flags stay 0. |
 | Iluvatar | `ix_sm_clock`, `ix_mem_clock` | gauge | MHz | same as above | Product-dependent. |
 | Enflame | `enflame_gcu_usage` | gauge | exporter help does not fix the unit | `host`, `minor_number`, `uuid`, `busid`, `slot`, `name`, `pod_name`, `pod_namespace`, `container_name` | `-1` means unsupported. |
 | Enflame | `enflame_gcu_memory_used_bytes`, `enflame_gcu_memory_total_bytes` | gauge | bytes | same as above | Physical collectors emit no samples when virtual devices are present. |
@@ -313,7 +313,10 @@ Pinned first-party evidence: [`metrics.yaml` at `7f169d7`](https://gitee.com/dee
 | `ix_mem_used` | gauge | `Used physical memory of iluvatar GPU (MiB).` | exact |
 | `ix_mem_free` | gauge | `Free physical memory of iluvatar GPU (MiB).` | exact |
 | `ix_power_usage` | gauge | `Power usage of iluvatar GPU (W).` | exact |
-| `ix_gpu_temperature` | gauge | `GPU temperature of iluvatar GPU (C).` | exact |
+| `ix_mem_utilization` | gauge | `Memory activity of iluvatar GPU (%).` | IX 4.3.0 |
+| `ix_temperature` | gauge | `Temperature of iluvatar GPU (C).` | IX 4.3.0 |
+| `ix_ecc_sbe_vol_status` | gauge | `Volatile single-bit ECC status of iluvatar GPU.` | IX 4.3.0, healthy value 0 |
+| `ix_ecc_dbe_vol_status` | gauge | `Volatile double-bit ECC status of iluvatar GPU.` | IX 4.3.0, healthy value 0 |
 | `ix_sm_clock` | gauge | `Sm clock of iluvatar GPU (MHz).` | exact |
 | `ix_mem_clock` | gauge | `Mem clock of iluvatar GPU (MHz).` | exact |
 

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "v1alpha2",
-  "revision": "2026-11-23.2",
+  "revision": "2026-11-23.3",
   "profiles": [
     {
       "id": "nvidia",
@@ -186,10 +186,18 @@
     },
     {
       "id": "iluvatar", "displayName": "Iluvatar CoreX", "state": "verified", "exporter": "DeepSpark ix-exporter",
-      "evidence": [{"source": "https://gitee.com/deep-spark/ix-exporter/blob/7f169d7f1c0b66cc809ecba28f6d520e8f28ff2c/etc/metrics.yaml", "revision": "7f169d7f1c0b66cc809ecba28f6d520e8f28ff2c", "checkedAt": "2026-08-07"}],
+      "evidence": [
+        {"source": "https://gitee.com/deep-spark/ix-exporter/blob/7f169d7f1c0b66cc809ecba28f6d520e8f28ff2c/etc/metrics.yaml", "revision": "7f169d7f1c0b66cc809ecba28f6d520e8f28ff2c", "checkedAt": "2026-08-07"},
+        {"source": "https://github.com/Deep-Spark/ix-exporter/tree/v4.3.0", "revision": "v4.3.0", "checkedAt": "2026-11-23"}
+      ],
       "defaults": {"memoryMiB": 32768, "idlePowerW": 40, "maxPowerW": 450, "idleTempC": 30, "maxTempC": 87, "coreClockMHz": 1700, "memoryClockMHz": 1400},
+      "models": [
+        {"id": "iluvatar-bi-v150", "nativeName": "BI-V150"},
+        {"id": "iluvatar-bi-v150s", "nativeName": "BI-V150S"},
+        {"id": "iluvatar-mrc-v100", "nativeName": "MRC-V100-0x1B"}
+      ],
       "deviceLabels": [
-        {"name": "name", "valueFrom": "device-name"}, {"name": "gpu", "valueFrom": "device-index"},
+        {"name": "name", "valueFrom": "native-model-name"}, {"name": "gpu", "valueFrom": "device-index"},
         {"name": "uuid", "valueFrom": "device-uuid"}, {"name": "driver", "valueFrom": "fixed", "value": "4.3.0"},
         {"name": "ixml", "valueFrom": "fixed", "value": "1.17.0"}, {"name": "serial", "valueFrom": "serial", "prefix": "IX"},
         {"name": "node_name", "valueFrom": "node-name"}
@@ -199,8 +207,11 @@
         {"name": "ix_mem_total", "type": "gauge", "help": "Total physical memory of iluvatar GPU (MiB).", "semantic": "memory-total", "unit": "MiB"},
         {"name": "ix_mem_used", "type": "gauge", "help": "Used physical memory of iluvatar GPU (MiB).", "semantic": "memory-used", "unit": "MiB"},
         {"name": "ix_mem_free", "type": "gauge", "help": "Free physical memory of iluvatar GPU (MiB).", "semantic": "memory-free", "unit": "MiB"},
+        {"name": "ix_mem_utilization", "type": "gauge", "help": "Memory activity of iluvatar GPU (%).", "semantic": "utilization", "unit": "percent"},
+        {"name": "ix_temperature", "type": "gauge", "help": "Temperature of iluvatar GPU (C).", "semantic": "temperature", "unit": "Celsius"},
         {"name": "ix_power_usage", "type": "gauge", "help": "Power usage of iluvatar GPU (W).", "semantic": "power", "unit": "watts"},
-        {"name": "ix_gpu_temperature", "type": "gauge", "help": "GPU temperature of iluvatar GPU (C).", "semantic": "temperature", "unit": "Celsius"},
+        {"name": "ix_ecc_sbe_vol_status", "type": "gauge", "help": "Volatile single-bit ECC status of iluvatar GPU.", "semantic": "constant-zero", "unit": "state"},
+        {"name": "ix_ecc_dbe_vol_status", "type": "gauge", "help": "Volatile double-bit ECC status of iluvatar GPU.", "semantic": "constant-zero", "unit": "state"},
         {"name": "ix_sm_clock", "type": "gauge", "help": "Sm clock of iluvatar GPU (MHz).", "semantic": "clock-core", "unit": "MHz"},
         {"name": "ix_mem_clock", "type": "gauge", "help": "Mem clock of iluvatar GPU (MHz).", "semantic": "clock-memory", "unit": "MHz"}
       ]

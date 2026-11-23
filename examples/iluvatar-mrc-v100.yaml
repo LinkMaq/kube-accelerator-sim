@@ -1,0 +1,30 @@
+metadata:
+  name: iluvatar-mrc-v100
+spec:
+  fidelity: scheduling
+  acceptance:
+    provisionalProfiles: false
+  nodeGroups:
+    - name: mrc-v100
+      replicas: 1
+      node:
+        capacity:
+          cpu: "64"
+          memory: 256Gi
+          pods: "110"
+        placement:
+          zone: accelerator-a
+        labels: {}
+        taints: []
+      acceleratorPools:
+        - name: mrc-v100
+          profile:
+            id: iluvatar
+            revision: 2026-11-23.3
+            digest: sha256:1f201b2f04eb162350d51efda1c6dde36d185e7f14e65c1fbebdbe297dd9c2ba
+          model: iluvatar-mrc-v100
+          contract: device-plugin
+          resource: gpu
+          variant: {}
+          count: 8
+          healthy: 8

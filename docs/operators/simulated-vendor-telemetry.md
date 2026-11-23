@@ -57,6 +57,14 @@ it and keeps the sample `node` label, so the canonical series belong to the
 Synthetic Node. Kasim still does not create an exporter Pod on each Synthetic
 Node.
 
+`<release>-ix-exporter` uses `app.kubernetes.io/name=iluvatar-support` and
+`app.kubernetes.io/component=exporter`, with port name `metrics`. That is the
+Service shape `accelerator-exporter` uses for `iluvatar-ix`. IX Exporter 4.3.0
+samples carry `gpu`, `name`, and `uuid`; the rule takes the node from the
+scrape target, not from `node_name`. The canonical series therefore stay on
+the real Node that runs the telemetry Pod. The Synthetic Node still owns the
+schedulable `iluvatar.com/gpu` capacity.
+
 ## What one sample means
 
 An H200 Scenario can expose a native NVIDIA family such as:

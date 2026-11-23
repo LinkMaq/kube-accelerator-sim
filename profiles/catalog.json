@@ -1,6 +1,6 @@
 {
   "schemaVersion": "v1alpha2",
-  "revision": "2026-11-23.2",
+  "revision": "2026-11-23.3",
   "profiles": [
     {
       "id": "nvidia",
@@ -400,7 +400,7 @@
       "id":"iluvatar",
       "displayName":"Iluvatar CoreX",
       "class":"verified",
-      "evidence":[{"id":"contract","grade":"A","source":"https://gitee.com/deep-spark/ix-device-plugin/tree/2fcca7862b62c002ed4ba45169efb82b7433e5f8","revision":"2fcca7862b62c002ed4ba45169efb82b7433e5f8","checkedAt":"2026-07-30"}],
+      "evidence":[{"id":"contract","grade":"A","source":"https://gitee.com/deep-spark/ix-device-plugin/tree/2fcca7862b62c002ed4ba45169efb82b7433e5f8","revision":"2fcca7862b62c002ed4ba45169efb82b7433e5f8","checkedAt":"2026-07-30"},{"id":"mrc-v100","grade":"B","source":"https://gitee.com/deep-spark/iluvatar-vgpu-manager/tree/v3.0.8","revision":"v3.0.8","checkedAt":"2026-11-23"}],
       "contracts":[{
         "id":"device-plugin","kind":"extended-resource","providerScope":"any-kubernetes","fidelityModes":["scheduling"],
         "resources":[{"alias":"gpu","name":"iluvatar.com/gpu","unit":"device"},{"alias":"legacy-gpu","name":"iluvatar.ai/gpu","unit":"device"}],
@@ -410,7 +410,8 @@
       }],
       "models":[
         {"id":"iluvatar-bi-v150","displayName":"Iluvatar BI-V150","aliases":["BI-V150"],"lifecycle":"k8s-identified","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu","legacy-gpu"],"evidenceRefs":["contract"]},
-        {"id":"iluvatar-bi-v150s","displayName":"Iluvatar BI-V150S","aliases":["BI-V150S"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu","legacy-gpu"],"evidenceRefs":["contract"]}
+        {"id":"iluvatar-bi-v150s","displayName":"Iluvatar BI-V150S","aliases":["BI-V150S"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu","legacy-gpu"],"evidenceRefs":["contract"]},
+        {"id":"iluvatar-mrc-v100","displayName":"Iluvatar MRC-V100","aliases":["MRC-V100","MRC-V100-0x1B"],"lifecycle":"current-product","selectable":true,"contracts":["device-plugin"],"resourceAliases":["gpu"],"acceleratorModelName":"mrc-v100","evidenceRefs":["mrc-v100"]}
       ]
     },
     {

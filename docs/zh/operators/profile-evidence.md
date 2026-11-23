@@ -16,7 +16,7 @@ Vendor Profile 是描述准确 Kubernetes 可见契约的不可变数据记录�
 
 ## 内置生态覆盖
 
-目录修订为 `2026-11-23.2`。使用 `kasim profile show <id> -o json` 查看准确来源、
+目录修订为 `2026-11-23.3`。使用 `kasim profile show <id> -o json` 查看准确来源、
 修订、检查日期、资源契约、型号、限制和摘要。
 
 | 生态 | Profile ID | 等级 | 代表性可选型号或状态 |
@@ -28,7 +28,7 @@ Vendor Profile 是描述准确 Kubernetes 可见契约的不可变数据记录�
 | 华为昇腾 | `huawei-ascend` | verified | Ascend 310/310P/910、Atlas A2/A3 |
 | 寒武纪 | `cambricon` | verified | MLU270/290/370/590 |
 | 壁仞 | `biren` | verified | BR100 系列 |
-| 天数智芯 | `iluvatar` | verified | BI-V150、BI-V150S |
+| 天数智芯 | `iluvatar` | verified | BI-V150、BI-V150S、MRC-V100 |
 | 燧原 | `enflame` | verified | S60、S60G |
 | 摩尔线程 | `moore-threads` | verified | MTT S80/S2000/S3000/S4000 |
 | FuriosaAI | `furiosa` | verified | RNGD |
@@ -48,7 +48,7 @@ Vendor Profile 是描述准确 Kubernetes 可见契约的不可变数据记录�
 ## 版本锚点
 
 证据一律锚定到不可变的上游修订，优先使用 release tag 而非漂移的 commit。截至
-目录修订 `2026-11-23.2` 的关键锚点：
+目录修订 `2026-11-23.3` 的关键锚点：
 
 | 证据来源 | 锚点 | 覆盖范围 |
 | --- | --- | --- |
@@ -69,7 +69,7 @@ Vendor Profile 是描述准确 Kubernetes 可见契约的不可变数据记录�
 ## 节点发现标签覆盖范围
 
 只有当厂商确实发布、且键有公开证据时，档案才携带厂商节点发现标签。截至目录
-修订版 `2026-11-23.2` 的覆盖情况：
+修订版 `2026-11-23.3` 的覆盖情况：
 
 | 档案 | 有取证取值的型号 | 路线与说明 |
 | --- | --- | --- |

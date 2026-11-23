@@ -31,7 +31,7 @@ func TestBundledCatalogHasEvidenceGatedCoverage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadBundled() error = %v", err)
 	}
-	if catalog.Revision() != "2026-11-23.2" || !strings.HasPrefix(catalog.Digest(), "sha256:") {
+	if catalog.Revision() != "2026-11-23.3" || !strings.HasPrefix(catalog.Digest(), "sha256:") {
 		t.Fatalf("unexpected catalog identity: %s %s", catalog.Revision(), catalog.Digest())
 	}
 	states := catalog.ProfileStates()
@@ -786,6 +786,42 @@ type memorySource struct {
 
 func (source memorySource) Snapshot(context.Context) (Observation, error) {
 	return source.observation, source.err
+}
+
+func TestIluvatarMRCUsesIX430Identity(t *testing.T) {
+	t.Parallel()
+
+	families := parseExpositionAt(
+		t, testModule(t), testObservation("iluvatar", "iluvatar-mrc-v100", 1, 1),
+		time.Date(2026, 11, 23, 12, 0, 0, 0, time.UTC),
+	)
+	utilization := families["ix_gpu_utilization"]
+	if utilization == nil || len(utilization.Metric) != 1 {
+		t.Fatal("missing ix_gpu_utilization")
+	}
+	labels := metricLabels(utilization.Metric[0])
+	if labels["name"] != "MRC-V100-0x1B" || labels["gpu"] != "0" || labels["uuid"] == "" ||
+		labels["node_name"] != "kasim-node-a" {
+		t.Errorf("ix identity labels = %#v", labels)
+	}
+	for _, name := range []string{"ix_mem_utilization", "ix_temperature", "ix_mem_total", "ix_mem_used", "ix_mem_free", "ix_power_usage"} {
+		if families[name] == nil || len(families[name].Metric) != 1 {
+			t.Errorf("missing IX 4.3.0 family %s", name)
+		}
+	}
+	if families["ix_gpu_temperature"] != nil {
+		t.Error("emitted ix_gpu_temperature, which IX 4.3.0 does not publish")
+	}
+	total := families["ix_mem_total"]
+	if total == nil || total.Metric[0].GetGauge().GetValue() != 32768 {
+		t.Errorf("ix_mem_total = %v, want the profile default 32768 MiB", total)
+	}
+	for _, name := range []string{"ix_ecc_sbe_vol_status", "ix_ecc_dbe_vol_status"} {
+		family := families[name]
+		if family == nil || len(family.Metric) != 1 || family.Metric[0].GetGauge().GetValue() != 0 {
+			t.Errorf("%s = %v, want a zero status flag", name, family)
+		}
+	}
 }
 
 func TestHygonDCUNameUsesNativeProduct(t *testing.T) {

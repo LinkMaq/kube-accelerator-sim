@@ -186,7 +186,7 @@ func TestBundledCatalogContainsRequiredCommonModelSeeds(t *testing.T) {
 			"cambricon-mlu590",
 		},
 		"biren":    {"biren-br100"},
-		"iluvatar": {"iluvatar-bi-v150", "iluvatar-bi-v150s"},
+		"iluvatar": {"iluvatar-bi-v150", "iluvatar-bi-v150s", "iluvatar-mrc-v100"},
 		"enflame":  {"enflame-s60", "enflame-s60g"},
 		"moore-threads": {
 			"moore-threads-mtt-s3000", "moore-threads-mtt-s80",
@@ -276,6 +276,7 @@ func TestBundledCatalogResolvesSourceBackedResourceSignalVariants(t *testing.T) 
 		{"metax-sgpu", "metax", "metax-c500", "device-plugin", "sgpu", "metax-tech.com/sgpu", false},
 		{"metax-vfio", "metax", "metax-c500", "device-plugin", "vfio-gpu", "metax-tech.com/vfio-gpu", false},
 		{"hygon-vdcu", "hygon", "hygon-k100-ai", "device-plugin", "dcu-share-30c-16g", "hygon.com/dcu-share-30c-16g", false},
+		{"iluvatar-mrc-v100", "iluvatar", "iluvatar-mrc-v100", "device-plugin", "gpu", "iluvatar.com/gpu", false},
 		{"hygon-bw100", "hygon", "hygon-bw100", "device-plugin", "dcu", "hygon.com/dcu", false},
 		{"hygon-bw100-vdcu", "hygon", "hygon-bw100", "device-plugin", "dcu-share-30c-16g", "hygon.com/dcu-share-30c-16g", false},
 		{"kunlunxin-hami", "kunlunxin-hami", "kunlunxin-p800", "hami-device", "xpu", "kunlunxin.com/xpu", true},
@@ -303,8 +304,11 @@ func TestBundledCatalogResolvesSourceBackedResourceSignalVariants(t *testing.T) 
 				)
 			}
 			wantModelName := test.modelID
-			if test.modelID == "hygon-bw100" {
+			switch test.modelID {
+			case "hygon-bw100":
 				wantModelName = "bw100"
+			case "iluvatar-mrc-v100":
+				wantModelName = "mrc-v100"
 			}
 			if resolved.ModelID() != test.modelID || resolved.AcceleratorModelName() != wantModelName {
 				t.Errorf(
@@ -333,7 +337,7 @@ func TestProfileViewExposesImmutableOfflineContractEvidence(t *testing.T) {
 	if profile.ID() != "nvidia" ||
 		profile.DisplayName() != "NVIDIA" ||
 		profile.Class() != "verified" ||
-		profile.Revision() != "2026-11-23.2" ||
+		profile.Revision() != "2026-11-23.3" ||
 		profile.Digest().String() == "" {
 		t.Fatalf("incomplete profile identity: %#v", profile)
 	}
