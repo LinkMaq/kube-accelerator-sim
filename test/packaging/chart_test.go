@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	productVersion = "0.7.2"
+	productVersion = "0.7.3"
 	chartPath      = "../../charts/kasim-runtime"
 )
 
@@ -177,6 +177,25 @@ func TestChartRendersOwnershipBoundedSecureRuntime(t *testing.T) {
 		annotations["prometheus.io/port"] != "9400" {
 		t.Errorf("telemetry Service scrape annotations = %#v", annotations)
 	}
+	dcuService := requireObject(
+		t,
+		objects,
+		"Service",
+		"contract-kasim-runtime-dcu-exporter",
+	)
+	dcuLabels := mapValue(t, dcuService.Metadata, "labels")
+	if dcuLabels["app.kubernetes.io/name"] != "dcu-support" ||
+		dcuLabels["app.kubernetes.io/component"] != "exporter" {
+		t.Errorf("DCU exporter Service labels = %#v", dcuLabels)
+	}
+	dcuPorts := sliceValue(t, dcuService.Spec, "ports")
+	if len(dcuPorts) != 1 {
+		t.Fatalf("DCU exporter Service ports = %d, want 1", len(dcuPorts))
+	}
+	dcuPort, ok := dcuPorts[0].(map[string]any)
+	if !ok || dcuPort["name"] != "metrics" || dcuPort["targetPort"] != "telemetry" {
+		t.Fatalf("DCU exporter Service port = %#v, want name metrics and target telemetry", dcuPorts[0])
+	}
 }
 
 func TestTelemetryDeliveryModesFailClosed(t *testing.T) {
@@ -196,6 +215,9 @@ func TestTelemetryDeliveryModesFailClosed(t *testing.T) {
 		if objectByKindName(disabled, kind, "contract-kasim-runtime-telemetry") != nil {
 			t.Errorf("telemetry.enabled=false rendered %s", kind)
 		}
+	}
+	if objectByKindName(disabled, "Service", "contract-kasim-runtime-dcu-exporter") != nil {
+		t.Error("telemetry.enabled=false rendered the DCU exporter Service")
 	}
 
 	command := exec.Command(
@@ -347,8 +369,8 @@ func TestChartVersionsAndImmutableRuntimeInputsStayExplicit(t *testing.T) {
 		"simulation.kasim.io/schema-version":             "v1alpha1",
 		"simulation.kasim.io/product-crd-sha256":         "fc4162c4d9b3137fa5c195e22c6604c625abb55b8a29c839856e1120467d3bd4",
 		"simulation.kasim.io/catalog-revision":           "2026-11-23.1",
-		"simulation.kasim.io/telemetry-catalog-revision": "2026-11-23.1",
-		"simulation.kasim.io/telemetry-catalog-sha256":   "140d9f39e644fc3fa533ffdaf24e42c144bb4cb358161eae0fed0f41570b409d",
+		"simulation.kasim.io/telemetry-catalog-revision": "2026-11-23.2",
+		"simulation.kasim.io/telemetry-catalog-sha256":   "f9c7e16e9233e38ada87498a34e29bacf7500d6050a79e296702b7d6b4736496",
 		"simulation.kasim.io/kubernetes-range":           "1.30-1.36",
 		"simulation.kasim.io/kwok-version":               "v0.8.0",
 		"simulation.kasim.io/kwok-manifest-sha256":       "a4c16e6431e382dcb5c1903139344b7a68652f16a6460337fe17a678a426f405",

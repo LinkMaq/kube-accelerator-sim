@@ -42,8 +42,8 @@ func TestProductBinariesReportVersionMetadata(t *testing.T) {
 				"schema=v1alpha1",
 				"catalog=2026-11-23.1",
 				"kubernetes=1.30-1.36",
-				"telemetry-catalog=2026-11-23.1",
-				"digest=sha256:140d9f39e644fc3fa533ffdaf24e42c144bb4cb358161eae0fed0f41570b409d",
+				"telemetry-catalog=2026-11-23.2",
+				"digest=sha256:f9c7e16e9233e38ada87498a34e29bacf7500d6050a79e296702b7d6b4736496",
 			},
 		},
 	}

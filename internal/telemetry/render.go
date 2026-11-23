@@ -310,6 +310,8 @@ func metricValue(
 		return convertMemory(limits.MemoryMiB, metric.Unit)
 	case "power":
 		return limits.IdlePowerW + (limits.MaxPowerW-limits.IdlePowerW)*latent, limits.MaxPowerW > 0
+	case "power-limit":
+		return limits.MaxPowerW, limits.MaxPowerW > 0
 	case "temperature":
 		return limits.IdleTempC + (limits.MaxTempC-limits.IdleTempC)*latent, limits.MaxTempC > 0
 	case "clock-core":

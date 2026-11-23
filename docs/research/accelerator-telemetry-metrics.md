@@ -56,7 +56,7 @@ declared/emitted by the cited implementation.
 | Huawei Ascend | `npu_chip_info_temperature`, `npu_chip_info_power`, `npu_chip_info_aicore_current_freq` | gauge | frequency is MHz; temperature and power units are not fixed in the cited collector help | same as above | Device-dependent. |
 | Huawei Ascend | `npu_chip_info_hbm_used_memory`, `npu_chip_info_hbm_total_memory`, `npu_chip_info_hbm_utilization`, `npu_chip_info_hbm_temperature`, `npu_chip_info_hbm_bandwidth_utilization` | gauge | collector help does not fix memory unit | same as above | HBM collector is restricted to supported Ascend 910-family devices; vNPU limitations apply. |
 | Hygon DCU | `dcu_utilizationrate`, `dcu_usedmemory_bytes`, `dcu_memorycap_bytes`, `dcu_memory_remaining` | gauge | percent for utilization; bytes for memory | `device_id`, `minor_number`, `name`, `node`, `pcieBus_number`, optional workload labels | The public implementation and vendor-operated guide agree on the names; the guide contains a `cu_usedmemory_bytes` typo while the source defines `dcu_usedmemory_bytes`. |
-| Hygon DCU | `dcu_power_usage`, `dcu_temp`, `dcu_ce_count`, `dcu_ue_count` | gauge | watts, Celsius, error counts | same as above; error families add `block_type` | The exporter has no separate physical-device health or memory-percentage family; consumers derive those from raw families. |
+| Hygon DCU | `dcu_power_usage`, `dcu_powercap`, `dcu_temp`, `dcu_ce_count`, `dcu_ue_count` | gauge | watts, Celsius, error counts | same as above; error families add `block_type` | `dcu_powercap` is the device power limit. The exporter has no separate physical-device health or memory-percentage family; consumers derive those from raw families. |
 | Huawei Ascend | `container_npu_utilization`, `container_npu_total_memory`, `container_npu_used_memory` | gauge | percent and MB | same as above | Workload attribution must exist; do not fabricate pod identity. |
 | Cambricon | `mlu_utilization` | gauge | percent | official Kubernetes configuration uses `driver`, `mcu`, `mlu`, `model`, `node`, `node_ip`, `sn`, `type`, `uuid`; some metrics include `vf` | Metric names, labels, and prefix are configuration-driven; official Kubernetes deployment uses prefix `mlu`. |
 | Cambricon | `mlu_memory_used`, `mlu_memory_total` | gauge | bytes | same as above | Product-dependent. |
@@ -272,6 +272,7 @@ confirms the selected families and meanings.
 | `dcu_memorycap_bytes` | gauge | `dcu metrics of gauge` | bytes |
 | `dcu_memory_remaining` | gauge | `dcu metrics of gauge` | bytes |
 | `dcu_power_usage` | gauge | `dcu metrics of gauge` | watts |
+| `dcu_powercap` | gauge | `dcu metrics of gauge` | watts |
 | `dcu_temp` | gauge | `dcu metrics of gauge` | Celsius |
 | `dcu_ce_count` | gauge | `dcu metrics of gauge` | count |
 | `dcu_ue_count` | gauge | `dcu metrics of gauge` | count |

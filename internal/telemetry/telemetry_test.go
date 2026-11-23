@@ -31,7 +31,7 @@ func TestBundledCatalogHasEvidenceGatedCoverage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadBundled() error = %v", err)
 	}
-	if catalog.Revision() != "2026-11-23.1" || !strings.HasPrefix(catalog.Digest(), "sha256:") {
+	if catalog.Revision() != "2026-11-23.2" || !strings.HasPrefix(catalog.Digest(), "sha256:") {
 		t.Fatalf("unexpected catalog identity: %s %s", catalog.Revision(), catalog.Digest())
 	}
 	states := catalog.ProfileStates()
@@ -473,7 +473,7 @@ func TestHuaweiAndHygonEmitEightIndependentConsistentDeviceSeries(t *testing.T) 
 			workloadLabels: []string{"dcu_pod_namespace", "dcu_pod_name", "container"},
 			requiredFamilies: []string{
 				"dcu_utilizationrate", "dcu_usedmemory_bytes", "dcu_memorycap_bytes",
-				"dcu_memory_remaining", "dcu_power_usage", "dcu_temp", "dcu_ce_count", "dcu_ue_count",
+				"dcu_memory_remaining", "dcu_power_usage", "dcu_powercap", "dcu_temp", "dcu_ce_count", "dcu_ue_count",
 			},
 		},
 	}
@@ -539,6 +539,13 @@ func TestHuaweiAndHygonEmitEightIndependentConsistentDeviceSeries(t *testing.T) 
 			}
 			if len(utilizationValues) < 3 {
 				t.Fatalf("independent utilization values = %v, want at least 3", utilizationValues)
+			}
+			if family := families["dcu_powercap"]; family != nil {
+				for _, sample := range family.Metric {
+					if sample.GetGauge().GetValue() != 350 {
+						t.Errorf("dcu_powercap = %v, want the profile power limit 350", sample.GetGauge().GetValue())
+					}
+				}
 			}
 
 			for ordinal := 0; ordinal < 8; ordinal++ {

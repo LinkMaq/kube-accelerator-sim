@@ -254,7 +254,7 @@ func supportedSemantic(semantic string) bool {
 		"ib-physical-state", "ib-state", "info", "link-rate", "memory-free",
 		"memory-free-reserved", "memory-ratio", "memory-reserved", "memory-total", "memory-used",
 		"memory-utilization-percent", "packet-rx-counter",
-		"packet-tx-counter", "power", "temperature",
+		"packet-tx-counter", "power", "power-limit", "temperature",
 		"traffic-rx-counter", "traffic-tx-counter", "throughput-rx", "throughput-tx",
 		"uncorrectable-error-count", "utilization", "utilization-ratio", "utilization-sparse", "last-error",
 		"voltage",

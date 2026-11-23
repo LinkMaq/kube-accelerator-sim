@@ -48,6 +48,15 @@ for example with `on(namespace, pod)`. They identify the one centralized
 simulated device. Classify this target as infrastructure and use `node` plus
 the exporter-native Node identity label for device placement.
 
+The chart also publishes `<release>-dcu-exporter`. Its labels are
+`app.kubernetes.io/name=dcu-support` and `app.kubernetes.io/component=exporter`,
+and its port name is `metrics`. That is the Service shape `accelerator-exporter`
+uses for the `hygon-dcu` rule. The Service selects the same centralized
+telemetry Pod, which stays on a real Node. The exporter on that Node scrapes
+it and keeps the sample `node` label, so the canonical series belong to the
+Synthetic Node. Kasim still does not create an exporter Pod on each Synthetic
+Node.
+
 ## What one sample means
 
 An H200 Scenario can expose a native NVIDIA family such as:
@@ -134,6 +143,7 @@ The Hygon contract follows the DCU-Exporter names and gauge types:
 | Total memory | `dcu_memorycap_bytes` | bytes |
 | Memory remaining | `dcu_memory_remaining` | bytes |
 | Current power | `dcu_power_usage` | watts |
+| Power limit | `dcu_powercap` | watts, the profile maximum |
 | Temperature | `dcu_temp` | Celsius |
 | Correctable errors | `dcu_ce_count` | count |
 | Uncorrectable errors | `dcu_ue_count` | count |

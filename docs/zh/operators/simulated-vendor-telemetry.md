@@ -42,6 +42,14 @@ ServiceMonitor 关闭。
 工作负载。后端应把该目标识别为基础设施组件，并使用 `node` 及 exporter 原生节点
 身份标签判断设备归属。
 
+Chart 还会发布 `<release>-dcu-exporter`。它的标签是
+`app.kubernetes.io/name=dcu-support` 和 `app.kubernetes.io/component=exporter`，
+端口名是 `metrics`。这是 `accelerator-exporter` 的 `hygon-dcu` 规则用来发现
+DCU Exporter 的 Service 形状。这个 Service 选择同一个集中式 telemetry Pod，
+Pod 仍在真实节点上。该节点上的 exporter 抓取它，并保留样本里的 `node` 标签，
+因此契约指标归到 Synthetic Node。Kasim 仍然不会在每台 Synthetic Node 上创建
+exporter Pod。
+
 ## 一条指标代表什么
 
 H200 场景可能生成如下 NVIDIA 原生 family：
@@ -116,6 +124,7 @@ HBM 已用量与总量、HBM 使用率、健康状态和错误码。自目录修
 | 显存总量 | `dcu_memorycap_bytes` | bytes |
 | 显存剩余量 | `dcu_memory_remaining` | bytes |
 | 实时功耗 | `dcu_power_usage` | watts |
+| 功率上限 | `dcu_powercap` | watts，取档案最大功耗 |
 | 温度 | `dcu_temp` | Celsius |
 | 可恢复错误 | `dcu_ce_count` | count |
 | 不可恢复错误 | `dcu_ue_count` | count |

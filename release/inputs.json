@@ -1,6 +1,6 @@
 {
   "schemaVersion": "v1alpha1",
-  "productVersion": "0.7.2",
+  "productVersion": "0.7.3",
   "publicSurfaces": {
     "cliBehavior": "v1",
     "scenarioTransport": "v1alpha1",
@@ -10,7 +10,7 @@
     "compatibilityMatrix": "2026-07-30",
     "controllerImage": "v1",
     "telemetry": "v1alpha5",
-    "chart": "0.7.2"
+    "chart": "0.7.3"
   },
   "goVersion": "1.26.0",
   "kubernetesDependencies": "0.36.3",
@@ -28,8 +28,8 @@
     "sha256": "6ad9dcc1ff6639b95d7c56474fe3e01264dafde447c496e41172b58c09927735"
   },
   "telemetryCatalog": {
-    "revision": "2026-11-23.1",
-    "sha256": "140d9f39e644fc3fa533ffdaf24e42c144bb4cb358161eae0fed0f41570b409d"
+    "revision": "2026-11-23.2",
+    "sha256": "f9c7e16e9233e38ada87498a34e29bacf7500d6050a79e296702b7d6b4736496"
   },
   "catalogSchema": {
     "version": "v1alpha2",

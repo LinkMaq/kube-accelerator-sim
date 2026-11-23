@@ -1,6 +1,6 @@
 {
   "schemaVersion": "v1alpha2",
-  "revision": "2026-11-23.1",
+  "revision": "2026-11-23.2",
   "profiles": [
     {
       "id": "nvidia",
@@ -295,6 +295,7 @@
         {"name": "dcu_memorycap_bytes", "type": "gauge", "help": "dcu metrics of gauge", "semantic": "memory-total", "unit": "bytes"},
         {"name": "dcu_memory_remaining", "type": "gauge", "help": "dcu metrics of gauge", "semantic": "memory-free", "unit": "bytes"},
         {"name": "dcu_power_usage", "type": "gauge", "help": "dcu metrics of gauge", "semantic": "power", "unit": "watts"},
+        {"name": "dcu_powercap", "type": "gauge", "help": "dcu metrics of gauge", "semantic": "power-limit", "unit": "watts"},
         {"name": "dcu_temp", "type": "gauge", "help": "dcu metrics of gauge", "semantic": "temperature", "unit": "Celsius"},
         {"name": "dcu_ce_count", "type": "gauge", "help": "dcu metrics of gauge", "semantic": "correctable-error-count", "unit": "count", "labels": [{"name": "block_type", "valueFrom": "fixed", "value": "dcu"}]},
         {"name": "dcu_ue_count", "type": "gauge", "help": "dcu metrics of gauge", "semantic": "uncorrectable-error-count", "unit": "count", "labels": [{"name": "block_type", "valueFrom": "fixed", "value": "dcu"}]}
